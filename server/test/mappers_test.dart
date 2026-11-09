@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:liblanis/easy_client.dart' as lanis;
 import 'package:schulportal_server/src/sph/mappers.dart';
 import 'package:test/test.dart';
 
@@ -67,6 +68,26 @@ void main() {
     expect(hw.single.courseName, 'Mathematik');
     expect(hw.single.description, 'S. 12 Nr. 3');
     expect(hw.single.date, DateTime(2026, 11, 9));
+  });
+
+  test('mapHomeworkHistory: entries with homework, newest first', () {
+    final lesson = sampleLessons().first;
+    final details = sampleDetails(lesson)
+      ..history.add(
+        lanis.CurrentEntry(
+          entryID: 'old',
+          files: [],
+          uploads: [],
+          topicDate: DateTime(2026, 10, 1),
+          homework: lanis.Homework(description: 'Alt', homeWorkDone: true),
+        ),
+      )
+      ..history.add(
+        lanis.CurrentEntry(entryID: 'nohw', files: [], uploads: []),
+      );
+    final hw = mapHomeworkHistory(lesson, details);
+    expect(hw.map((h) => (h.entryId, h.done)), [('e1', false), ('old', true)]);
+    expect(hw.first.courseName, 'Mathematik');
   });
 
   test('mapCourse falls back to teacher abbreviation', () {

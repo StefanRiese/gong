@@ -96,6 +96,31 @@ class FakeGateway implements SphGateway {
     return _data(sampleDetails(lesson));
   }
 
+  /// Calls to setHomeworkDone as (courseId, entryId, done).
+  final homeworkCalls = <(String, String, bool)>[];
+
+  /// Answer of the portal for setHomeworkDone.
+  String homeworkAnswer = '1';
+
+  @override
+  Future<String> setHomeworkDone(
+    String courseId,
+    String entryId,
+    bool done,
+  ) async {
+    await _data(null);
+    homeworkCalls.add((courseId, entryId, done));
+    for (final l in lessonsData) {
+      final e = l.currentEntry;
+      if (l.courseID == courseId &&
+          e?.entryID == entryId &&
+          e?.homework != null) {
+        e!.homework!.homeWorkDone = done;
+      }
+    }
+    return homeworkAnswer;
+  }
+
   @override
   Future<void> dispose() async => disposed = true;
 }

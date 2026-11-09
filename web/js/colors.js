@@ -67,6 +67,23 @@ export function autoColor(name) {
   return assigned[key] ?? PALETTE[hashOf(key) % PALETTE.length];
 }
 
+/**
+ * Timetable subject that a course belongs to, e.g. "Mathematik 7b" →
+ * "Mathematik" (longest subject the course name starts with). Falls back to
+ * the course name, so unknown courses still get a stable color.
+ */
+export function subjectForCourse(courseName, subjects) {
+  const name = String(courseName ?? '').trim();
+  const lower = name.toLocaleLowerCase('de');
+  let best = null;
+  for (const s of new Set(subjects.map((x) => x?.trim()).filter(Boolean))) {
+    const sl = s.toLocaleLowerCase('de');
+    const fits = lower === sl || lower.startsWith(`${sl} `);
+    if (fits && (!best || s.length > best.length)) best = s;
+  }
+  return best ?? name;
+}
+
 /** Color for a subject, or null without a name. */
 export function subjectColor(name) {
   const key = name?.trim();

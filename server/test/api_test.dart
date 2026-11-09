@@ -183,6 +183,7 @@ void main() {
         '/api/courses',
         '/api/courses/100',
         '/api/homework',
+        '/api/homework?alle=1',
         '/api/grades',
       ]) {
         final r = await send('GET', path, cookie: cookie);
@@ -259,6 +260,81 @@ void main() {
         expect(e['retryAfter'], isNotNull);
       },
     );
+
+    Future<Response> setDone(String path, Object body, {String? type}) =>
+        Future.value(
+          handler(
+            Request(
+              'PUT',
+              Uri.parse('http://localhost$path'),
+              body: body is String ? body : jsonEncode(body),
+              headers: {
+                'content-type': type ?? 'application/json',
+                'cookie': cookie,
+              },
+            ),
+          ),
+        );
+
+    test('mark homework as done updates portal and cache', () async {
+      var b = await body(await send('GET', '/api/homework', cookie: cookie));
+      expect(b['data'][0]['done'], isFalse);
+      await send('GET', '/api/courses/100', cookie: cookie); // fill cache
+      await send('GET', '/api/homework?alle=1', cookie: cookie);
+      final detailCalls = gw.lessonDetailCalls;
+
+      final r = await setDone('/api/courses/100/entries/e1/homework', {
+        'done': true,
+      });
+      expect(r.statusCode, 200);
+      expect(await body(r), {'done': true});
+      expect(gw.homeworkCalls.single, ('100', 'e1', true));
+
+      // Cached data is patched, not reloaded from the portal.
+      b = await body(await send('GET', '/api/homework', cookie: cookie));
+      expect((b['cached'], b['data'][0]['done']), (true, true));
+      b = await body(await send('GET', '/api/homework?alle=1', cookie: cookie));
+      expect((b['cached'], b['data'][0]['done']), (true, true));
+      b = await body(await send('GET', '/api/courses/100', cookie: cookie));
+      final entry = (b['data']['history'] as List).firstWhere(
+        (e) => e['id'] == 'e1',
+      );
+      expect((b['cached'], entry['homeworkDone']), (true, true));
+      expect(gw.lessonDetailCalls, detailCalls, reason: 'no reload');
+    });
+
+    test('mark homework: validation and errors', () async {
+      const path = '/api/courses/100/entries/e1/homework';
+      expect((await setDone(path, {'done': 'yes'})).statusCode, 400);
+      expect((await setDone(path, 'nope')).statusCode, 400);
+      expect(
+        (await setDone(path, {'done': true}, type: 'text/plain')).statusCode,
+        415,
+      );
+      expect(
+        (await setDone('/api/courses/1%26x/entries/e1/homework', {
+          'done': true,
+        })).statusCode,
+        400,
+      );
+      gw.homeworkAnswer = '0';
+      final r = await setDone(path, {'done': true});
+      expect(r.statusCode, 502);
+      expect(gw.homeworkCalls, hasLength(2));
+    });
+
+    test('mark homework requires login', () async {
+      final r = await handler(
+        Request(
+          'PUT',
+          Uri.parse('http://localhost/api/courses/100/entries/e1/homework'),
+          body: '{"done":true}',
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      expect(r.statusCode, 401);
+      expect(gw.homeworkCalls, isEmpty);
+    });
 
     test('refresh clears the cache', () async {
       await send('GET', '/api/homework', cookie: cookie);

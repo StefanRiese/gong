@@ -268,6 +268,16 @@ class Homework {
     required this.done,
   });
 
+  Homework withDone(bool value) => Homework(
+    courseId: courseId,
+    courseName: courseName,
+    entryId: entryId,
+    date: date,
+    topic: topic,
+    description: description,
+    done: value,
+  );
+
   Map<String, Object?> toJson() => {
     'courseId': courseId,
     'courseName': courseName,
@@ -299,6 +309,17 @@ class LessonEntry {
     this.homeworkDone = false,
     this.attendance,
   });
+
+  LessonEntry withHomeworkDone(bool value) => LessonEntry(
+    id: id,
+    date: date,
+    periods: periods,
+    topic: topic,
+    description: description,
+    homework: homework,
+    homeworkDone: value,
+    attendance: attendance,
+  );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -358,6 +379,14 @@ class CourseDetails {
     required this.exams,
     required this.attendance,
   });
+
+  CourseDetails withHistory(List<LessonEntry> value) => CourseDetails(
+    course: course,
+    history: value,
+    grades: grades,
+    exams: exams,
+    attendance: attendance,
+  );
 
   Map<String, Object?> toJson() => {
     'course': course.toJson(),

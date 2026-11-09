@@ -85,12 +85,52 @@ class SphService {
     () async => mapCurrentHomework(await _loadLessons()),
   );
 
+  /// All homework (open and done) from the lesson histories of all courses,
+  /// newest first. Needs one request per course.
+  Future<List<Homework>> allHomework() => _run(SphFeature.lessons, () async {
+    final lessons = await _loadLessons();
+    final byEntry = <String, Homework>{};
+    for (final l in lessons) {
+      final details = await _gateway.lessonDetails(l.courseURL);
+      for (final h in mapHomeworkHistory(l, details)) {
+        byEntry['${h.courseId}/${h.entryId}'] = h;
+      }
+      // The current entry may be newer than the history page.
+      for (final h in mapCurrentHomework([l])) {
+        byEntry['${h.courseId}/${h.entryId}'] = h;
+      }
+    }
+    final all = byEntry.values.toList()
+      ..sort(
+        (a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)),
+      );
+    return all;
+  });
+
   /// Full course view: lesson history incl. homework, grades, exams.
   Future<CourseDetails> courseDetails(String courseId) =>
       _run(SphFeature.lessons, () async {
         final lesson = await _findLesson(courseId);
         return mapCourseDetails(await _gateway.lessonDetails(lesson.courseURL));
       });
+
+  static final _idPattern = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+
+  /// Marks the homework of a lesson entry as done (or not done) in the portal.
+  Future<void> setHomeworkDone(String courseId, String entryId, bool done) {
+    if (!_idPattern.hasMatch(courseId) || !_idPattern.hasMatch(entryId)) {
+      throw ArgumentError('Invalid course or entry id');
+    }
+    return _run(SphFeature.lessons, () async {
+      final answer = await _gateway.setHomeworkDone(courseId, entryId, done);
+      if (answer != '1') {
+        throw SphDataException(
+          'Schulportal did not confirm the change (answer: '
+          '${answer.length > 40 ? '${answer.substring(0, 40)}…' : answer})',
+        );
+      }
+    });
+  }
 
   /// Grades and exams of all courses. Needs one request per course.
   Future<List<CourseGrades>> grades() => _run(SphFeature.lessons, () async {

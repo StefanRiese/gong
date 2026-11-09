@@ -101,6 +101,19 @@ void main() {
     expect(r.value, 7);
   });
 
+  test('update changes the value but keeps its age', () async {
+    await cache.get('k', ttl, () async => [1, 2]);
+    now = now.add(const Duration(minutes: 3));
+    cache.update<List<int>>('k', (v) => [...v, 3]);
+    final r = await cache.get<List<int>>('k', ttl, () async => [9]);
+    expect(r.value, [1, 2, 3]);
+    expect(r.cached, isTrue);
+    expect(cache.fetchedAt('k'), DateTime(2026, 11, 9, 12));
+    cache.update<String>('k', (v) => 'wrong type ignored');
+    cache.update<List<int>>('missing', (v) => v);
+    expect(cache.fetchedAt('missing'), isNull);
+  });
+
   test('clear removes entries; maxEntries evicts oldest', () async {
     final small = ResponseCache(maxEntries: 2, serveStaleOn: (_) => false);
     var loads = 0;

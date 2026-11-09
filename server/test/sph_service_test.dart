@@ -193,6 +193,44 @@ void main() {
       expect(d.course.name, 'Englisch');
     });
 
+    test('setHomeworkDone forwards to the portal', () async {
+      await service.setHomeworkDone('100', 'e1', true);
+      expect(gw.homeworkCalls.single, ('100', 'e1', true));
+      expect((await service.homework()).single.done, isTrue);
+    });
+
+    test('setHomeworkDone: unconfirmed answer → retry, then error', () async {
+      gw.homeworkAnswer = '<html>login</html>';
+      await expectLater(
+        service.setHomeworkDone('100', 'e1', true),
+        throwsA(isA<SphDataException>()),
+      );
+      expect(gw.homeworkCalls, hasLength(2), reason: 'retried after re-login');
+      expect(gw.loginCalls, 2);
+    });
+
+    test('setHomeworkDone rejects odd ids', () {
+      expect(
+        () => service.setHomeworkDone('1&a=x', 'e1', true),
+        throwsArgumentError,
+      );
+      expect(() => service.setHomeworkDone('1', '', true), throwsArgumentError);
+    });
+
+    test('setHomeworkDone needs Mein Unterricht', () async {
+      gw.applets = {'stundenplan.php'};
+      await expectLater(
+        service.setHomeworkDone('100', 'e1', true),
+        throwsA(isA<SphFeatureDisabledException>()),
+      );
+    });
+
+    test('allHomework collects history of all courses', () async {
+      final all = await service.allHomework();
+      expect(all.map((h) => (h.courseId, h.entryId)), [('100', 'e1')]);
+      expect(gw.lessonDetailCalls, 2);
+    });
+
     test('homework returns current homework only', () async {
       final hw = await service.homework();
       expect(hw.single.courseId, '100');

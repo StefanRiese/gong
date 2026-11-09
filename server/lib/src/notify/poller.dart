@@ -251,6 +251,27 @@ class Poller {
     return sent;
   }
 
+  /// Keeps the full homework list (one request per course) fresh for the web
+  /// UI: reloaded when older than [allHomeworkRefresh]. Failures are ignored
+  /// here; the web UI then loads it on demand.
+  Future<void> _warmAllHomework() async {
+    final age = cache.fetchedAt('homework:all');
+    if (age != null && _now().difference(age) < allHomeworkRefresh) return;
+    try {
+      await cache.get(
+        'homework:all',
+        CacheTtl.allHomework,
+        service.allHomework,
+        refresh: true,
+      );
+    } catch (e) {
+      log('warm homework list: $e');
+    }
+  }
+
+  /// Minimum age before the poller reloads the full homework list.
+  static const allHomeworkRefresh = Duration(minutes: 25);
+
   /// Loads fresh data; stale cache data (portal down) counts as a failure.
   Future<T> _load<T>(
     String key,
@@ -281,6 +302,7 @@ class Poller {
           CacheTtl.homework,
           service.homework,
         );
+        await _warmAllHomework();
         return detectHomework(items, seen);
       case WatchKind.grades:
         final courses = await _load('grades', CacheTtl.grades, service.grades);

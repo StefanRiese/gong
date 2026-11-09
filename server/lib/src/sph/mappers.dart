@@ -144,6 +144,28 @@ List<Homework> mapCurrentHomework(lanis.Lessons lessons) => [
           ),
 ];
 
+/// All homework of one course from its lesson history (newest first).
+List<Homework> mapHomeworkHistory(lanis.Lesson l, lanis.DetailedLesson d) {
+  final items = <Homework>[
+    for (final e in d.history)
+      if (e.homework case final hw?)
+        if (_clean(hw.description) case final text?)
+          Homework(
+            courseId: l.courseID,
+            courseName: l.name.trim(),
+            entryId: e.entryID,
+            date: e.topicDate,
+            topic: _clean(e.topicTitle),
+            description: text,
+            done: hw.homeWorkDone,
+          ),
+  ];
+  items.sort(
+    (a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)),
+  );
+  return items;
+}
+
 LessonEntry _mapEntry(lanis.CurrentEntry e) => LessonEntry(
   id: e.entryID,
   date: e.topicDate,

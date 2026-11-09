@@ -14,6 +14,7 @@ import * as course from './views/course.js';
 import * as calendar from './views/calendar.js';
 import * as notifications from './views/notifications.js';
 import * as settings from './views/settings.js';
+import * as subjects from './views/subjects.js';
 import { setSubjectColors } from './colors.js';
 
 route('/', today);
@@ -25,14 +26,17 @@ route('/kurse/:id', course);
 route('/kalender', calendar);
 route('/benachrichtigungen', notifications);
 route('/einstellungen', settings);
+route('/faecher', subjects);
 
+// short: label in the phone tab bar
 const NAV = [
   { path: '/', label: 'Heute', icon: 'today' },
-  { path: '/stundenplan', label: 'Stundenplan', icon: 'timetable', feature: 'timetable' },
-  { path: '/vertretungen', label: 'Vertretungen', icon: 'substitutions', feature: 'substitutions' },
-  { path: '/hausaufgaben', label: 'Hausaufgaben', icon: 'homework', feature: 'lessons' },
+  { path: '/stundenplan', label: 'Stundenplan', short: 'Plan', icon: 'timetable', feature: 'timetable' },
+  { path: '/vertretungen', label: 'Vertretungen', short: 'Vertr.', icon: 'substitutions', feature: 'substitutions' },
+  { path: '/hausaufgaben', label: 'Hausaufgaben', short: 'Aufgaben', icon: 'homework', feature: 'lessons' },
   { path: '/noten', label: 'Noten', icon: 'grades', feature: 'lessons' },
-  { path: '/kalender', label: 'Kalender', icon: 'calendar', feature: 'calendar' },
+  { path: '/faecher', label: 'Fächer', icon: 'subjects', feature: 'lessons' },
+  { path: '/kalender', label: 'Kalender', short: 'Termine', icon: 'calendar', feature: 'calendar' },
 ];
 
 const root = document.getElementById('app');
@@ -80,8 +84,13 @@ function showShell() {
   }, icon('refresh'));
   const nav = h('nav', { class: 'nav', 'aria-label': 'Hauptnavigation' },
     NAV.filter((n) => !n.feature || account.features.has(n.feature)).map((n) =>
-      h('a', { href: n.path, class: 'nav-link', dataset: { path: n.path } },
-        icon(n.icon), h('span', null, n.label))),
+      h('a', {
+        href: n.path, class: 'nav-link', dataset: { path: n.path },
+        title: n.label, 'aria-label': n.label,
+      },
+      icon(n.icon),
+      h('span', { class: 'label-long' }, n.label),
+      h('span', { class: 'label-short', 'aria-hidden': 'true' }, n.short ?? n.label))),
   );
   const header = h('header', { class: 'topbar' },
     h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Schulportal'),
@@ -112,7 +121,7 @@ async function renderRoute({ focus = true } = {}) {
     const path = a.dataset.path;
     const active = path === '/' ? location.pathname === '/' :
       location.pathname.startsWith(path) ||
-      (path === '/noten' && location.pathname.startsWith('/kurse/'));
+      (path === '/faecher' && location.pathname.startsWith('/kurse/'));
     a.classList.toggle('active', active);
     if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }

@@ -18,8 +18,25 @@ js/format.js            German date formatting
 js/views/*.js           one module per page
 ```
 
-Pages: `/` (Heute), `/stundenplan`, `/vertretungen`, `/hausaufgaben`, `/noten`, `/kurse/{id}`,
-`/kalender`, `/benachrichtigungen` (bell icon: ntfy status, test message, check now). Navigation items are hidden when the feature is not enabled for the account.
+Pages: `/` (Heute), `/stundenplan`, `/vertretungen`, `/hausaufgaben`, `/noten`,
+`/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
+`/kalender`, `/einstellungen` (gear icon: subject colors, link to notifications),
+`/benachrichtigungen` (ntfy status, test message, check now).
+
+Homework can be marked as „erledigt“ on Hausaufgaben, Heute and the course page; the change is
+saved in Schulportal. All homework views use the full list from the course histories
+(`/api/homework?alle=1`), because the portal's overview only contains the latest lesson per
+course:
+
+- Hausaufgaben: grouped by course (subject color), open homework by default; „Erledigte
+  anzeigen“ (`?erledigte=1`, remembered in `localStorage`) also shows done homework.
+- In open-only lists (Hausaufgaben without „Erledigte anzeigen“, Heute) homework marked as done
+  disappears right away; a toast offers „Rückgängig“ for 6 seconds.
+- Heute: open homework of the last 14 days (older ones are linked), loaded after the page.
+- Fächer: open-homework badges per course, loaded after the page.
+
+Subject colors: automatic (distinct for up to 16 subjects) or set on the settings page; stored
+on the server so all devices use the same colors. Navigation items are hidden when the feature is not enabled for the account.
 
 The calendar can be filtered by text (`?suche=…`, searches title, description, place and
 category), by category (chips) and by hiding past events. Hidden categories and "hide past" are

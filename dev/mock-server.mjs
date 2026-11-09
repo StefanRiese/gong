@@ -16,6 +16,7 @@ const webDir = resolve(fileURLToPath(new URL('../web', import.meta.url)));
 const stale = process.env.MOCK_STALE === '1';
 const sessions = new Set();
 let settings = { subjectColors: {} };
+const doneOverrides = new Map(); // "course/entry" → done
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -137,6 +138,7 @@ function courseDetails(id) {
     homework: i < 2 ? 'Aufgaben aus dem Arbeitsheft S. 12' : null,
     homeworkDone: i === 1, attendance: i === 2 ? 'entschuldigt' : null,
   }));
+  for (const e of history) e.homeworkDone = doneOverrides.get(`${id}/${e.id}`) ?? e.homeworkDone;
   return { course, history, ...gradesByCourse[id], attendance: { 'Fehlstunden': '2', 'davon unentschuldigt': '0' } };
 }
 
@@ -201,6 +203,15 @@ async function handleApi(req, res, url) {
   if (path === '/api/auth/me') return json(res, 200, { authenticated: sessions.has(token(req)) });
   if (!sessions.has(token(req))) return error(res, 401, 'unauthorized', 'Login required');
 
+  const hw = /^\/api\/courses\/([^/]+)\/entries\/([^/]+)\/homework$/.exec(path);
+  if (hw && req.method === 'PUT') {
+    const { done } = JSON.parse((await readBody(req)) || '{}');
+    if (typeof done !== 'boolean') return error(res, 400, 'bad_request', 'Expected {"done": bool}');
+    // Course 104 simulates the portal refusing the change.
+    if (hw[1] === '104') return error(res, 502, 'sph_bad_response', 'Unexpected response from Schulportal');
+    doneOverrides.set(`${hw[1]}/${hw[2]}`, done);
+    return json(res, 200, { done });
+  }
   if (path === '/api/settings' && req.method === 'GET') return json(res, 200, settings);
   if (path === '/api/settings' && req.method === 'PUT') {
     const body = JSON.parse((await readBody(req)) || '{}');
@@ -241,7 +252,20 @@ async function handleApi(req, res, url) {
     case '/api/timetable': return data(res, timetable);
     case '/api/substitutions': return data(res, substitutions);
     case '/api/courses': return data(res, courses);
-    case '/api/homework': return data(res, homework);
+    case '/api/homework': {
+      const withDone = (h) => ({ ...h, done: doneOverrides.get(`${h.courseId}/${h.entryId}`) ?? h.done });
+      if (url.searchParams.get('alle') !== '1') return data(res, homework.map(withDone));
+      // All homework: current entries plus older ones from the course histories.
+      const all = [...homework.map(withDone)];
+      for (const c of courses) {
+        for (const e of courseDetails(c.id).history) {
+          if (!e.homework || all.some((h) => h.courseId === c.id && h.entryId === e.id)) continue;
+          all.push({ courseId: c.id, courseName: c.name, entryId: e.id, date: e.date, topic: e.topic,
+            description: e.homework, done: e.homeworkDone });
+        }
+      }
+      return data(res, all.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')));
+    }
     case '/api/grades': return data(res, grades);
     case '/api/calendar': {
       const from = url.searchParams.get('from') ? new Date(`${url.searchParams.get('from')}T00:00`) : today;

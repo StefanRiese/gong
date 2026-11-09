@@ -27,5 +27,9 @@ abstract interface class SphGateway {
   Future<lanis.Lessons> lessons();
   Future<lanis.DetailedLesson> lessonDetails(Uri courseUrl);
 
+  /// Marks homework of a lesson entry as done/undone. Returns the portal's
+  /// raw answer ("1" = success).
+  Future<String> setHomeworkDone(String courseId, String entryId, bool done);
+
   Future<void> dispose();
 }

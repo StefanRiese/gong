@@ -99,6 +99,9 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | GET | `/api/courses` | cached 1 h |
 | GET | `/api/courses/{id}` | history, grades, exams; cached 30 min |
 | GET | `/api/homework` | current homework; cached 15 min |
+| GET | `/api/homework?alle=1` | all homework incl. done and older entries (one portal request per course); cached 45 min, kept fresh by the poller (~every 40 min) when notifications are enabled |
+| PUT | `/api/courses/{id}/entries/{entry}/homework` | body `{"done": true\|false}`; marks homework as done/undone **in Schulportal**; cached lists are patched, not reloaded |
+| GET / PUT | `/api/settings` | user settings, e.g. `{"subjectColors": {"Mathematik": "#3b6fd8"}}` |
 | GET | `/api/grades` | all courses (one portal request per course); cached 1 h |
 | POST | `/api/refresh` | clears the cache |
 

@@ -1,9 +1,11 @@
-import { h, empty, textBlock } from '../dom.js';
+import { append, h, empty, textBlock } from '../dom.js';
+import { navigate } from '../router.js';
 import {
   addDays, isoWeekday, longDate, minutesOf, parseYmd, relativeDay, shortDate, startOfDay, time, ymd,
 } from '../format.js';
 import {
-  badge, isCancellation, lessonsOn, load, pageHeader, periodRange, section,
+  badge, homeworkDoneToast, homeworkToggle, isCancellation, lazySection, lessonsOn, load, pageHeader,
+  periodRange, removeAnimated, section,
   substitutionCard, weekFor,
 } from './common.js';
 import { assignAutoColors, subjectStyle } from '../colors.js';
@@ -12,10 +14,11 @@ export const title = 'Heute';
 
 export async function render(ctx) {
   const now = new Date();
-  const [tt, subs, hw, cal] = await Promise.all([
+  // Homework is loaded lazily (see below): the full list needs one portal
+  // request per course and should not delay the rest of the page.
+  const [tt, subs, cal] = await Promise.all([
     load(ctx, 'timetable', '/api/timetable'),
     load(ctx, 'substitutions', '/api/substitutions'),
-    load(ctx, 'lessons', '/api/homework'),
     load(ctx, 'calendar', '/api/calendar'),
   ]);
 
@@ -38,7 +41,9 @@ export async function render(ctx) {
         subs ? substitutionsSection(subs, subDay, target) : null,
       ),
       h('div', null,
-        section('Hausaufgaben', hw, homeworkList),
+        lazySection('Hausaufgaben',
+          ctx.features.has('lessons') ? () => ctx.get('/api/homework?alle=1') : null,
+          (items) => homeworkList(items, now)),
         section('Nächste Termine', cal, (events) => eventList(events, now)),
       ),
     ),
@@ -118,16 +123,43 @@ function substitutionsSection(subs, subDay, target) {
   });
 }
 
-function homeworkList(items) {
+/** Open homework of the last [RECENT_DAYS] days; older ones are linked. */
+const RECENT_DAYS = 14;
+
+function homeworkList(items, now) {
+  const cutoff = addDays(startOfDay(now), -RECENT_DAYS);
   const open = items.filter((i) => !i.done);
-  if (open.length === 0) return empty('Keine offenen Hausaufgaben.');
-  return h('div', { class: 'stack' }, open.map((i) =>
-    h('article', { class: 'card' },
+  const recent = open
+    .filter((i) => !i.date || parseYmd(i.date) >= cutoff)
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+  const older = open.length - recent.length;
+  const moreLink = older > 0
+    ? h('p', null, h('a', { href: '/hausaufgaben' },
+      `${older} ältere offene Hausaufgabe${older === 1 ? '' : 'n'} →`))
+    : null;
+  const emptyText = 'Keine offenen Hausaufgaben der letzten zwei Wochen.';
+  if (recent.length === 0) return [empty(emptyText), moreLink];
+  const stack = h('div', { class: 'stack' });
+  // Only open homework is listed here: hide items once they are marked done.
+  const hide = async (item, card) => {
+    await removeAnimated(card);
+    if (!stack.querySelector('article.card')) stack.replaceWith(empty(emptyText));
+    homeworkDoneToast(item, () => navigate(location.pathname + location.search, { replace: true }));
+  };
+  return [append(stack, recent.map((i) => {
+    const card = h('article', { class: 'card' });
+    return append(card, [
       h('div', { class: 'card-title' },
         h('a', { href: `/kurse/${encodeURIComponent(i.courseId)}` }, i.courseName),
         i.date ? h('span', { class: 'muted' }, shortDate(parseYmd(i.date))) : null),
       textBlock(i.description),
-    )));
+      h('div', { class: 'card-actions' },
+        homeworkToggle({
+          courseId: i.courseId, entryId: i.entryId, done: i.done, card,
+          onSaved: (value) => { if (value) hide(i, card); },
+        })),
+    ]);
+  })), moreLink];
 }
 
 function eventList(events, now) {

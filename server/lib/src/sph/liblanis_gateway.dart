@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:liblanis/easy_client.dart' as lanis;
 
 import 'sph_gateway.dart';
@@ -66,6 +67,36 @@ class LiblanisGateway implements SphGateway {
       .parsers
       .lessonsStudent
       .getDetailedCourseView(courseUrl.toString());
+
+  /// Same request as liblanis' `LessonsStudentParser.setHomework`, but with a
+  /// plain-text response: liblanis passes dio's parsed body through as String,
+  /// which fails if the portal answers "1" with a JSON content type.
+  @override
+  Future<String> setHomeworkDone(
+    String courseId,
+    String entryId,
+    bool done,
+  ) async {
+    final session = _client.session;
+    if (session == null) {
+      throw lanis.UnauthorizedException('Not logged in');
+    }
+    final response = await session.dio.post<String>(
+      'https://start.schulportal.hessen.de/meinunterricht.php',
+      data: {
+        'a': 'sus_homeworkDone',
+        'entry': entryId,
+        'id': courseId,
+        'b': done ? 'done' : 'undone',
+      },
+      options: Options(
+        responseType: ResponseType.plain,
+        contentType: Headers.formUrlEncodedContentType,
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+      ),
+    );
+    return (response.data ?? '').trim();
+  }
 
   @override
   Future<void> dispose() => _client.dispose();

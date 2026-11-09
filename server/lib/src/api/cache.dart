@@ -85,6 +85,20 @@ class ResponseCache {
   /// Removes all entries (e.g. after a manual refresh).
   void clear() => _entries.clear();
 
+  /// Removes one entry (e.g. after data was changed).
+  void remove(String key) => _entries.remove(key);
+
+  /// When [key] was last loaded, or null if not cached.
+  DateTime? fetchedAt(String key) => _entries[key]?.fetchedAt;
+
+  /// Replaces the cached value of [key] (keeping its age), e.g. to apply a
+  /// change the user just made without reloading from Schulportal.
+  void update<T>(String key, T Function(T value) change) {
+    final e = _entries[key];
+    if (e == null || e.value is! T) return;
+    _entries[key] = _Entry(change(e.value as T), e.fetchedAt);
+  }
+
   Future<_Entry> _load<T>(String key, Future<T> Function() load) {
     final running = _pending[key];
     if (running != null) return running;

@@ -224,6 +224,29 @@ void main() {
       db.close();
     });
 
+    test('homework run keeps the full homework list warm', () async {
+      final cache = Api.createCache(now: () => clock);
+      final p = Poller(
+        service: service,
+        cache: cache,
+        db: db,
+        notifier: notifier,
+        now: () => clock,
+      );
+      await p.runNow([WatchKind.homework]);
+      expect(cache.fetchedAt('homework:all'), clock);
+      final calls = gw.lessonDetailCalls;
+
+      clock = clock.add(const Duration(minutes: 20));
+      await p.runNow([WatchKind.homework]);
+      expect(gw.lessonDetailCalls, calls, reason: 'still fresh enough');
+
+      clock = clock.add(const Duration(minutes: 20));
+      await p.runNow([WatchKind.homework]);
+      expect(cache.fetchedAt('homework:all'), clock);
+      expect(gw.lessonDetailCalls, greaterThan(calls));
+    });
+
     test('first run records baseline without notifications', () async {
       expect(await poller.runNow(), 0);
       expect(notifier.sent, isEmpty);

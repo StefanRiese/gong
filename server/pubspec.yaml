@@ -8,6 +8,7 @@ environment:
 dependencies:
   crypto: ^3.0.8
   # Pinned: liblanis is pre-1.0 and its API may change.
+  dio: ^5.11.1
   liblanis: 0.1.4
   shelf: ^1.4.3
   shelf_router: ^1.1.5

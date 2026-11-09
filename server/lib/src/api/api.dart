@@ -11,6 +11,7 @@ import '../auth/password.dart';
 import '../auth/sessions.dart';
 import '../notify/notifier.dart';
 import '../notify/poller.dart';
+import '../models/models.dart';
 import '../sph/errors.dart';
 import '../sph/sph_service.dart';
 import '../storage/settings_store.dart';
@@ -25,6 +26,9 @@ class CacheTtl {
   static const courses = Duration(hours: 1);
   static const courseDetails = Duration(minutes: 30);
   static const homework = Duration(minutes: 15);
+
+  /// Refreshed by the poller about every 40 min during active hours.
+  static const allHomework = Duration(minutes: 45);
   static const grades = Duration(hours: 1);
 }
 
@@ -41,8 +45,10 @@ const _maxCalendarRange = Duration(days: 400);
 ///   POST /api/auth/logout
 ///   GET  /api/auth/me
 ///   GET  /api/account | timetable | substitutions | courses | homework | grades
+///   GET  /api/homework?alle=1   all homework incl. done and older entries
 ///   GET  /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
 ///   GET  /api/courses/{id}
+///   PUT  /api/courses/{id}/entries/{entry}/homework  {"done": bool}
 ///   POST /api/refresh       clears the cache
 ///   GET  /api/settings      user settings (subject colors)
 ///   PUT  /api/settings      replace settings (JSON)
@@ -127,10 +133,19 @@ class Api {
           (_) => service.courseDetails(id),
         )(r);
       })
-      ..get(
-        '/api/homework',
-        _data('homework', CacheTtl.homework, (_) => service.homework()),
-      )
+      ..put('/api/courses/<id>/entries/<entry>/homework', _setHomeworkDone)
+      ..get('/api/homework', (Request r) {
+        final all = const {'1', 'true'}.contains(r.url.queryParameters['alle']);
+        return all
+            ? _data(
+                'homework:all',
+                CacheTtl.allHomework,
+                (_) => service.allHomework(),
+              )(r)
+            : _data('homework', CacheTtl.homework, (_) => service.homework())(
+                r,
+              );
+      })
       ..get(
         '/api/grades',
         _data('grades', CacheTtl.grades, (_) => service.grades()),
@@ -299,6 +314,51 @@ class Api {
       CacheTtl.calendar,
       (_) => service.calendar(from: start, to: end),
     )(request);
+  }
+
+  Future<Response> _setHomeworkDone(
+    Request request,
+    String courseId,
+    String entryId,
+  ) async {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    if (!_isJson(request)) {
+      return _error(415, 'unsupported_media_type', 'Use application/json');
+    }
+    final bool done;
+    try {
+      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
+      final value = body is Map ? body['done'] : null;
+      if (value is! bool) throw const FormatException();
+      done = value;
+    } on FormatException {
+      return _error(400, 'bad_request', 'Expected {"done": true|false}');
+    }
+    try {
+      await service.setHomeworkDone(courseId, entryId, done);
+    } on SphException catch (e) {
+      return _sphError(e);
+    } on ArgumentError catch (e) {
+      return _error(400, 'bad_request', '${e.message}');
+    }
+    // Apply the change to cached data instead of discarding it: reloading the
+    // full homework list takes one portal request per course.
+    List<Homework> patch(List<Homework> list) => [
+      for (final h in list)
+        h.courseId == courseId && h.entryId == entryId ? h.withDone(done) : h,
+    ];
+    cache.update<List<Homework>>('homework', patch);
+    cache.update<List<Homework>>('homework:all', patch);
+    cache.update<CourseDetails>(
+      'course:$courseId',
+      (d) => d.withHistory([
+        for (final e in d.history)
+          e.id == entryId ? e.withHomeworkDone(done) : e,
+      ]),
+    );
+    return _json(200, {'done': done});
   }
 
   Response _refresh(Request request) {
