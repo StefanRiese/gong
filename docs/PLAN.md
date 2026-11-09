@@ -1,108 +1,165 @@
 # Plan: Schulportal Hessen Client
 
-Goal: a personal client for **Schulportal Hessen** (school ID `6128`, login at
+Goal: a self-hosted client for **Schulportal Hessen** (school ID `6128`, login at
 `https://login.schulportal.hessen.de/?i=6128`) that shows Stundenplan, Vertretungsplan,
-Hausaufgaben, Noten, Kalender and Nachrichten in a clean, fast UI.
+Hausaufgaben, Noten, Kalender and Nachrichten in a clean, fast web UI.
+
+## Decisions
+
+| Topic | Decision |
+|---|---|
+| Architecture | **Self-hosted server + web UI** (option A, see below) |
+| Language (backend) | **Dart** |
+| Portal access | **[liblanis](https://pub.dev/packages/liblanis)** from the lanis-mobile project |
+| License | **GPL-3.0** (required because liblanis is GPL-3.0) |
+| Deployment | **Proxmox LXC container** (Debian), native binary as systemd service — **no Docker** |
 
 ## 1. Background: how Schulportal Hessen works
 
-- There is **no official API**. Every client (Lanis-Mobile, SPHclient, sph-ha, …) logs in like
-  a browser and parses HTML / internal AJAX responses. Changes to the portal can break the client,
-  so parsing must be isolated and covered by tests with saved HTML fixtures.
-- **Login flow** (verified in the MIT-licensed reference `lanis-mobile/SPHclient`):
-  1. `POST https://login.schulportal.hessen.de/?i=6128`
-     form body: `user2=<username>&user=6128.<username>&password=<password>`
-  2. Follow the redirect via `https://connect.schulportal.hessen.de`
-  3. Final redirect to `https://start.schulportal.hessen.de` sets the session cookie `sid`
-  4. All further requests send cookies `sid`, `i=6128`, `schulportal_lastschool=6128`
-  5. Logout: `https://start.schulportal.hessen.de/index.php?logout=all`
-- **Modules / endpoints** (on `start.schulportal.hessen.de`):
+- There is **no official API**. All clients log in like a browser and parse HTML / internal
+  AJAX responses. Portal changes can break parsing.
+- A pure browser webapp **cannot** talk to Schulportal directly (no CORS headers, cookies not
+  readable cross-origin), so a backend is required.
+- Login flow (for reference; handled by liblanis):
+  `POST login.schulportal.hessen.de/?i=6128` with `user2=<user>&user=6128.<user>&password=…`
+  → redirect via `connect.schulportal.hessen.de` → `start.schulportal.hessen.de` sets cookie `sid`.
+- Which modules (applets) exist depends on the school's configuration. Noten are only visible
+  if school 6128 has enabled them in "Mein Unterricht".
 
-  | Feature          | Endpoint                         | Status        |
-  |------------------|----------------------------------|---------------|
-  | Vertretungsplan  | `vertretungsplan.php`            | verified      |
-  | Kalender         | `kalender.php` (POST, JSON)      | verified      |
-  | Stundenplan      | `stundenplan.php`                | to verify     |
-  | Hausaufgaben     | `meinunterricht.php` (per course)| to verify     |
-  | Noten/Leistungen | `meinunterricht.php` → course detail | to verify; only if the school enables it |
-  | Nachrichten      | `nachrichten.php` (AES-encrypted, key handshake via `ajax.php`) | to verify, hardest |
+## 2. Why liblanis
 
-  Which modules exist depends on the school's configuration. The first step is to log in
-  manually and record what school 6128 actually offers (browser DevTools → Network tab).
+liblanis is the pure-Dart library behind the Lanis-Mobile app (no Flutter dependency,
+published on pub.dev, actively maintained).
 
-## 2. Architecture decision: webapp vs. server-client
-
-**Important constraint:** a pure browser webapp **cannot** talk to Schulportal directly.
-The portal sends no CORS headers and its cookies cannot be read cross-origin. Any web UI
-therefore needs a backend that does the portal requests. The real choice is:
-
-| Option | Description | Pros | Cons |
-|---|---|---|---|
-| **A. Self-hosted server + web UI** (recommended) | Backend logs into SPH, caches data, exposes a small REST/JSON API; web frontend (PWA) runs in any browser/phone | Works on every device; one place for parsing; can poll and send notifications (new grade, homework, substitution); fits existing home setup (Proxmox/Home Assistant) | Credentials stored on the server → must be encrypted; server needs to be reachable (VPN/Tailscale or reverse proxy) |
-| B. Thin proxy + smart frontend | Backend only forwards requests; parsing happens in the browser | Little server logic | Parsing in frontend is harder to test; still needs a server; no background notifications |
-| C. Native/mobile app or desktop app | App talks to SPH directly (no CORS in native apps) | No server, credentials stay on the device | Separate builds per platform; no background polling without extra effort; Lanis-Mobile already exists |
-| D. CLI/library only | Command-line tool | Simplest start | No nice UI |
-
-**Recommendation: Option A**, built so the SPH access is a standalone **library**
-(`core`). The library can later be reused by a CLI, a Home Assistant integration or a
-native app, so the decision is not locked in.
-
-```
-┌───────────────┐    HTTPS/JSON    ┌──────────────────────────────┐    HTTPS (scraping)    ┌──────────────────────┐
-│ Web UI (PWA)  │ ───────────────▶ │ Backend server               │ ─────────────────────▶ │ Schulportal Hessen   │
-│ phone/desktop │ ◀─────────────── │  api/  ── core/ (SPH lib)    │ ◀───────────────────── │ login./start.        │
-└───────────────┘                  │  cache (SQLite), scheduler   │                        └──────────────────────┘
-                                   │  notifications (optional)    │
-                                   └──────────────────────────────┘
-```
-
-## 3. Language choice (open)
-
-| Language | Fit |
+| Feature we need | liblanis parser |
 |---|---|
-| **TypeScript** (Node backend + React/Svelte frontend) | One language for frontend and backend; MIT reference `SPHclient` is TS; good HTML parsing (cheerio) |
-| Python (FastAPI + separate frontend) | Very good scraping tools (httpx, BeautifulSoup); several Python SPH projects exist as reference; easy Home Assistant reuse |
-| Rust (axum) | Fast, single binary; more effort for HTML scraping and frontend |
+| Stundenplan | `timetable` |
+| Vertretungsplan | `substitutions` |
+| Hausaufgaben, Noten, Klausuren | `lessons` (Mein Unterricht: `Homework`, `LessonMark`, `LessonExam`) |
+| Kalender | `calendar` |
+| Nachrichten (encrypted) | `conversations` (RSA/AES handshake included) |
+| Dateispeicher | `data_storage` |
+| Login, session keep-alive, offline cache | `EasyLanisClient`, optional SQLite |
 
-Suggestion: **TypeScript** if the web UI is the focus, **Python** if Home Assistant integration
-matters more.
+Compared alternatives: `SPHclient` (TypeScript, MIT) covers only login, Vertretungsplan and
+Kalender; `liblanis-for-python` (MIT) has login/encryption but no module parsers yet.
 
-## 4. Milestones
+**Risks:** liblanis is pre-1.0 (`0.1.x`), so its API may change → pin the version and wrap it
+behind our own service layer so a change only touches one place. If a parser breaks, fix it
+upstream with a PR instead of forking.
 
-1. **Exploration** – log in manually, record requests/responses for each module (save anonymised
-   HTML as test fixtures in `tests/fixtures/`). Document endpoints in `docs/endpoints.md`.
-2. **Core: login & session** – login, session keep-alive, re-login when `sid` expires, logout.
-3. **Core: read-only modules** – Vertretungsplan → Kalender → Stundenplan → Hausaufgaben
-   (Mein Unterricht) → Noten. Each one: fetch, parse into typed models, fixture tests.
-4. **Backend API** – endpoints like `GET /api/timetable`, `/api/substitutions`, `/api/homework`,
-   `/api/grades`, `/api/calendar`; caching in SQLite to keep request volume to SPH low.
-5. **Web UI** – PWA with views: Today (timetable + substitutions), Homework, Grades, Calendar.
-6. **Extras** – Nachrichten (encryption handshake), notifications (Pushover/ntfy/Home Assistant)
-   for new homework, grades and substitutions, marking homework as done, multiple children/accounts.
-7. **Deployment** – Docker container, run on the home server; access via VPN or reverse proxy
-   with authentication.
+## 3. Architecture
 
-## 5. Security & privacy
+```
+┌───────────────┐   HTTPS/JSON   ┌───────────────────────────────────────┐   HTTPS   ┌────────────────────┐
+│ Web UI (PWA)  │ ─────────────▶ │ Dart backend (shelf)                  │ ────────▶ │ Schulportal Hessen │
+│ phone/desktop │ ◀───────────── │  api/      REST endpoints + auth      │ ◀──────── │ login./start.      │
+└───────────────┘                │  service/  wraps liblanis             │           └────────────────────┘
+                                 │  storage/  SQLite (cache, accounts)   │
+                                 │  jobs/     polling + notifications    │
+                                 └───────────────────────────────────────┘
+```
 
-- Credentials and data belong to a (possibly minor) student → personal data under DSGVO.
-  Self-host only, for your own family's accounts; no public multi-user service.
-- Store credentials encrypted (secret key from env), never in the repo (`.env` is git-ignored).
-- The web UI must have its own login; never expose the backend to the internet unauthenticated.
-- Be polite to the portal: caching, low polling intervals (e.g. every 15–30 min), clear User-Agent.
-- Unofficial access may conflict with the portal's terms of use; keep it for personal use.
+- **Backend:** Dart with `shelf` + `shelf_router`. One process, compiled to a native binary.
+- **Storage:** SQLite (via liblanis' optional database + own tables for app users and
+  notification state). Credentials encrypted with a key from an environment variable.
+- **Web UI:** separate frontend served as static files by the backend. Framework still open
+  (see open decisions).
+- **API sketch:**
+  - `POST /api/login` / `POST /api/logout` – login to *our* app (not SPH)
+  - `GET /api/timetable`, `/api/substitutions?date=`, `/api/homework`, `/api/grades`,
+    `/api/exams`, `/api/calendar?from=&to=`, `/api/messages`
+  - `POST /api/homework/{id}/done` – mark homework as done (if supported by SPH)
+  - `POST /api/refresh` – force refresh from SPH
 
-## 6. Open decisions
+## 4. Platforms
 
-- [ ] Architecture: Option A (recommended) / B / C / D
-- [ ] Language: TypeScript / Python / Rust
-- [ ] Which modules does school 6128 actually provide (Noten especially)?
-- [ ] Notifications: needed? Which channel?
-- [ ] How the server is reached from outside (VPN, Tailscale, reverse proxy)
-- [ ] License (MIT would allow reuse of ideas from `SPHclient`)
+| Part | Windows | Linux | macOS |
+|---|---|---|---|
+| Backend (native binary via `dart compile exe`) | ✅ | ✅ | ✅ |
+| Web UI | any modern browser, incl. Android/iOS (installable as PWA) | | |
+
+Notes:
+- `dart compile exe` builds for the OS it runs on; build Windows/macOS binaries on those OSes
+  (e.g. via a GitHub Actions matrix). Linux binaries can also be cross-compiled.
+- SQLite: the `sqlite3` package needs a native SQLite library on each OS → verify
+  bundling/availability on Windows and macOS during milestone 1.
+- Main deployment target: Linux binary in a Proxmox LXC container (see section 6).
+
+## 5. Project structure (target)
+
+```
+schulportal-client/
+├── server/                 # Dart backend (own pubspec.yaml)
+│   ├── bin/server.dart     # entry point
+│   ├── lib/
+│   │   ├── api/            # shelf routes, auth middleware
+│   │   ├── service/        # SphService: wraps liblanis, maps to our models
+│   │   ├── storage/        # SQLite, credential encryption
+│   │   └── jobs/           # polling, change detection, notifications
+│   └── test/
+├── web/                    # Frontend (framework TBD)
+├── docs/
+├── deploy/                 # systemd unit, install/update script, example config
+└── .github/workflows/      # CI: analyze, test, build binaries for win/linux/mac
+```
+
+## 6. Deployment on Proxmox (LXC)
+
+No Docker: the backend is a single native binary, so it runs directly in an unprivileged
+LXC container.
+
+- **Container:** Debian 12/13 template, unprivileged, ~1 vCPU, 512 MB RAM, 2–4 GB disk.
+  No Dart SDK needed in the container — only the compiled binary + static web files.
+- **Build:** `dart compile exe server/bin/server.dart` on a Linux x64 machine or in CI
+  (GitHub Actions release artifact); the binary only needs glibc and the system `libsqlite3`
+  (`apt install libsqlite3-0`).
+- **Layout in the container:**
+  - `/opt/schulportal-client/` – binary + `web/` static files
+  - `/etc/schulportal-client/config.env` – port, secret key, polling interval (mode 600)
+  - `/var/lib/schulportal-client/` – SQLite database
+  - runs as dedicated user `schulportal` via systemd unit `schulportal-client.service`
+- **Install/update:** `deploy/install.sh` downloads the latest release (or copies a local
+  build), installs the unit, restarts the service. Proxmox snapshots/backups (vzdump) cover
+  the database.
+- **Access:** expose the port only in the LAN; from outside via VPN/Tailscale (can run in the
+  same or a separate LXC) or an existing reverse proxy with TLS.
+
+## 7. Milestones
+
+1. **Spike** – Dart project in `server/`, add liblanis, CLI script that logs into school 6128
+   and dumps which applets exist and what timetable/substitutions/lessons return.
+   Answers: does school 6128 provide Noten? Does SQLite work on all three OSes?
+2. **Service layer** – `SphService` wrapping `EasyLanisClient`: login, re-login on session
+   expiry, typed results for all needed modules; unit tests with mocked liblanis.
+3. **REST API** – shelf server with the endpoints above, app login, response caching.
+4. **Web UI** – views: Heute (Stundenplan + Vertretungen), Hausaufgaben, Noten, Klausuren,
+   Kalender, Nachrichten. Installable PWA.
+5. **Background jobs & notifications** – poll every 15–30 min, detect new homework, grades,
+   substitutions; send via ntfy/Pushover/Home Assistant.
+6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
+   for Windows/Linux/macOS, docs.
+7. **Extras** – multiple accounts (siblings), Dateispeicher, dark mode, offline view.
+
+## 8. Security & privacy
+
+- Student data is personal data (DSGVO). Self-host for your own family only; no public service.
+- SPH credentials stored encrypted; secret key only in env / `.env` (git-ignored).
+- Web UI has its own login; backend never exposed to the internet without authentication
+  (prefer VPN/Tailscale, otherwise reverse proxy with TLS).
+- Gentle on the portal: caching, polling no more often than every 15 minutes, clear User-Agent.
+- Unofficial access may conflict with the portal's terms of use; keep it personal.
+
+## 9. Open decisions
+
+- [ ] Frontend framework: Flutter Web (all Dart, shares models) vs. Svelte/TypeScript (lighter,
+      faster to load) vs. Jaspr (Dart, HTML-based)
+- [ ] Notification channel: ntfy / Pushover / Home Assistant / none
+- [ ] Remote access: VPN/Tailscale vs. reverse proxy
+- [ ] Single account or several (siblings) from the start
 
 ## References
 
-- `lanis-mobile/SPHclient` (TypeScript, MIT) – compact login + Vertretungsplan/Kalender
-- `lanis-mobile` app (Flutter) – most complete feature set, incl. Nachrichten encryption
-- `leonsio/sph-ha` (Python, MIT) – Home Assistant integration
-- `dewenni/lanis` (Python, MIT) – Hausaufgaben/Termine via Pushover
+- [liblanis](https://github.com/lanis-mobile/liblanis) (Dart, GPL-3.0) – portal access library
+- [lanis](https://github.com/lanis-mobile/lanis) (Flutter app, GPL-3.0) – real-world usage of liblanis
+- [SPHclient](https://github.com/lanis-mobile/SPHclient) (TypeScript, MIT) – minimal reference for the login flow
