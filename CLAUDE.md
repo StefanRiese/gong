@@ -9,7 +9,8 @@ Self-hosted client for **Schulportal Hessen** (school 6128): a Dart server (port
 with Server-Sent Events, ntfy notifications, setup and settings in the web UI) plus a plain
 HTML/JS web UI. Deployed as a native binary + systemd service in a Proxmox LXC container, and
 as desktop apps (Windows tray exe, macOS menu bar app). License GPL-3.0 (required by liblanis).
-Plan and decisions: `docs/PLAN.md`; API and configuration: `server/README.md`.
+Plan and decisions: `docs/PLAN.md`; API reference: `docs/API.md` (keep it in sync with
+`lib/src/api/api.dart`); configuration: `server/README.md`.
 
 ## Layout
 

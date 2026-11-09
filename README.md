@@ -71,7 +71,8 @@ WEB_DIR=../web dart run bin/server.dart
 Without credentials the server starts in setup mode and logs a setup link
 (`http://127.0.0.1:8080/einrichtung?token=…`); the settings are stored in the database next to it.
 Alternatively, put `SPH_USERNAME`, `SPH_PASSWORD` and `APP_PASSWORD` into `server/.env`
-(see `server/.env.example`). Details: [server/README.md](server/README.md) (incl. the API),
+(see `server/.env.example`). Details: [server/README.md](server/README.md), REST API:
+[docs/API.md](docs/API.md),
 [web/README.md](web/README.md).
 
 UI development without Schulportal: `node dev/mock-server.mjs` (password `demo`;

@@ -123,6 +123,8 @@ interval + 5 min while the sync covers them, otherwise for the TTLs in `CacheTtl
 
 ### API
 
+Full reference with data models and examples: [docs/API.md](../docs/API.md).
+
 All responses are JSON. Data endpoints need the session cookie from the login.
 
 | Method | Path | Notes |
