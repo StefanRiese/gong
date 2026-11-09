@@ -6,6 +6,7 @@ import { initColors, subjectStyle } from '../colors.js';
 export const title = 'Stundenplan';
 
 const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+const SHORT_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
 
 export async function render(ctx) {
   const tt = await ctx.get('/api/timetable');
@@ -36,8 +37,8 @@ export async function render(ctx) {
   const today = isoWeekday(new Date());
   return h('div', null,
     pageHeader('Stundenplan', tt.currentWeek ? badge(`Aktuell Woche ${tt.currentWeek}`, 'info') : null, toggle),
-    grid(tt, week, today),
-    dayList(tt, week, today),
+    // Week table on all screens; compact on phones (see .tt-grid in app.css).
+    h('div', { class: 'tt-scroll' }, grid(tt, week, today)),
   );
 }
 
@@ -51,7 +52,7 @@ function slotsOf(tt) {
   }));
 }
 
-/** Week grid (wide screens). */
+/** Week table: days as columns, periods as rows. */
 function grid(tt, week, today) {
   const slots = slotsOf(tt);
   const cells = [h('div', { class: 'tt-corner' })];
@@ -60,15 +61,16 @@ function grid(tt, week, today) {
     h('div', {
       class: ['tt-day', i + 1 === today && 'today'],
       style: { 'grid-column': i + 2, 'grid-row': 1 },
-    }, day)));
+      title: day,
+    }, h('span', { class: 'long' }, day), h('span', { class: 'short', 'aria-hidden': 'true' }, SHORT_DAYS[i]))));
 
   slots.forEach((s, i) => cells.push(
     h('div', {
       class: ['tt-slot', s.period == null && 'break'],
       style: { 'grid-column': 1, 'grid-row': i + 2 },
     },
-    s.period != null ? h('strong', null, `${s.period}.`) : h('span', null, s.label || 'Pause'),
-    h('small', null, `${s.start}–${s.end}`))));
+    s.period != null ? h('strong', null, `${s.period}.`) : h('span', { class: 'break-label' }, s.label || 'Pause'),
+    h('small', null, s.start, h('span', { class: 'tt-end' }, `–${s.end}`)))));
 
   for (let d = 1; d <= 5; d++) {
     // Group lessons that start in the same slot (e.g. A/B week shown together).
@@ -92,33 +94,24 @@ function grid(tt, week, today) {
     }
   }
 
+  // Lesson rows and (lower) break rows; heights come from CSS variables.
+  const rows = slots.map((s) => (s.period == null
+    ? 'minmax(var(--tt-break-row), auto)'
+    : 'minmax(var(--tt-row), auto)'));
   return h('div', {
     class: 'tt-grid',
-    style: { 'grid-template-rows': `auto repeat(${slots.length}, minmax(3.2rem, auto))` },
+    style: { 'grid-template-rows': `auto ${rows.join(' ')}` },
   }, cells);
 }
 
 function lessonBox(l) {
-  return h('div', { class: 'tt-lesson', style: subjectStyle(l.subject) },
-    h('strong', null, l.subject ?? '—', l.week ? badge(l.week, 'info') : null),
-    h('span', null, [l.room, l.teacher].filter(Boolean).join(' · ')));
-}
-
-/** Lessons per day (narrow screens). */
-function dayList(tt, week, today) {
-  const order = [1, 2, 3, 4, 5];
-  if (today <= 5) order.push(...order.splice(0, today - 1));
-  return h('div', { class: 'tt-days' }, order.map((d) => {
-    const lessons = lessonsOn(tt, d, week);
-    return h('section', { class: ['section', d === today && 'today'] },
-      h('h2', null, DAYS[d - 1], d === today ? badge('heute', 'info') : null),
-      lessons.length === 0 ? empty('Kein Unterricht.') :
-        h('ol', { class: 'lesson-list' }, lessons.map((l) =>
-          h('li', { class: 'lesson', style: subjectStyle(l.subject) },
-            h('div', { class: 'lesson-time' }, h('span', null, l.start), h('span', null, l.end)),
-            h('div', { class: 'lesson-body' },
-              h('div', { class: 'lesson-title' }, h('strong', null, l.subject ?? '—'),
-                l.week ? badge(`Woche ${l.week}`, 'info') : null),
-              h('div', { class: 'muted' }, [l.room, l.teacher].filter(Boolean).join(' · ')))))));
-  }));
+  return h('div', {
+    class: 'tt-lesson', style: subjectStyle(l.subject),
+    title: [l.subject, l.room, l.teacher, l.week && `Woche ${l.week}`, `${l.start}–${l.end}`].filter(Boolean).join(' · '),
+  },
+  h('strong', null, l.subject ?? '—', l.week ? badge(l.week, 'info') : null),
+  h('span', null,
+    l.room ? h('span', { class: 'tt-room' }, l.room) : null,
+    l.room && l.teacher ? h('span', { class: 'tt-teacher' }, ' · ') : null,
+    l.teacher ? h('span', { class: 'tt-teacher' }, l.teacher) : null));
 }

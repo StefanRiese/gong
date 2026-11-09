@@ -6,6 +6,12 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- Stundenplan: the week table (days as columns) is now also used on phones instead of a list
+  per day – compact with short weekdays („Mo“ … „Fr“), a narrow time column, smaller fonts
+  and subject names that wrap with hyphenation; the teacher is only shown on wide screens
+  (and in the tooltip). Break rows are lower. Below 330 px the table scrolls sideways.
+
 ## [0.8.0] – 2026-11-09
 
 ### Changed

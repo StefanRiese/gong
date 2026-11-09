@@ -20,7 +20,7 @@ js/views/*.js           one module per page
 js/views/forms.js       form helpers for setup and server settings (fields, school search)
 ```
 
-Pages: `/` (Heute), `/stundenplan`, `/vertretungen`, `/hausaufgaben`, `/noten`,
+Pages: `/` (Heute), `/stundenplan` (week table; compact on phones), `/vertretungen`, `/hausaufgaben`, `/noten`,
 `/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
 `/kalender`, `/einstellungen` (gear icon: subject colors, links),
 `/einstellungen/server` (Schulportal login, web UI password, sync, notifications, network),
