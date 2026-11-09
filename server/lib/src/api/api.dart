@@ -319,6 +319,13 @@ class Api {
 
   // --- helpers ---------------------------------------------------------------
 
+  /// Only same-origin scripts/styles; no inline code, no framing, no plugins.
+  static const contentSecurityPolicy =
+      "default-src 'self'; script-src 'self'; style-src 'self'; "
+      "img-src 'self' data:; connect-src 'self'; manifest-src 'self'; "
+      "object-src 'none'; base-uri 'none'; form-action 'self'; "
+      "frame-ancestors 'none'";
+
   static Handler _securityHeaders(Handler inner) {
     return (Request request) async {
       final response = await inner(request);
@@ -328,7 +335,10 @@ class Api {
           'x-content-type-options': 'nosniff',
           'x-frame-options': 'DENY',
           'referrer-policy': 'no-referrer',
-          if (isApi) 'cache-control': 'no-store',
+          'content-security-policy': contentSecurityPolicy,
+          // API data must not be cached; web UI files are revalidated on each
+          // load (ETag/Last-Modified) so updates show up immediately.
+          'cache-control': isApi ? 'no-store' : 'no-cache',
         },
       );
     };

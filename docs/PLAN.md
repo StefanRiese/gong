@@ -63,8 +63,8 @@ upstream with a PR instead of forking.
 - **Backend:** Dart with `shelf` + `shelf_router`. One process, compiled to a native binary.
 - **Storage:** SQLite (via liblanis' optional database + own tables for app users and
   notification state). Credentials encrypted with a key from an environment variable.
-- **Web UI:** separate frontend served as static files by the backend. Framework still open
-  (see open decisions).
+- **Web UI:** plain HTML/CSS/JavaScript modules in `web/`, served as static files by the
+  backend (`WEB_DIR`). No framework, no build step.
 - **API sketch:**
   - `POST /api/login` / `POST /api/logout` – login to *our* app (not SPH)
   - `GET /api/timetable`, `/api/substitutions?date=`, `/api/homework`, `/api/grades`,
@@ -100,7 +100,8 @@ schulportal-client/
 │   │   ├── storage/        # SQLite, credential encryption
 │   │   └── jobs/           # polling, change detection, notifications
 │   └── test/
-├── web/                    # Frontend (framework TBD)
+├── web/                    # Web UI (plain HTML/CSS/JS)
+├── dev/                    # mock API server for UI development
 ├── docs/
 ├── deploy/                 # systemd unit, install/update script, example config
 └── .github/workflows/      # CI: analyze, test, build binaries for win/linux/mac
@@ -151,6 +152,14 @@ LXC container.
    Sessions are in memory for now (lost on restart).
 4. **Web UI** – views: Heute (Stundenplan + Vertretungen), Hausaufgaben, Noten, Klausuren,
    Kalender, Nachrichten. Installable PWA.
+   *Result (2026-11-09):* done with plain HTML/CSS/JS modules (no framework, no build step).
+   Views: Heute (today's lessons with substitutions merged in, homework, next events),
+   Stundenplan (week grid / day list, A/B weeks), Vertretungen, Hausaufgaben, Noten, Kurs detail,
+   Kalender (month list). Responsive (sidebar ≥ 800 px, bottom tab bar below), dark mode,
+   installable via web manifest. No innerHTML; server sends a strict CSP. Mock API server
+   (`dev/mock-server.mjs`) for UI work without the portal. Checked in headless Firefox at desktop
+   and phone width, light and dark, against mock data and the real server.
+   Nachrichten not built (not enabled for school 6128).
 5. **Background jobs & notifications** – poll every 15–30 min, detect new homework, grades,
    substitutions; send via ntfy/Pushover/Home Assistant.
 6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
@@ -168,8 +177,7 @@ LXC container.
 
 ## 9. Open decisions
 
-- [ ] Frontend framework: Flutter Web (all Dart, shares models) vs. Svelte/TypeScript (lighter,
-      faster to load) vs. Jaspr (Dart, HTML-based)
+- [x] Frontend: plain HTML/CSS/JavaScript modules (no framework, no build step)
 - [ ] Notification channel: ntfy / Pushover / Home Assistant / none
 - [ ] Remote access: VPN/Tailscale vs. reverse proxy
 - [ ] Single account or several (siblings) from the start

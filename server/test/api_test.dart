@@ -282,6 +282,7 @@ void main() {
       dir = Directory.systemTemp.createTempSync('sph_web_');
       File('${dir.path}/index.html').writeAsStringSync('<h1>App</h1>');
       File('${dir.path}/app.js').writeAsStringSync('console.log(1)');
+      File('${dir.path}/manifest.webmanifest').writeAsStringSync('{}');
       api = build(webDir: dir.path);
       handler = api.handler;
     });
@@ -293,8 +294,21 @@ void main() {
       expect(await r.readAsString(), '<h1>App</h1>');
       expect(r.headers['x-frame-options'], 'DENY');
 
+      expect(
+        r.headers['content-security-policy'],
+        allOf(
+          contains("script-src 'self'"),
+          contains("frame-ancestors 'none'"),
+        ),
+      );
+      expect(r.headers['cache-control'], 'no-cache');
+
       r = await send('GET', '/app.js');
       expect(await r.readAsString(), 'console.log(1)');
+      expect(r.headers['content-type'], startsWith('text/javascript'));
+
+      r = await send('GET', '/manifest.webmanifest');
+      expect(r.headers['content-type'], 'application/manifest+json');
 
       r = await send('GET', '/noten');
       expect(r.statusCode, 200);
