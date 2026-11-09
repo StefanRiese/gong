@@ -84,7 +84,7 @@ Without internet access on the container, copy a release archive over and use
 | Update to the latest release | `bash /opt/schulportal-client/deploy/install.sh` |
 | Install a specific version | `bash /opt/schulportal-client/deploy/install.sh --version v0.1.0` |
 | Back to the previous version | `bash /opt/schulportal-client/deploy/install.sh --rollback` |
-| Change credentials / web password / ntfy | `bash /opt/schulportal-client/deploy/install.sh --configure` |
+| Change credentials / web password / ntfy / sync | web UI: *Einstellungen → Server* (or `install.sh --configure`) |
 | Status | `systemctl status schulportal-client` |
 | Logs | `journalctl -u schulportal-client -f` |
 | Restart (after editing config.env) | `systemctl restart schulportal-client` |
@@ -100,7 +100,7 @@ Updates keep `config.env`. The previous version stays in `/opt/schulportal-clien
 |---|---|
 | `/opt/schulportal-client/` | program (`bin/`, `lib/`), web UI (`web/`), `deploy/`, `VERSION` |
 | `/etc/schulportal-client/config.env` | configuration and credentials (mode 600, root) |
-| `/var/lib/schulportal-client/` | database `schulportal.db`: web logins (hashed), notification state |
+| `/var/lib/schulportal-client/` | database `schulportal.db`: settings from the web UI (incl. credentials), cached portal data, web logins (hashed), notification state; `setup-token` until set up |
 | `/etc/systemd/system/schulportal-client.service` | systemd unit |
 
 `config.env` settings are described in `/opt/schulportal-client/config.env.example`.
@@ -113,19 +113,17 @@ Do not forward the port on your router. Options:
 - **VPN / Tailscale** (recommended): install Tailscale in this or another container and open
   `http://<tailscale-ip>:8080`.
 - **Reverse proxy with HTTPS** (e.g. Nginx Proxy Manager, Caddy, Traefik): proxy to
-  `http://<container-ip>:8080`, then set in `config.env`:
-
-  ```
-  COOKIE_SECURE='true'
-  TRUST_PROXY='true'
-  ```
-
-  and restart the service. With a proxy on the same container you can also set
-  `HOST='127.0.0.1'`.
+  `http://<container-ip>:8080`, then enable *Einstellungen → Server → Netzwerk → Erweitert*
+  „Nur über HTTPS“ and „Hinter einem Reverse-Proxy“ (or in `config.env`:
+  `COOKIE_SECURE='true'`, `TRUST_PROXY='true'`) and restart the service. With a proxy on the
+  same container you can also choose „Nur auf diesem Gerät“ (`HOST='127.0.0.1'`).
+  The proxy must not buffer `/api/events` (Server-Sent Events) for live updates.
 
 ## Backups
 
-Proxmox backups (vzdump) of the container include configuration and data. The program itself
+Proxmox backups (vzdump) of the container include configuration and data. The database
+contains the Schulportal credentials if they were entered in the web UI – treat backups
+accordingly. The program itself
 can always be reinstalled with `install.sh`.
 
 ## Sandbox without "Nesting"
@@ -145,6 +143,10 @@ runs on Debian 12 and 13):
 ```sh
 bash deploy/build-release.sh     # → dist/schulportal-client-linux-x64.tar.gz (+ .sha256)
 ```
+
+The Windows exe and the macOS app can only be built on Windows / macOS (see
+[DESKTOP.md](DESKTOP.md)); `gh workflow run release.yml --ref main` builds everything on GitHub
+Actions without publishing.
 
 Pushing a tag `v*` builds releases for Linux, Windows and macOS on GitHub Actions and
 publishes them as a GitHub release. The Windows and macOS builds are desktop apps with a tray /

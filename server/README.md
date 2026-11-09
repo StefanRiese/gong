@@ -26,7 +26,7 @@ dart run bin/spike.dart --details   # also prints homework, grades, messages
 
 `.env` is git-ignored. Environment variables take precedence over `.env`.
 
-## Service layer (milestone 2)
+## Service layer
 
 ```
 lib/
@@ -39,6 +39,9 @@ lib/
   src/sph/errors.dart          SphAuth/Unavailable/FeatureDisabled/NotFound/DataException
   src/config/env.dart          .env loader, credentials
 ```
+
+`SphService.lessonsSnapshot()` loads every course page once and returns course details,
+grades and the full homework list together (used by the sync).
 
 Session policy of `SphService`:
 
@@ -71,16 +74,52 @@ dart test       # unit tests, no network (fake gateway)
 dart analyze
 ```
 
-## HTTP server (milestone 3)
+## HTTP server
 
 ```sh
 cd server
-cp .env.example .env               # fill in SPH_* values
-dart run bin/hash_password.dart    # paste the printed APP_PASSWORD_HASH=… into .env
-dart run bin/server.dart           # listens on http://127.0.0.1:8080
+WEB_DIR=../web dart run bin/server.dart     # listens on http://127.0.0.1:8080
 ```
 
-`ENV_FILE=/path/to/config.env` selects another config file.
+### Configuration
+
+Settings come from three layers (later ones win):
+
+1. `.env` / the file in `ENV_FILE` (see `.env.example`),
+2. environment variables,
+3. settings made in the web UI (setup page, *Einstellungen → Server*), stored in the database
+   (`meta` key `server-config`).
+
+Without Schulportal credentials or web UI password the server starts in **setup mode**: data
+endpoints answer `503 setup_required`, the web UI shows the setup page, and the settings
+endpoints only accept the one-time setup token (header `X-Setup-Token`). The token is logged as
+link `…/einrichtung?token=…` and written to `DATA_DIR/setup-token`; it is discarded when the
+setup is done. Settings changes apply at runtime (`AppServer` implements `ServerControl`);
+`HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE` and `TRUST_PROXY` need a restart. A different
+school or user clears cached data and notification state. `DATA_DIR/reset-web-settings` (one
+key per line, written by `install.sh --configure`) drops web UI values on the next start so the
+config file applies again.
+
+A plain `APP_PASSWORD` in the config file is replaced by `APP_PASSWORD_HASH` on start (if the
+file is writable).
+
+### Background sync
+
+`SyncService` (`lib/src/sync/`) keeps the cached data fresh during `ACTIVE_HOURS`, one task at a
+time with short pauses:
+
+| Task | Interval | Cache keys |
+|---|---|---|
+| `substitutions`, `homework` | `POLL_INTERVAL_MINUTES` (15) | `substitutions`, `homework` (merged into `homework:all`) |
+| `lessons` | `GRADES_INTERVAL_MINUTES` (120) | `courses`, `course:<id>`, `grades`, `homework:all` – one request per course |
+| `calendar` | 60 min | `calendar:<today>:<+60 days>` |
+| `account`, `timetable` | 6 h | `account`, `timetable` |
+
+Failures are retried after 5, 10, 20 … min (at most the interval); `SYNC=false` disables the
+schedule (data is then loaded on demand). The `ResponseCache` answers from the cache right away
+and refreshes expired entries in the background (stale-while-revalidate); entries are persisted
+in the `cache` table, so they are there after a restart. Entries count as fresh for their sync
+interval + 5 min while the sync covers them, otherwise for the TTLs in `CacheTtl`.
 
 ### API
 
@@ -88,71 +127,86 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/healthz` | no login |
+| GET | `/healthz` | `{"status": "ok", "app": "schulportal-client"}`, no login |
 | POST | `/api/auth/login` | body `{"password": "…"}`, `Content-Type: application/json`; sets cookie `sph_session` |
 | POST | `/api/auth/logout` | |
 | GET | `/api/auth/me` | `{"authenticated": bool}` |
 | GET | `/api/account` | enabled features |
-| GET | `/api/timetable` | cached 6 h |
-| GET | `/api/substitutions` | cached 10 min |
-| GET | `/api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | default today … +60 days, max 400 days; cached 1 h |
-| GET | `/api/courses` | cached 1 h |
-| GET | `/api/courses/{id}` | history, grades, exams; cached 30 min |
-| GET | `/api/homework` | current homework; cached 15 min |
-| GET | `/api/homework?alle=1` | all homework incl. done and older entries (one portal request per course); cached 45 min, kept fresh by the poller (~every 40 min) when notifications are enabled |
+| GET | `/api/timetable` | |
+| GET | `/api/substitutions` | |
+| GET | `/api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | default today … +60 days, max 400 days |
+| GET | `/api/courses` | |
+| GET | `/api/courses/{id}` | history, grades, exams, attendance |
+| GET | `/api/homework` | current homework (portal overview) |
+| GET | `/api/homework?alle=1` | all homework incl. done and older entries (course histories) |
 | PUT | `/api/courses/{id}/entries/{entry}/homework` | body `{"done": true\|false}`; marks homework as done/undone **in Schulportal**; cached lists are patched, not reloaded |
-| GET / PUT | `/api/settings` | user settings, e.g. `{"subjectColors": {"Mathematik": "#3b6fd8"}}` |
-| GET | `/api/grades` | all courses (one portal request per course); cached 1 h |
-| POST | `/api/refresh` | clears the cache |
+| GET | `/api/grades` | grades and exams of all courses |
+| GET / PUT | `/api/settings` | UI settings: `subjectColors`, `courseSubjects` |
+| POST | `/api/refresh` | starts a sync of all data in the background → `202 {"refreshing": true}` |
+| GET | `/api/sync` | sync status per task (last run/success/error, interval, next run) |
+| GET | `/api/events` | Server-Sent Events: `update {key, fetchedAt}`, `sync {running}` |
+| GET | `/api/notifications` | notification settings and status |
+| POST | `/api/notifications/test` | test message |
+| POST | `/api/notifications/check` | sync + check now → `{"sent": n}` |
+| GET | `/api/setup` | `{"setupRequired": bool}`, no login |
+| GET | `/api/server-settings` | settings (secrets only as set/unset), sources, pending restart |
+| PUT | `/api/server-settings` | `{"settings": {KEY: value}, "appPassword"?, "currentPassword"?}`; new Schulportal credentials are tested first; finishing the setup logs in |
+| POST | `/api/server-settings/test-login` | `{"schoolId", "username", "password"?}`; max. 5 per 5 min |
+| GET | `/api/schools?q=…` | school search in the public school list of Schulportal Hessen |
 
-Data responses: `{"data": …, "fetchedAt": "…", "cached": bool, "stale": bool}`.
-`?refresh=1` bypasses the cache. If the portal is down, the last cached data is returned with
-`"stale": true`.
+The settings endpoints need the login – or, in setup mode, the setup token.
+
+Data responses:
+`{"data": …, "key": "…", "fetchedAt": "…", "cached": bool, "stale": bool, "refreshing": bool}`.
+`stale` = the last refresh failed (portal down), `refreshing` = a refresh runs in the background.
+`?refresh=1` waits for fresh data instead.
 
 Errors: `{"error": {"code": "…", "message": "…"}}`
 
 | Status | Code | Meaning |
 |---|---|---|
 | 400 | `bad_request` | invalid parameters |
+| 400 | `invalid_settings` | settings rejected; `problems` lists them |
+| 400 | `sph_login_failed` | new Schulportal credentials do not work |
 | 401 | `unauthorized` / `invalid_password` | not logged in / wrong web UI password |
+| 403 | `setup_token_invalid` / `invalid_password` | setup token missing or wrong / wrong current password |
 | 404 | `feature_disabled` / `not_found` | applet not enabled / unknown course or path |
-| 415 | `unsupported_media_type` | login without JSON content type |
-| 429 | `too_many_attempts` | 5 failed logins in 15 min (`Retry-After` header) |
+| 415 | `unsupported_media_type` | request without JSON content type |
+| 429 | `too_many_attempts` | too many failed logins or test logins (`Retry-After` header) |
 | 502 | `sph_bad_response` | unexpected portal response |
-| 503 | `sph_auth_failed` / `sph_unavailable` | Schulportal login failed / portal down |
+| 503 | `sph_auth_failed` / `sph_unavailable` / `setup_required` | Schulportal login failed / portal down / not set up |
 
-If `WEB_DIR` is set, the server also serves the web UI; unknown non-API paths return
-`index.html`.
+If `WEB_DIR` is set, the server also serves the web UI from there (the desktop builds embed
+it); unknown non-API paths return `index.html`.
 
-## Notifications (milestone 5)
+## Notifications
 
-With `NTFY_TOPIC` set, `Poller` checks substitutions, homework and grades in the background
-(see `.env.example` for intervals and active hours) and sends new items to ntfy.
+With `NTFY_TOPIC` set, `Poller` checks the data of every sync of substitutions, homework and
+grades for new items and sends them to ntfy.
 
 ```
-lib/src/storage/app_database.dart   SQLite: seen items, poll status, web sessions (hashed)
+lib/src/storage/app_database.dart   SQLite: seen items, status, web sessions (hashed), cache
 lib/src/notify/change_detector.dart fingerprints + German notification texts (pure functions)
-lib/src/notify/poller.dart          schedule, baseline on first run, retry on send failure
+lib/src/notify/poller.dart          baseline on first run, retry on send failure
 lib/src/notify/notifier.dart        ntfy JSON publisher
 ```
 
 - first run per kind records a baseline without notifications
 - an item is marked as seen only after its notification was sent
 - more than 8 new items at once → one summary notification
-- loads go through the response cache (keeps the web UI fast)
-
-API: `GET /api/notifications` (settings + status), `POST /api/notifications/test`,
-`POST /api/notifications/check` (check now; returns `{"sent": n}`).
 
 ## Native build
 
 ```sh
 dart build cli -t bin/server.dart -o build/server
-./build/server/bundle/bin/server
+./build/server/bundle/bin/server            # run
+./build/server/bundle/bin/server check      # verify SQLite (and embedded files: --desktop)
+./build/server/bundle/bin/server version
 ```
 
 The bundle contains the executable and `lib/libsqlite3.so` (SQLite is bundled by the
 `sqlite3` package's build hook).
 
-A complete release archive (server, password tool, web UI, install files) is built with
-`bash deploy/build-release.sh` from the repository root.
+Release builds come from `bash deploy/build-release.sh` (repository root): a Linux archive
+with server, password tool, web UI and install files, the Windows tray exe, or the macOS build
+for the app bundle (see `deploy/DESKTOP.md`).

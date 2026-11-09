@@ -10,18 +10,30 @@ index.html              entry page
 manifest.webmanifest    install as app (Android/iOS/desktop)
 icon.svg, icon-*.png    app icons
 css/app.css             all styles (light/dark, desktop sidebar / mobile tab bar)
-js/app.js               shell: login gate, navigation, view rendering, refresh, logout
+js/app.js               shell: setup/login gate, navigation, view rendering, live updates,
+                        refresh, logout
 js/router.js            history-based router
 js/api.js               fetch wrapper, German error messages
 js/dom.js               h() element builder, htmlToText(), icons
 js/format.js            German date formatting
 js/views/*.js           one module per page
+js/views/forms.js       form helpers for setup and server settings (fields, school search)
 ```
 
 Pages: `/` (Heute), `/stundenplan`, `/vertretungen`, `/hausaufgaben`, `/noten`,
 `/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
-`/kalender`, `/einstellungen` (gear icon: subject colors, link to notifications),
-`/benachrichtigungen` (ntfy status, test message, check now).
+`/kalender`, `/einstellungen` (gear icon: subject colors, links),
+`/einstellungen/server` (Schulportal login, web UI password, sync, notifications, network),
+`/benachrichtigungen` (ntfy status, test message, check now), and `/einrichtung` (setup page,
+shown instead of the login while the server is not set up; the token from the setup link is
+kept in `sessionStorage` and removed from the address bar).
+
+**Live updates and refresh:** pages answer from the server's cache right away. `app.js` follows
+`/api/events` (Server-Sent Events): when a cache key used by the current page changes, the page
+is re-rendered quietly (no loading placeholder, no focus change; postponed while an input has
+focus). Pages with forms export `live = false` and are never re-rendered. „Neu laden“ starts a
+sync on the server (`POST /api/refresh`, 202); the button spins while the server syncs. The
+status shows the age of the oldest data („Stand …“, „· wird aktualisiert“, „Offline“).
 
 Homework can be marked as „erledigt“ on Hausaufgaben, Heute and the course page; the change is
 saved in Schulportal. All homework views use the full list from the course histories
@@ -56,18 +68,20 @@ remembered per browser in `localStorage` (key `calendarFilter`).
 
 ## Development
 
-With the real server (needs Schulportal credentials, see `server/README.md`):
+With the real server (without credentials it shows the setup page, see `server/README.md`):
 
 ```sh
 cd server
 WEB_DIR=../web dart run bin/server.dart
 ```
 
-Without Schulportal, using invented sample data (Node.js, no dependencies):
+Without Schulportal, using invented sample data (Node.js, no dependencies). „Neu laden“
+simulates a 2.5 s sync with live updates:
 
 ```sh
 node dev/mock-server.mjs          # http://127.0.0.1:8090, password: demo
 MOCK_STALE=1 node dev/mock-server.mjs   # simulate "portal down, cached data"
+MOCK_SETUP=1 node dev/mock-server.mjs   # not set up: /einrichtung?token=demo-token
 ```
 
 Edit files and reload the browser — there is nothing to build.
