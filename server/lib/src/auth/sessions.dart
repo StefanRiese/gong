@@ -1,17 +1,29 @@
 import 'dart:convert';
 import 'dart:math';
 
-/// In-memory login sessions for the web UI (sliding expiry).
+import '../storage/app_database.dart';
+
+/// Login sessions for the web UI (sliding expiry).
 ///
-/// Sessions are lost on restart; users then simply log in again.
+/// With a [database], sessions survive restarts (tokens are stored hashed);
+/// without, they live in memory only.
 class SessionStore {
   final Duration ttl;
+  final AppDatabase? database;
   final DateTime Function() _now;
   final _sessions = <String, DateTime>{};
+  final _persistedExpiry = <String, DateTime>{};
   final _random = Random.secure();
 
-  SessionStore({this.ttl = const Duration(days: 30), DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+  /// Persisted expiry is only rewritten when it moved by more than this,
+  /// to avoid a database write on every request.
+  static const _persistThreshold = Duration(days: 1);
+
+  SessionStore({
+    this.ttl = const Duration(days: 30),
+    this.database,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   int get length => _sessions.length;
 
@@ -20,31 +32,54 @@ class SessionStore {
     _purgeExpired();
     final bytes = List<int>.generate(32, (_) => _random.nextInt(256));
     final token = base64Url.encode(bytes).replaceAll('=', '');
-    _sessions[token] = _now().add(ttl);
+    final expires = _now().add(ttl);
+    _sessions[token] = expires;
+    _persist(token, expires);
     return token;
   }
 
   /// True if [token] is a valid session; extends its lifetime.
   bool validate(String? token) {
     if (token == null || token.isEmpty) return false;
-    final expires = _sessions[token];
+    var expires = _sessions[token];
+    if (expires == null && database != null) {
+      expires = database!.sessionExpiry(token);
+      if (expires != null) _persistedExpiry[token] = expires;
+    }
     if (expires == null) return false;
     final now = _now();
     if (!now.isBefore(expires)) {
-      _sessions.remove(token);
+      revoke(token);
       return false;
     }
-    _sessions[token] = now.add(ttl);
+    final renewed = now.add(ttl);
+    _sessions[token] = renewed;
+    final persisted = _persistedExpiry[token];
+    if (persisted == null ||
+        renewed.difference(persisted) > _persistThreshold) {
+      _persist(token, renewed);
+    }
     return true;
   }
 
   void revoke(String? token) {
-    if (token != null) _sessions.remove(token);
+    if (token == null) return;
+    _sessions.remove(token);
+    _persistedExpiry.remove(token);
+    database?.deleteSession(token);
+  }
+
+  void _persist(String token, DateTime expires) {
+    if (database == null) return;
+    database!.saveSession(token, expires);
+    _persistedExpiry[token] = expires;
   }
 
   void _purgeExpired() {
     final now = _now();
     _sessions.removeWhere((_, expires) => !now.isBefore(expires));
+    _persistedExpiry.removeWhere((t, _) => !_sessions.containsKey(t));
+    database?.purgeSessions(now);
   }
 }
 

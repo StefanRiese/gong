@@ -252,7 +252,52 @@ configure() { # force
   config_set SPH_SCHOOL_ID "$school"
   config_set SPH_USERNAME "$user"
   [[ -z $pw ]] || config_set SPH_PASSWORD "$pw"
-  say "Zugangsdaten gespeichert in $CONFIG_FILE (nur für root lesbar)"
+  configure_ntfy
+  say "Einstellungen gespeichert in $CONFIG_FILE (nur für root lesbar)"
+}
+
+random_topic() {
+  printf 'sph-%s' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"
+}
+
+configure_ntfy() {
+  echo
+  echo "Push-Benachrichtigungen (Vertretungen, Hausaufgaben, Noten) über ntfy."
+  echo "Auf ntfy.sh kann jeder mitlesen, der den Themennamen kennt – daher ein zufälliger Name."
+  local current answer topic server token app_url ip port
+  current=$(config_get NTFY_TOPIC)
+  answer=$(ask "Benachrichtigungen aktivieren? (j/n)" "j")
+  if [[ ! $answer =~ ^[jJyY] ]]; then
+    config_set NTFY_TOPIC ''
+    say "Benachrichtigungen deaktiviert."
+    return 0
+  fi
+
+  server=$(config_get NTFY_URL)
+  server=$(ask "ntfy-Server" "${server:-https://ntfy.sh}")
+  [[ $server =~ ^https?://[^/]+ ]] || die "ntfy-Server muss mit http:// oder https:// beginnen."
+
+  topic=$(ask "Thema" "${current:-$(random_topic)}")
+  [[ $topic =~ ^[-_A-Za-z0-9]{1,64}$ ]] || die "Thema: nur Buchstaben, Ziffern, - und _ (max. 64 Zeichen)."
+
+  token=$(ask_secret "Zugangs-Token (optional, leer = keiner/unverändert)")
+
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  port=$(config_get PORT)
+  app_url=$(config_get APP_URL)
+  app_url=$(ask "Adresse der Web-Oberfläche für Links in Nachrichten" \
+    "${app_url:-http://${ip:-127.0.0.1}:${port:-8080}}")
+
+  config_set NTFY_URL "$server"
+  config_set NTFY_TOPIC "$topic"
+  [[ -z $token ]] || config_set NTFY_TOKEN "$token"
+  config_set APP_URL "$app_url"
+
+  echo
+  echo "In der ntfy-App (Android/iOS) abonnieren:"
+  echo "  Server: $server"
+  echo "  Thema:  $topic"
+  echo 'Testnachricht danach in der Web-Oberfläche unter „Benachrichtigungen“ senden.'
 }
 
 # Unprivileged LXC without "nesting" cannot set up the sandbox namespaces.

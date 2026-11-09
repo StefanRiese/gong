@@ -295,6 +295,10 @@ main:focus { outline: none; }
 .button:disabled { opacity: .6; cursor: default; }
 .button.small { padding: .3rem .8rem; font-size: .85rem; }
 
+.button-row { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.error-text { color: var(--danger); font-size: .85rem; }
+code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: var(--surface-2); overflow-wrap: anywhere; }
+
 .back-link { display: inline-flex; align-items: center; gap: .2rem; margin-bottom: .5rem; font-weight: 500; }
 .back-link .icon { width: 18px; height: 18px; }
 

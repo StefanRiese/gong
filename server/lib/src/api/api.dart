@@ -9,6 +9,8 @@ import 'package:shelf_static/shelf_static.dart';
 
 import '../auth/password.dart';
 import '../auth/sessions.dart';
+import '../notify/notifier.dart';
+import '../notify/poller.dart';
 import '../sph/errors.dart';
 import '../sph/sph_service.dart';
 import 'cache.dart';
@@ -40,6 +42,9 @@ const _maxCalendarRange = Duration(days: 400);
 ///   GET  /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
 ///   GET  /api/courses/{id}
 ///   POST /api/refresh       clears the cache
+///   GET  /api/notifications          notification settings + poll status
+///   POST /api/notifications/test     send a test notification
+///   POST /api/notifications/check    check for changes now
 /// Data endpoints accept `?refresh=1` to bypass the cache and answer with
 /// `{"data": …, "fetchedAt": …, "cached": bool, "stale": bool}`.
 class Api {
@@ -51,6 +56,9 @@ class Api {
   final bool cookieSecure;
   final bool trustProxy;
   final String? webDir;
+
+  /// Background polling + notifications; null = disabled.
+  final Poller? poller;
   final DateTime Function() _now;
 
   Api({
@@ -62,19 +70,21 @@ class Api {
     this.cookieSecure = false,
     this.trustProxy = false,
     this.webDir,
+    this.poller,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
        sessions = sessions ?? SessionStore(now: now),
        limiter = limiter ?? LoginRateLimiter(now: now),
-       cache =
-           cache ??
-           ResponseCache(
-             now: now,
-             serveStaleOn: (e) =>
-                 e is SphUnavailableException ||
-                 e is SphDataException ||
-                 e is SphAuthException,
-           );
+       cache = cache ?? createCache(now: now);
+
+  /// Cache shared by the API and the background poller.
+  static ResponseCache createCache({DateTime Function()? now}) => ResponseCache(
+    now: now,
+    serveStaleOn: (e) =>
+        e is SphUnavailableException ||
+        e is SphDataException ||
+        e is SphAuthException,
+  );
 
   Handler get handler {
     final router = Router(notFoundHandler: _notFound)
@@ -118,7 +128,10 @@ class Api {
         '/api/grades',
         _data('grades', CacheTtl.grades, (_) => service.grades()),
       )
-      ..post('/api/refresh', _refresh);
+      ..post('/api/refresh', _refresh)
+      ..get('/api/notifications', _notifications)
+      ..post('/api/notifications/test', _notificationTest)
+      ..post('/api/notifications/check', _notificationCheck);
 
     return const Pipeline()
         .addMiddleware(_securityHeaders)
@@ -285,6 +298,68 @@ class Api {
     }
     cache.clear();
     return Response(204);
+  }
+
+  // --- notifications -----------------------------------------------------------
+
+  Response _notifications(Request request) {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final p = poller;
+    if (p == null) return _json(200, {'enabled': false});
+    final c = p.config;
+    return _json(200, {
+      'enabled': true,
+      'target': p.notifier.description,
+      'kinds': [for (final k in c.kinds) k.name],
+      'intervalMinutes': c.interval.inMinutes,
+      'gradesIntervalMinutes': c.gradesInterval.inMinutes,
+      'activeHours': [c.activeFromHour, c.activeToHour],
+      'includeGradeValues': c.includeGradeValues,
+      'status': {
+        for (final k in c.kinds)
+          k.name: {
+            ...p.status(k).toJson(),
+            'nextRun': p.nextRun(k).toUtc().toIso8601String(),
+          },
+      },
+    });
+  }
+
+  Future<Response> _notificationTest(Request request) async {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final p = poller;
+    if (p == null) {
+      return _error(409, 'notifications_disabled', 'NTFY_TOPIC is not set');
+    }
+    try {
+      await p.notifier.send(
+        const AppNotification(
+          title: 'Schulportal: Test',
+          message: 'Benachrichtigungen funktionieren.',
+          tags: ['white_check_mark'],
+          clickPath: '/benachrichtigungen',
+        ),
+      );
+      return Response(204);
+    } on NotifyException catch (e) {
+      return _error(502, 'notify_failed', e.message);
+    }
+  }
+
+  Future<Response> _notificationCheck(Request request) async {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final p = poller;
+    if (p == null) {
+      return _error(409, 'notifications_disabled', 'NTFY_TOPIC is not set');
+    }
+    final sent = await p.runNow();
+    return _json(200, {'sent': sent});
   }
 
   // --- static web UI / fallbacks -----------------------------------------------

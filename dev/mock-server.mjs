@@ -200,6 +200,24 @@ async function handleApi(req, res, url) {
   if (path === '/api/auth/me') return json(res, 200, { authenticated: sessions.has(token(req)) });
   if (!sessions.has(token(req))) return error(res, 401, 'unauthorized', 'Login required');
 
+  if (path === '/api/notifications' && req.method === 'GET') {
+    const ago = (min) => new Date(Date.now() - min * 60e3).toISOString();
+    const ahead = (min) => new Date(Date.now() + min * 60e3).toISOString();
+    return json(res, 200, {
+      enabled: true, target: 'ntfy.sh, Thema sph-x7…', kinds: ['substitutions', 'homework', 'grades'],
+      intervalMinutes: 20, gradesIntervalMinutes: 120, activeHours: [6, 22], includeGradeValues: false,
+      status: {
+        substitutions: { lastRun: ago(7), lastSuccess: ago(7), lastError: null, sent: 3, baseline: true, nextRun: ahead(13) },
+        homework: { lastRun: ago(7), lastSuccess: ago(7), lastError: null, sent: 5, baseline: true, nextRun: ahead(13) },
+        grades: { lastRun: ago(95), lastSuccess: ago(215), lastError: 'Schulportal nicht erreichbar', sent: 1, baseline: true, nextRun: ahead(25) },
+      },
+    });
+  }
+  if (req.method === 'POST' && path === '/api/notifications/test') {
+    res.writeHead(204);
+    return res.end();
+  }
+  if (req.method === 'POST' && path === '/api/notifications/check') return json(res, 200, { sent: 1 });
   if (req.method === 'POST' && path === '/api/refresh') {
     res.writeHead(204);
     return res.end();

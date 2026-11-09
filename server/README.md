@@ -121,6 +121,26 @@ Errors: `{"error": {"code": "…", "message": "…"}}`
 If `WEB_DIR` is set, the server also serves the web UI; unknown non-API paths return
 `index.html`.
 
+## Notifications (milestone 5)
+
+With `NTFY_TOPIC` set, `Poller` checks substitutions, homework and grades in the background
+(see `.env.example` for intervals and active hours) and sends new items to ntfy.
+
+```
+lib/src/storage/app_database.dart   SQLite: seen items, poll status, web sessions (hashed)
+lib/src/notify/change_detector.dart fingerprints + German notification texts (pure functions)
+lib/src/notify/poller.dart          schedule, baseline on first run, retry on send failure
+lib/src/notify/notifier.dart        ntfy JSON publisher
+```
+
+- first run per kind records a baseline without notifications
+- an item is marked as seen only after its notification was sent
+- more than 8 new items at once → one summary notification
+- loads go through the response cache (keeps the web UI fast)
+
+API: `GET /api/notifications` (settings + status), `POST /api/notifications/test`,
+`POST /api/notifications/check` (check now; returns `{"sent": n}`).
+
 ## Native build
 
 ```sh

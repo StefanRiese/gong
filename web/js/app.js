@@ -12,6 +12,7 @@ import * as homework from './views/homework.js';
 import * as grades from './views/grades.js';
 import * as course from './views/course.js';
 import * as calendar from './views/calendar.js';
+import * as notifications from './views/notifications.js';
 
 route('/', today);
 route('/stundenplan', timetable);
@@ -20,6 +21,7 @@ route('/hausaufgaben', homework);
 route('/noten', grades);
 route('/kurse/:id', course);
 route('/kalender', calendar);
+route('/benachrichtigungen', notifications);
 
 const NAV = [
   { path: '/', label: 'Heute', icon: 'today' },
@@ -78,6 +80,10 @@ function showShell() {
     status,
     h('div', { class: 'topbar-actions' },
       refreshButton,
+      h('a', {
+        href: '/benachrichtigungen', class: 'icon-button', title: 'Benachrichtigungen',
+        'aria-label': 'Benachrichtigungen',
+      }, icon('bell')),
       h('button', {
         class: 'icon-button', title: 'Abmelden', 'aria-label': 'Abmelden', onclick: logout,
       }, icon('logout')),

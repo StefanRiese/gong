@@ -19,7 +19,7 @@ js/views/*.js           one module per page
 ```
 
 Pages: `/` (Heute), `/stundenplan`, `/vertretungen`, `/hausaufgaben`, `/noten`, `/kurse/{id}`,
-`/kalender`. Navigation items are hidden when the feature is not enabled for the account.
+`/kalender`, `/benachrichtigungen` (bell icon: ntfy status, test message, check now). Navigation items are hidden when the feature is not enabled for the account.
 
 The calendar can be filtered by text (`?suche=…`, searches title, description, place and
 category), by category (chips) and by hiding past events. Hidden categories and "hide past" are

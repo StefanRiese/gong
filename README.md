@@ -4,13 +4,13 @@ A self-hosted client for **Schulportal Hessen**: a Dart server (using
 [liblanis](https://pub.dev/packages/liblanis)) plus a web UI for Stundenplan, Vertretungsplan,
 Hausaufgaben, Noten, Kalender and Nachrichten.
 
-> **Status:** working server, web UI and LXC deployment; notifications next. See [docs/PLAN.md](docs/PLAN.md).
+> **Status:** working server, web UI, push notifications (ntfy) and LXC deployment. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Goals
 
 - Log in to Schulportal Hessen and keep the session alive
 - Show Stundenplan, Vertretungsplan, Hausaufgaben, Noten, Klausuren, Kalender and Nachrichten
-- Notify about new homework, grades and substitutions
+- Push notifications (ntfy) about new substitutions, homework and grades
 - Native binary for Windows, Linux and macOS; deployed as a systemd service in a Proxmox LXC container
 
 ## Project structure

@@ -83,6 +83,7 @@ const ICONS = {
   calendar: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M8 14h2M12 14h2M16 14h0',
   refresh: 'M20 11a8 8 0 0 0-14.6-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5L20 16M20 20v-4h-4',
   logout: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10',
+  bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
   back: 'M15 5l-7 7 7 7',
   prev: 'M15 5l-7 7 7 7',
   next: 'M9 5l7 7-7 7',

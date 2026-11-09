@@ -162,6 +162,13 @@ LXC container.
    Nachrichten not built (not enabled for school 6128).
 5. **Background jobs & notifications** – poll every 15–30 min, detect new homework, grades,
    substitutions; send via ntfy/Pushover/Home Assistant.
+   *Result (2026-11-09):* done with **ntfy**, for substitutions, homework and grades, one
+   recipient. SQLite database (seen items, poll status, persistent web sessions with hashed
+   tokens); poller every 20 min (grades 2 h), 6–22 h; baseline on first run; retry on failed
+   delivery; summary when > 8 new items; grade values off by default (ntfy.sh topics are
+   readable by anyone who knows the name). Web UI page „Benachrichtigungen“ (status, test,
+   check now); `install.sh --configure` sets up ntfy with a random topic. 92 unit tests;
+   end-to-end test with real data against a local fake ntfy server.
 6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
    for Windows/Linux/macOS, docs.
    *Result (2026-11-09):* done. `deploy/schulportal-client.service` (own system user, systemd
@@ -186,7 +193,7 @@ LXC container.
 ## 9. Open decisions
 
 - [x] Frontend: plain HTML/CSS/JavaScript modules (no framework, no build step)
-- [ ] Notification channel: ntfy / Pushover / Home Assistant / none
+- [x] Notification channel: ntfy (substitutions, homework, grades; one recipient)
 - [ ] Remote access: VPN/Tailscale vs. reverse proxy (both documented in `deploy/README.md`)
 - [ ] Single account or several (siblings) from the start
 

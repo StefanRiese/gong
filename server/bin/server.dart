@@ -24,6 +24,15 @@ Future<void> main(List<String> args) async {
     exit(78);
   }
 
+  final AppDatabase db;
+  try {
+    Directory(config.dataDir).createSync(recursive: true);
+    db = AppDatabase.open(config.databasePath);
+  } on Object catch (e) {
+    stderr.writeln('Cannot open database ${config.databasePath}: $e');
+    exit(73); // EX_CANTCREAT
+  }
+
   final service = SphService(
     LiblanisGateway(
       schoolId: config.sph.schoolId,
@@ -31,13 +40,35 @@ Future<void> main(List<String> args) async {
       password: config.sph.password,
     ),
   );
+  final cache = Api.createCache();
+
+  Poller? poller;
+  final ntfy = config.ntfy;
+  if (ntfy != null && config.poller.kinds.isNotEmpty) {
+    poller = Poller(
+      service: service,
+      cache: cache,
+      db: db,
+      notifier: NtfyNotifier(
+        server: ntfy.server,
+        topic: ntfy.topic,
+        token: ntfy.token,
+        appUrl: config.appUrl,
+      ),
+      config: config.poller,
+      log: (m) => _log(m, false),
+    );
+  }
+
   final api = Api(
     service: service,
     passwordHash: config.appPasswordHash,
-    sessions: SessionStore(ttl: config.sessionTtl),
+    sessions: SessionStore(ttl: config.sessionTtl, database: db),
+    cache: cache,
     cookieSecure: config.cookieSecure,
     trustProxy: config.trustProxy,
     webDir: config.webDir,
+    poller: poller,
   );
 
   final handler = const Pipeline()
@@ -52,13 +83,28 @@ Future<void> main(List<String> args) async {
     '${config.webDir != null ? ', web UI from ${config.webDir}' : ''})',
     false,
   );
+  if (poller != null) {
+    final c = config.poller;
+    _log(
+      'Notifications via ${poller.notifier.description}: '
+      '${c.kinds.map((k) => k.name).join(', ')} every ${c.interval.inMinutes} min '
+      '(grades ${c.gradesInterval.inMinutes} min), '
+      '${c.activeFromHour}–${c.activeToHour} h',
+      false,
+    );
+    poller.start();
+  } else {
+    _log('Notifications disabled (NTFY_TOPIC not set)', false);
+  }
 
   final done = Completer<void>();
   Future<void> shutdown(ProcessSignal signal) async {
     if (done.isCompleted) return;
     _log('Received $signal, shutting down', false);
     await server.close();
+    await poller?.stop();
     await service.dispose();
+    db.close();
     done.complete();
   }
 

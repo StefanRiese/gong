@@ -3,3 +3,5 @@ build/
 # Spike output may contain personal data (grades, messages)
 out/
 *.db
+*.db-wal
+*.db-shm

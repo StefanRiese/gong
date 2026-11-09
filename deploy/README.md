@@ -36,6 +36,29 @@ The script
 
 Then open `http://<container-ip>:8080` and log in with the web UI password.
 
+## Push notifications (ntfy)
+
+`install.sh` asks whether to enable notifications and suggests a random topic name. On your
+phone, install the **ntfy** app (Android: Play Store/F-Droid, iOS: App Store), tap **+** and
+subscribe to that topic on the same server (default `https://ntfy.sh`). Then open
+**Benachrichtigungen** (bell icon) in the web UI and press **Testnachricht senden**.
+
+What happens:
+
+- the server checks substitutions and homework every 20 min and grades every 2 h,
+  only between 6 and 22 o'clock;
+- the first check after setup only records the current state (no flood of old entries);
+- new or changed substitutions, new homework and new grades are sent once each;
+  tapping a notification opens the matching page of the web UI (`APP_URL`);
+- grade values are **not** included by default (`NOTIFY_GRADE_VALUES='true'` to change);
+- if ntfy is unreachable, the notification is sent with the next check.
+
+Privacy: on the public ntfy.sh server anyone who knows the topic name can read the messages.
+Keep the random name secret, or use your own ntfy server / an access token (`NTFY_TOKEN`).
+All settings: see `config.env.example` (`NOTIFY`, `POLL_INTERVAL_MINUTES`,
+`GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, …). Change them with `install.sh --configure` or by
+editing `config.env` and restarting the service.
+
 Without internet access on the container, copy a release archive over and use
 `bash install.sh --from schulportal-client-linux-x64.tar.gz`.
 
@@ -46,7 +69,7 @@ Without internet access on the container, copy a release archive over and use
 | Update to the latest release | `bash /opt/schulportal-client/deploy/install.sh` |
 | Install a specific version | `bash /opt/schulportal-client/deploy/install.sh --version v0.1.0` |
 | Back to the previous version | `bash /opt/schulportal-client/deploy/install.sh --rollback` |
-| Change credentials / web password | `bash /opt/schulportal-client/deploy/install.sh --configure` |
+| Change credentials / web password / ntfy | `bash /opt/schulportal-client/deploy/install.sh --configure` |
 | Status | `systemctl status schulportal-client` |
 | Logs | `journalctl -u schulportal-client -f` |
 | Restart (after editing config.env) | `systemctl restart schulportal-client` |
@@ -62,7 +85,7 @@ Updates keep `config.env`. The previous version stays in `/opt/schulportal-clien
 |---|---|
 | `/opt/schulportal-client/` | program (`bin/`, `lib/`), web UI (`web/`), `deploy/`, `VERSION` |
 | `/etc/schulportal-client/config.env` | configuration and credentials (mode 600, root) |
-| `/var/lib/schulportal-client/` | data directory (used from milestone 5 on) |
+| `/var/lib/schulportal-client/` | database `schulportal.db`: web logins (hashed), notification state |
 | `/etc/systemd/system/schulportal-client.service` | systemd unit |
 
 `config.env` settings are described in `/opt/schulportal-client/config.env.example`.
