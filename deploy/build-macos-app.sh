@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Builds the macOS app bundle from one or two server builds of
-# build-release.sh (macOS, one per architecture). With arm64 and x64 the
-# binaries are merged with lipo into a universal app:
+# build-release.sh (macOS, one per architecture). With arm64 and x64 the app
+# is universal: the launcher and SQLite are merged with lipo; the Dart server
+# is included once per architecture (bin/server-<arch>), because lipo drops
+# the program that Dart appends to its AOT executables:
 #
 #   bash deploy/build-macos-app.sh dist/macos-arm64 dist/macos-x64
 #   → dist/schulportal-client-macos-universal.zip (+ .sha256)
@@ -43,18 +45,21 @@ merge() {
   lipo -create "${files[@]}" -output "$out"
 }
 
-echo "Merging server binaries"
-merge bin/server "$contents/Resources/bin/server"
-chmod +x "$contents/Resources/bin/server"
+echo "Server binaries"
+targets=()
+for d in "${inputs[@]}"; do
+  a=$(lipo -archs "$d/bin/server")
+  [[ $a != *" "* ]] || { echo "$d/bin/server is not a single-architecture binary" >&2; exit 1; }
+  targets+=("$a")
+  # Unmodified: re-signing or lipo would cut off the appended Dart program.
+  cp "$d/bin/server" "$contents/Resources/bin/server-$a"
+  chmod +x "$contents/Resources/bin/server-$a"
+done
 for lib in "${inputs[0]}"/lib/*; do
   merge "lib/$(basename "$lib")" "$contents/Resources/lib/$(basename "$lib")"
 done
 
 echo "Compiling menu bar app"
-targets=()
-for d in "${inputs[@]}"; do
-  for a in $(lipo -archs "$d/bin/server"); do targets+=("$a"); done
-done
 slices=()
 for a in "${targets[@]}"; do
   swiftc -O -target "$a-apple-macos11" -o "$work/launcher-$a" "$ROOT/deploy/macos/main.swift"
@@ -80,7 +85,7 @@ done
 iconutil -c icns "$iconset" -o "$contents/Resources/AppIcon.icns"
 
 echo "Signing (ad hoc)"
-codesign --force --sign - "$contents/Resources/lib/"* "$contents/Resources/bin/server"
+codesign --force --sign - "$contents/Resources/lib/"*
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
 
@@ -91,9 +96,9 @@ for a in "${targets[@]}"; do
     x86_64) arch -x86_64 /usr/bin/true 2>/dev/null || { echo "(no Rosetta, skipping x86_64 check)"; continue; } ;;
   esac
   echo "-- $a"
-  arch "-$a" "$contents/Resources/bin/server" check --desktop
+  arch "-$a" "$contents/Resources/bin/server-$a" check --desktop
 done
-for f in "$contents/MacOS/SchulportalClient" "$contents/Resources/bin/server" "$contents/Resources/lib/"*; do
+for f in "$contents/MacOS/SchulportalClient" "$contents/Resources/bin/"* "$contents/Resources/lib/"*; do
   echo "$(basename "$f"): $(lipo -archs "$f")"
 done
 

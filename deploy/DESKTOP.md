@@ -58,10 +58,12 @@ Starting the app a second time opens the web UI instead of a second server.
   (`server/tool/set_exe_icon.dart`), runs `server check --desktop` and marks the exe as GUI application
   (`server/tool/set_gui_subsystem.dart`). The tray icon is implemented with Win32 calls via
   `dart:ffi` (`server/lib/src/desktop/`).
-- On macOS it builds the server per architecture; `deploy/build-macos-app.sh` merges the arm64
-  and x64 builds with `lipo`, compiles the menu bar app (`deploy/macos/main.swift`) for both
-  architectures and assembles `Schulportal-Client.app`. The menu bar app starts the server
-  (`Contents/Resources/bin/server`) as child process with `ENV_FILE` set.
+- On macOS it builds the server per architecture; `deploy/build-macos-app.sh` compiles the
+  menu bar app (`deploy/macos/main.swift`) as universal binary, merges SQLite with `lipo` and
+  puts both servers into the bundle as `Contents/Resources/bin/server-arm64` / `server-x86_64`
+  (Dart AOT executables cannot be merged with `lipo`: the Dart program is appended to the
+  runtime and would be lost). The menu bar app starts the server of its own architecture as
+  child process with `ENV_FILE` set.
 - The release workflow builds macOS arm64 on `macos-latest` and x64 on `macos-15-intel`, then
   merges them in the `macos-app` job.
 - Icons: `python3 deploy/desktop/make-icons.py` (Pillow) regenerates all icon files in

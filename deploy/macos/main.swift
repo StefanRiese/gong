@@ -1,6 +1,6 @@
 // Menu bar app for the macOS build of schulportal-client.
 //
-// Starts the Dart server (Contents/Resources/bin/server) as child process and
+// Starts the Dart server (Contents/Resources/bin/server-<arch>) as child process and
 // shows a menu bar icon with: open web UI, edit settings, show log, restart,
 // quit. Config and data live in ~/Library/Application Support/schulportal-client,
 // the log in ~/Library/Logs/Schulportal-Client.log.
@@ -8,6 +8,15 @@
 // Built by deploy/build-macos-app.sh (swiftc, no Xcode project).
 
 import Cocoa
+
+/// Dart AOT executables cannot be merged with lipo (the program is appended
+/// to the runtime), so the app contains one server per architecture and the
+/// (universal) launcher starts the one matching its own slice.
+#if arch(arm64)
+private let serverBinary = "bin/server-arm64"
+#else
+private let serverBinary = "bin/server-x86_64"
+#endif
 
 /// Exit codes of the server (see server/lib/src/desktop/desktop.dart).
 private let exitConfigInvalid: Int32 = 78
@@ -78,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startServer() {
         guard let resources = Bundle.main.resourceURL else { return }
         let process = Process()
-        process.executableURL = resources.appendingPathComponent("bin/server")
+        process.executableURL = resources.appendingPathComponent(serverBinary)
         var env = ProcessInfo.processInfo.environment
         env["ENV_FILE"] = configURL.path
         process.environment = env
