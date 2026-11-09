@@ -80,7 +80,9 @@ Native builds use `dart build cli` (not `dart compile exe`, which lacks native a
 - Solo repository: commit directly to `main`, only when the user asks; push after committing.
 - Never mention Claude in commits or PRs (no `Co-Authored-By: Claude`).
 - Update `CHANGELOG.md` (section *Unreleased*) with every user-visible change.
-- Releases: move *Unreleased* to a new version section, then tag `vX.Y.Z` and push the tag
-  (only on request) — GitHub Actions builds Linux x64/arm64, Windows and macOS archives.
+- Releases: move *Unreleased* to a new version section, commit and push, then tag `vX.Y.Z`
+  and push the tag (only on request). GitHub Actions builds Linux x64/arm64, Windows and macOS
+  archives; the release notes come from that CHANGELOG section (`deploy/release-notes.sh`,
+  the release fails if the section is missing).
 - Deployment target: `bash /opt/schulportal-client/deploy/install.sh` in the LXC container
   updates to the latest release.
