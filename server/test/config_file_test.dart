@@ -62,44 +62,4 @@ void main() {
       expect(hashPlainPasswordInFile('${dir.path}/missing.env'), isFalse);
     });
   });
-
-  group('desktopConfigTemplate', () {
-    test('is incomplete until filled in, then valid', () {
-      file.writeAsStringSync(desktopConfigTemplate(dataDir: dir.path));
-      expect(
-        () => AppConfig.fromEnv(_fileEnv(file)),
-        throwsA(
-          isA<ConfigException>().having(
-            (e) => e.problems,
-            'problems',
-            hasLength(2), // SPH credentials, app password
-          ),
-        ),
-      );
-
-      final filled = file
-          .readAsStringSync()
-          .replaceFirst('SPH_USERNAME=\n', 'SPH_USERNAME=max.muster\n')
-          .replaceFirst('SPH_PASSWORD=\n', 'SPH_PASSWORD=x\n')
-          .replaceFirst('APP_PASSWORD=\n', 'APP_PASSWORD=geheim123\n');
-      file.writeAsStringSync(filled);
-      final c = AppConfig.fromEnv(_fileEnv(file));
-      expect(c.dataDir, dir.path);
-      expect(c.openBrowser, isTrue);
-      expect(c.ntfy, isNull);
-      expect(PasswordHasher.verify('geheim123', c.appPasswordHash), isTrue);
-    });
-
-    test('uses the requested line endings', () {
-      final t = desktopConfigTemplate(dataDir: r'C:\x', eol: '\r\n');
-      expect(t, contains('DATA_DIR=C:\\x\r\n'));
-      expect(t.replaceAll('\r\n', ''), isNot(contains('\n')));
-    });
-  });
 }
-
-/// Only the file's values (not the test process environment).
-Map<String, String> _fileEnv(File f) => {
-  for (final l in f.readAsLinesSync())
-    if (parseEnvLine(l) case final e?) e.key: e.value,
-};

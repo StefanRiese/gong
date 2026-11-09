@@ -15,6 +15,8 @@ import * as calendar from './views/calendar.js';
 import * as notifications from './views/notifications.js';
 import * as settings from './views/settings.js';
 import * as subjects from './views/subjects.js';
+import * as setup from './views/setup.js';
+import * as serverSettings from './views/server-settings.js';
 import { initColors } from './colors.js';
 
 route('/', today);
@@ -26,6 +28,7 @@ route('/kurse/:id', course);
 route('/kalender', calendar);
 route('/benachrichtigungen', notifications);
 route('/einstellungen', settings);
+route('/einstellungen/server', serverSettings);
 route('/faecher', subjects);
 
 // short: label in the phone tab bar
@@ -45,6 +48,12 @@ const root = document.getElementById('app');
 let account = null;
 let renderToken = 0;
 let shell = null;
+
+/** Cache keys of the data shown by the current page (for live updates). */
+let liveKeys = new Set();
+/** @type {EventSource | null} */
+let events = null;
+let liveTimer = null;
 
 const ACCOUNT_KEY = 'lastAccount';
 const ALL_FEATURES = ['timetable', 'substitutions', 'calendar', 'lessons'];
@@ -70,6 +79,9 @@ function rememberAccount(acc) {
 async function boot() {
   root.className = '';
   try {
+    const { setupRequired } = await api('/api/setup');
+    if (setupRequired) return showSetup();
+    if (location.pathname === '/einrichtung') history.replaceState(null, '', '/');
     const me = await api('/api/auth/me');
     if (!me.authenticated) return showLogin();
     let portalProblem = null;
@@ -113,7 +125,16 @@ async function loadColors() {
   });
 }
 
+/** Server not set up yet: setup page instead of the login. */
+function showSetup() {
+  stopLive();
+  account = null;
+  shell = null;
+  root.replaceChildren(setup.render({ token: setup.takeToken(), onDone: boot }));
+}
+
 function showLogin() {
+  stopLive();
   account = null;
   shell = null;
   document.title = 'Anmelden – Schulportal';
@@ -154,9 +175,14 @@ function showShell() {
   shell = { main, status, nav, refreshButton };
   root.replaceChildren(header, h('div', { class: 'layout' }, nav, main));
   renderRoute();
+  startLive();
 }
 
-async function renderRoute({ focus = true } = {}) {
+/**
+ * Renders the current route. quiet: live update of the same page (no loading
+ * placeholder, no focus change; on errors the old content stays).
+ */
+async function renderRoute({ focus = true, quiet = false } = {}) {
   if (!shell) return;
   const token = ++renderToken;
   const found = match(location.pathname);
@@ -178,22 +204,26 @@ async function renderRoute({ focus = true } = {}) {
   }
 
   const metas = [];
+  const keys = new Set();
   const ctx = {
     params: found.params,
     query: new URLSearchParams(location.search),
     features: account.features,
-    /** Loads a data endpoint and records its freshness. */
+    /** Loads a data endpoint and records its freshness and cache key. */
     async get(path) {
       const res = await api(path);
       metas.push(res);
+      if (res.key) keys.add(res.key);
       return res.data;
     },
   };
 
-  status.textContent = '';
-  main.setAttribute('aria-busy', 'true');
-  main.replaceChildren(h('div', { class: 'loading' }, 'Laden …'));
-  document.title = `${found.view.title} – Schulportal`;
+  if (!quiet) {
+    status.textContent = '';
+    main.setAttribute('aria-busy', 'true');
+    main.replaceChildren(h('div', { class: 'loading' }, 'Laden …'));
+    document.title = `${found.view.title} – Schulportal`;
+  }
 
   let content;
   try {
@@ -201,6 +231,7 @@ async function renderRoute({ focus = true } = {}) {
   } catch (err) {
     if (token !== renderToken) return;
     if (err instanceof ApiError && err.isUnauthorized) return showLogin();
+    if (quiet) return; // keep what is shown
     content = h('div', null, h('h1', null, found.view.title), errorBox(errorMessage(err)));
   }
   if (token !== renderToken) return;
@@ -208,7 +239,68 @@ async function renderRoute({ focus = true } = {}) {
   main.removeAttribute('aria-busy');
   main.replaceChildren(content);
   if (focus) main.focus({ preventScroll: true });
+  // Same Set object: data a page loads later (e.g. Heute) is tracked too.
+  liveKeys = keys;
   updateStatus(metas);
+}
+
+// --- live updates -------------------------------------------------------------
+
+/** Follows /api/events: re-renders the page when its data changed on the server. */
+function startLive() {
+  stopLive();
+  if (typeof EventSource === 'undefined') return;
+  events = new EventSource('/api/events');
+  const parse = (e) => {
+    try {
+      return JSON.parse(e.data);
+    } catch {
+      return null;
+    }
+  };
+  events.addEventListener('update', (e) => {
+    const msg = parse(e);
+    if (msg && liveKeys.has(msg.key)) scheduleLiveRender();
+  });
+  events.addEventListener('sync', (e) => {
+    const msg = parse(e);
+    if (msg) setSyncing(Boolean(msg.running));
+  });
+}
+
+function stopLive() {
+  events?.close();
+  events = null;
+  clearTimeout(liveTimer);
+  liveKeys = new Set();
+}
+
+/** Several updates arrive together during a sync: render once. */
+function scheduleLiveRender() {
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(liveRender, 600);
+}
+
+function liveRender() {
+  if (!shell) return;
+  const found = match(location.pathname);
+  if (!found || found.view.live === false) return;
+  // Do not pull the rug from under someone typing or choosing.
+  const active = document.activeElement;
+  if (active && shell.main.contains(active) && active.matches('input, select, textarea')) {
+    active.addEventListener('blur', scheduleLiveRender, { once: true });
+    return;
+  }
+  renderRoute({ focus: false, quiet: true });
+}
+
+/** Refresh button shows whether a sync with Schulportal is running. */
+function setSyncing(running) {
+  const button = shell?.refreshButton;
+  if (!button) return;
+  button.classList.toggle('spinning', running);
+  button.disabled = running;
+  button.title = running ? 'Wird aktualisiert …' : 'Neu laden';
 }
 
 let portalNotice = null;
@@ -237,30 +329,50 @@ function updateStatus(metas) {
     return;
   }
   const oldest = metas.map((m) => m.fetchedAt).sort()[0];
+  const refreshing = metas.some((m) => m.refreshing) ? ' · wird aktualisiert' : '';
   if (metas.some((m) => m.stale)) {
     status.classList.add('stale');
-    status.textContent = `Offline – Stand ${age(oldest)}`;
+    status.textContent = `Offline – Stand ${age(oldest)}${refreshing}`;
     status.title = 'Das Schulportal ist nicht erreichbar; es werden gespeicherte Daten angezeigt.';
   } else {
-    status.textContent = `Stand ${age(oldest)}`;
-    status.title = '';
+    status.textContent = `Stand ${age(oldest)}${refreshing}`;
+    status.title = refreshing ? 'Die Daten werden im Hintergrund vom Schulportal geladen.' : '';
   }
 }
 
+/**
+ * Asks the server to sync all data with Schulportal. The request returns
+ * right away; the page updates when the sync is done (and in between via
+ * live updates).
+ */
 async function refresh() {
   const button = shell?.refreshButton;
   if (!button || button.disabled) return;
-  button.disabled = true;
-  button.classList.add('spinning');
+  setSyncing(true);
   try {
-    await api('/api/refresh', { method: 'POST' });
-    await renderRoute({ focus: false });
+    const res = await api('/api/refresh', { method: 'POST' });
+    if (res === null) {
+      await renderRoute({ focus: false }); // 204: server without sync
+    } else {
+      await waitForSync();
+      // With an open event stream the page already followed the updates.
+      if (events?.readyState !== EventSource.OPEN) await renderRoute({ focus: false, quiet: true });
+    }
   } catch (err) {
     if (err instanceof ApiError && err.isUnauthorized) return showLogin();
-    shell.status.textContent = errorMessage(err);
+    if (shell) shell.status.textContent = errorMessage(err);
   } finally {
-    button.disabled = false;
-    button.classList.remove('spinning');
+    setSyncing(false);
+  }
+}
+
+/** Waits until the server's sync is finished (max. 5 minutes). */
+async function waitForSync() {
+  const until = Date.now() + 5 * 60e3;
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const s = await api('/api/sync');
+    if (!s.running) return;
   }
 }
 

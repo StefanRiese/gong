@@ -1,10 +1,9 @@
 import 'dart:async';
 
-import '../api/api.dart' show CacheTtl;
-import '../api/cache.dart';
-import '../sph/errors.dart';
+import '../models/models.dart';
 import '../sph/sph_service.dart';
 import '../storage/app_database.dart';
+import '../sync/sync_service.dart';
 import 'change_detector.dart';
 import 'notifier.dart';
 
@@ -22,14 +21,9 @@ enum WatchKind {
   }
 }
 
+/// What to notify about; schedule and active hours come from [SyncConfig].
 class PollerConfig {
   final Set<WatchKind> kinds;
-  final Duration interval;
-  final Duration gradesInterval;
-
-  /// Polling only between these hours (local time), e.g. 6 and 22.
-  final int activeFromHour;
-  final int activeToHour;
   final bool includeGradeValues;
 
   const PollerConfig({
@@ -38,19 +32,8 @@ class PollerConfig {
       WatchKind.homework,
       WatchKind.grades,
     },
-    this.interval = const Duration(minutes: 20),
-    this.gradesInterval = const Duration(hours: 2),
-    this.activeFromHour = 6,
-    this.activeToHour = 22,
     this.includeGradeValues = false,
   });
-
-  Duration intervalFor(WatchKind kind) =>
-      kind == WatchKind.grades ? gradesInterval : interval;
-
-  bool isActive(DateTime t) => activeFromHour <= activeToHour
-      ? t.hour >= activeFromHour && t.hour < activeToHour
-      : t.hour >= activeFromHour || t.hour < activeToHour;
 }
 
 /// Status of one watched kind (persisted in the database).
@@ -91,126 +74,106 @@ class PollStatus {
   };
 }
 
-/// Periodically loads data, detects new items and sends notifications.
+/// Detects new items in the data of the [SyncService] and sends
+/// notifications.
 ///
 /// - the first successful run per kind only records the current state
 /// - an item is marked as seen only after its notification was sent, so
 ///   failed deliveries are retried on the next run
-/// - loads go through [ResponseCache] (refresh), which keeps the web UI fast
 class Poller {
-  final SphService service;
-  final ResponseCache cache;
+  final SyncService sync;
   final AppDatabase db;
   final Notifier notifier;
   final PollerConfig config;
   final void Function(String message) log;
   final DateTime Function() _now;
 
-  Timer? _timer;
-  Future<void>? _running;
+  int _sentTotal = 0;
 
   /// Forgotten fingerprints are pruned after this time.
   static const _retention = Duration(days: 90);
 
   Poller({
-    required this.service,
-    required this.cache,
+    required this.sync,
     required this.db,
     required this.notifier,
     this.config = const PollerConfig(),
     void Function(String message)? log,
     DateTime Function()? now,
   }) : log = log ?? ((_) {}),
-       _now = now ?? DateTime.now;
-
-  /// Starts checking once a minute which kinds are due.
-  void start() {
-    _timer ??= Timer.periodic(const Duration(minutes: 1), (_) => _tick());
-    Timer(const Duration(seconds: 20), _tick);
+       _now = now ?? DateTime.now {
+    sync.addListener(_onData);
+    sync.addFailureListener(_onFailure);
   }
 
-  Future<void> stop() async {
-    _timer?.cancel();
-    _timer = null;
-    await _running;
-  }
+  static SyncTask taskFor(WatchKind kind) => switch (kind) {
+    WatchKind.substitutions => SyncTask.substitutions,
+    WatchKind.homework => SyncTask.homework,
+    WatchKind.grades => SyncTask.lessons,
+  };
+
+  static WatchKind? _kindFor(SyncTask task) => switch (task) {
+    SyncTask.substitutions => WatchKind.substitutions,
+    SyncTask.homework => WatchKind.homework,
+    SyncTask.lessons => WatchKind.grades,
+    _ => null,
+  };
 
   PollStatus status(WatchKind kind) =>
       PollStatus.fromJson(db.getJson('poll:${kind.name}'));
 
-  /// Next time [kind] is due (ignoring active hours). Never run → due
-  /// immediately (a fixed past time, so it is due regardless of clock ticks).
-  DateTime nextRun(WatchKind kind) {
-    final last = status(kind).lastRun;
-    return last == null
-        ? DateTime.fromMillisecondsSinceEpoch(0)
-        : last.add(config.intervalFor(kind));
-  }
+  /// Next scheduled check of [kind] (the sync of its data).
+  DateTime nextRun(WatchKind kind) => sync.nextRun(taskFor(kind));
 
-  /// Kinds that are due at [now] (respecting active hours).
-  List<WatchKind> dueKinds(DateTime now) => !config.isActive(now)
-      ? const []
-      : [
-          for (final k in config.kinds)
-            if (!nextRun(k).isAfter(now)) k,
-        ];
-
-  void _tick() {
-    if (_running != null) return;
-    final due = dueKinds(_now());
-    if (due.isEmpty) return;
-    _running = _guard(_runKinds(due));
-  }
-
-  /// Never lets an error escape from the timer (it would end the program).
-  Future<void> _guard(Future<int> f) => f
-      .then<void>(
-        (_) {},
-        onError: (Object e, StackTrace st) => log('poller error: $e\n$st'),
-      )
-      .whenComplete(() => _running = null);
-
-  /// Runs the given kinds now (all configured kinds by default), regardless
-  /// of schedule and active hours. Returns the number of notifications sent.
+  /// Syncs the given kinds (all configured kinds by default) now and returns
+  /// the number of notifications sent.
   Future<int> runNow([Iterable<WatchKind>? kinds]) async {
-    while (_running != null) {
-      await _running;
-    }
-    final f = _runKinds((kinds ?? config.kinds).toList());
-    _running = _guard(f);
-    return f;
+    final before = _sentTotal;
+    await sync.refreshNow([
+      for (final k in (kinds ?? config.kinds)) taskFor(k),
+    ]);
+    return _sentTotal - before;
   }
 
-  Future<int> _runKinds(List<WatchKind> kinds) async {
-    var total = 0;
-    for (final k in kinds) {
-      total += await _run(k);
-    }
-    return total;
+  Future<void> _onData(SyncTask task, Object? data) async {
+    final kind = _kindFor(task);
+    if (kind == null || !config.kinds.contains(kind)) return;
+    final seen = db.seen(kind.name);
+    final detection = switch (kind) {
+      WatchKind.substitutions => detectSubstitutions(
+        data as List<SubstitutionDay>,
+        seen,
+        _now(),
+      ),
+      WatchKind.homework => detectHomework(data as List<Homework>, seen),
+      WatchKind.grades => detectGrades(
+        (data as LessonsSnapshot).grades,
+        seen,
+        includeValues: config.includeGradeValues,
+      ),
+    };
+    _sentTotal += await _process(kind, detection);
   }
 
-  Future<int> _run(WatchKind kind) async {
+  void _onFailure(SyncTask task, Object error) {
+    final kind = _kindFor(task);
+    if (kind == null || !config.kinds.contains(kind)) return;
+    final previous = status(kind);
+    _save(
+      kind,
+      PollStatus(
+        lastRun: _now(),
+        lastSuccess: previous.lastSuccess,
+        lastError: SyncService.describeError(error),
+        sent: previous.sent,
+        baseline: previous.baseline,
+      ),
+    );
+  }
+
+  Future<int> _process(WatchKind kind, Detection detection) async {
     final started = _now();
     final previous = status(kind);
-    Detection detection;
-    try {
-      detection = await _detect(kind, db.seen(kind.name));
-    } catch (e) {
-      final message = _describe(e);
-      log('poll ${kind.name}: ${e is SphException ? e.message : e}');
-      _save(
-        kind,
-        PollStatus(
-          lastRun: started,
-          lastSuccess: previous.lastSuccess,
-          lastError: message,
-          sent: previous.sent,
-          baseline: previous.baseline,
-        ),
-      );
-      return 0;
-    }
-
     var sent = 0;
     String? error;
     if (!previous.baseline) {
@@ -250,78 +213,6 @@ class Poller {
     );
     return sent;
   }
-
-  /// Keeps the full homework list (one request per course) fresh for the web
-  /// UI: reloaded when older than [allHomeworkRefresh]. Failures are ignored
-  /// here; the web UI then loads it on demand.
-  Future<void> _warmAllHomework() async {
-    final age = cache.fetchedAt('homework:all');
-    if (age != null && _now().difference(age) < allHomeworkRefresh) return;
-    try {
-      await cache.get(
-        'homework:all',
-        CacheTtl.allHomework,
-        service.allHomework,
-        refresh: true,
-      );
-    } catch (e) {
-      log('warm homework list: $e');
-    }
-  }
-
-  /// Minimum age before the poller reloads the full homework list.
-  static const allHomeworkRefresh = Duration(minutes: 25);
-
-  /// Loads fresh data; stale cache data (portal down) counts as a failure.
-  Future<T> _load<T>(
-    String key,
-    Duration ttl,
-    Future<T> Function() load,
-  ) async {
-    final r = await cache.get<T>(key, ttl, load, refresh: true);
-    if (r.stale) {
-      throw const SphUnavailableException(
-        'Schulportal not reachable (only cached data available)',
-      );
-    }
-    return r.value;
-  }
-
-  Future<Detection> _detect(WatchKind kind, Set<String> seen) async {
-    switch (kind) {
-      case WatchKind.substitutions:
-        final days = await _load(
-          'substitutions',
-          CacheTtl.substitutions,
-          service.substitutions,
-        );
-        return detectSubstitutions(days, seen, _now());
-      case WatchKind.homework:
-        final items = await _load(
-          'homework',
-          CacheTtl.homework,
-          service.homework,
-        );
-        await _warmAllHomework();
-        return detectHomework(items, seen);
-      case WatchKind.grades:
-        final courses = await _load('grades', CacheTtl.grades, service.grades);
-        return detectGrades(
-          courses,
-          seen,
-          includeValues: config.includeGradeValues,
-        );
-    }
-  }
-
-  /// Short German description for the status page.
-  static String _describe(Object e) => switch (e) {
-    SphUnavailableException() => 'Schulportal nicht erreichbar',
-    SphAuthException() => 'Anmeldung beim Schulportal fehlgeschlagen',
-    SphFeatureDisabledException() => 'Bereich nicht freigeschaltet',
-    SphDataException() => 'Unerwartete Daten vom Schulportal',
-    _ => 'Unerwarteter Fehler',
-  };
 
   void _save(WatchKind kind, PollStatus s) =>
       db.setJson('poll:${kind.name}', s.toJson());

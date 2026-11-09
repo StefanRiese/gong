@@ -1,5 +1,6 @@
 import '../auth/password.dart';
 import '../notify/poller.dart';
+import '../sync/sync_service.dart';
 import 'env.dart';
 
 /// ntfy push notification settings; null in [AppConfig.ntfy] = disabled.
@@ -40,6 +41,9 @@ class AppConfig {
   final Uri? appUrl;
   final PollerConfig poller;
 
+  /// Background sync with Schulportal (also drives notifications).
+  final SyncConfig sync;
+
   /// Open the web UI in the default browser after start (desktop builds).
   final bool openBrowser;
 
@@ -56,8 +60,16 @@ class AppConfig {
     this.ntfy,
     this.appUrl,
     this.poller = const PollerConfig(),
+    this.sync = const SyncConfig(),
     this.openBrowser = false,
+    this.missing = const [],
   });
+
+  /// Required settings that are not set yet (with `allowIncomplete`): the
+  /// server then starts in setup mode (web UI setup page).
+  final List<String> missing;
+
+  bool get needsSetup => missing.isNotEmpty;
 
   String get databasePath => '$dataDir/schulportal.db';
 
@@ -65,15 +77,29 @@ class AppConfig {
   static final _hoursPattern = RegExp(r'^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$');
 
   /// Parses [env]; throws [ConfigException] listing all problems.
-  factory AppConfig.fromEnv(Map<String, String> env) {
+  /// With [allowIncomplete], missing Schulportal credentials or web UI
+  /// password are no error but listed in [missing] (setup mode).
+  /// [passwordIterations] overrides the PBKDF2 cost for a plain
+  /// APP_PASSWORD (tests).
+  factory AppConfig.fromEnv(
+    Map<String, String> env, {
+    int? passwordIterations,
+    bool allowIncomplete = false,
+  }) {
     final problems = <String>[];
+    final missing = <String>[];
     String? get(String key) {
       final v = env[key]?.trim();
       return (v == null || v.isEmpty) ? null : v;
     }
 
-    final sph = SphCredentials.fromEnv(env);
-    if (sph == null) problems.add('SPH_USERNAME and SPH_PASSWORD are required');
+    var sph = SphCredentials.fromEnv(env);
+    if (sph == null) {
+      const message = 'SPH_USERNAME and SPH_PASSWORD are required';
+      (allowIncomplete ? missing : problems).add(message);
+      final school = int.tryParse(get('SPH_SCHOOL_ID') ?? '6128') ?? 6128;
+      sph = SphCredentials(school, get('SPH_USERNAME') ?? '', '');
+    }
 
     // APP_PASSWORD (plain text) wins over APP_PASSWORD_HASH; the desktop
     // builds replace it with the hash in the config file (see config_file.dart).
@@ -83,10 +109,12 @@ class AppConfig {
       if (plain.length < 8) {
         problems.add('APP_PASSWORD must have at least 8 characters');
       } else {
-        hash = PasswordHasher.hash(plain);
+        hash = passwordIterations == null
+            ? PasswordHasher.hash(plain)
+            : PasswordHasher.hash(plain, iterations: passwordIterations);
       }
     } else if (hash.isEmpty) {
-      problems.add(
+      (allowIncomplete ? missing : problems).add(
         'APP_PASSWORD or APP_PASSWORD_HASH is required (create a hash with '
         'bin/hash_password, or run deploy/install.sh --configure)',
       );
@@ -140,7 +168,7 @@ class AppConfig {
       }
     }
 
-    final interval = int.tryParse(get('POLL_INTERVAL_MINUTES') ?? '20');
+    final interval = int.tryParse(get('POLL_INTERVAL_MINUTES') ?? '15');
     if (interval == null || interval < 5) {
       problems.add('POLL_INTERVAL_MINUTES must be at least 5');
     }
@@ -183,7 +211,7 @@ class AppConfig {
     if (problems.isNotEmpty) throw ConfigException(problems);
 
     return AppConfig(
-      sph: sph!,
+      sph: sph,
       appPasswordHash: hash,
       host: get('HOST') ?? '127.0.0.1',
       port: port!,
@@ -196,13 +224,22 @@ class AppConfig {
       appUrl: appUrl,
       poller: PollerConfig(
         kinds: kinds,
-        interval: Duration(minutes: interval!),
-        gradesInterval: Duration(minutes: gradesInterval!),
-        activeFromHour: from,
-        activeToHour: to,
         includeGradeValues: _bool(env['NOTIFY_GRADE_VALUES']),
       ),
+      sync: SyncConfig(
+        enabled: !const {
+          '0',
+          'false',
+          'no',
+          'off',
+        }.contains(env['SYNC']?.trim().toLowerCase()),
+        interval: Duration(minutes: interval!),
+        detailsInterval: Duration(minutes: gradesInterval!),
+        activeFromHour: from,
+        activeToHour: to,
+      ),
       openBrowser: _bool(env['OPEN_BROWSER']),
+      missing: missing,
     );
   }
 

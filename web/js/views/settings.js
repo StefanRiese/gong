@@ -8,6 +8,9 @@ import { pageHeader } from './common.js';
 
 export const title = 'Einstellungen';
 
+/** No live re-rendering: it would discard unsaved changes. */
+export const live = false;
+
 let rowCounter = 0;
 
 export async function render(ctx) {
@@ -122,6 +125,11 @@ export async function render(ctx) {
   return h('div', null,
     pageHeader('Einstellungen'),
     h('section', { class: 'section' },
+      h('h2', null, 'Server'),
+      h('p', null, h('a', { href: '/einstellungen/server', class: 'settings-link' },
+        icon('settings'), 'Schulportal-Zugang, Passwort, Abgleich, Benachrichtigungen, Netzwerk')),
+    ),
+    h('section', { class: 'section' },
       h('div', { class: 'section-head' }, h('h2', null, 'Fächer & Farben'), resetAll, status),
       h('p', { class: 'hint' },
         'Jeder Kurs nutzt die Farbe seines Stundenplan-Fachs, damit Stundenplan, Fächer, ',
@@ -132,7 +140,7 @@ export async function render(ctx) {
     h('section', { class: 'section' },
       h('h2', null, 'Benachrichtigungen'),
       h('p', null, h('a', { href: '/benachrichtigungen', class: 'settings-link' },
-        icon('bell'), 'Push-Benachrichtigungen (ntfy): Status, Testnachricht')),
+        icon('bell'), 'Push-Benachrichtigungen: Status, Testnachricht')),
     ),
   );
 }

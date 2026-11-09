@@ -11,7 +11,7 @@ import 'win32.dart';
 enum TrayCommand { quit, restart }
 
 /// Notification area icon with a popup menu (right click):
-/// open web UI, edit settings, show log, restart, quit.
+/// open web UI, settings (web UI), show log, restart, quit.
 ///
 /// The Win32 message loop blocks, so it runs in its own isolate; the window
 /// procedure is called synchronously on that isolate's thread.
@@ -25,7 +25,7 @@ class WindowsTray {
   /// Starts the tray isolate; [onCommand] receives menu commands.
   static Future<WindowsTray> start({
     required String url,
-    required String configPath,
+    required String settingsUrl,
     required String logPath,
     required Uint8List iconPng,
     String? startupHint,
@@ -53,7 +53,7 @@ class WindowsTray {
       _TrayArgs(
         port.sendPort,
         url,
-        configPath,
+        settingsUrl,
         logPath,
         TransferableTypedData.fromList([iconPng]),
         startupHint,
@@ -80,7 +80,7 @@ class WindowsTray {
 class _TrayArgs {
   final SendPort port;
   final String url;
-  final String configPath;
+  final String settingsUrl;
   final String logPath;
   final TransferableTypedData icon;
   final String? startupHint;
@@ -88,7 +88,7 @@ class _TrayArgs {
   _TrayArgs(
     this.port,
     this.url,
-    this.configPath,
+    this.settingsUrl,
     this.logPath,
     this.icon,
     this.startupHint,
@@ -125,7 +125,7 @@ void _runTray(_TrayArgs args, Arena arena) {
     void item(int id, String text) =>
         AppendMenu(menu, MF_STRING, id, text.toNativeUtf16(allocator: arena));
     item(_idOpen, 'Schulportal-Client öffnen');
-    item(_idSettings, 'Einstellungen bearbeiten');
+    item(_idSettings, 'Einstellungen');
     item(_idLog, 'Protokoll anzeigen');
     AppendMenu(menu, MF_SEPARATOR, 0, nullptr);
     item(_idRestart, 'Neu starten');
@@ -152,7 +152,7 @@ void _runTray(_TrayArgs args, Arena arena) {
       case _idOpen:
         openUrl();
       case _idSettings:
-        openInNotepad(args.configPath);
+        shellOpen(args.settingsUrl);
       case _idLog:
         openInNotepad(args.logPath);
       case _idRestart:

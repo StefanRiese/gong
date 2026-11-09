@@ -211,12 +211,19 @@ config_complete() {
   [[ -n $(config_get SPH_USERNAME) && -n $(config_get SPH_PASSWORD) && -n $(config_get APP_PASSWORD_HASH) ]]
 }
 
+# Set up in the web UI: settings are in the database, no setup token left.
+web_configured() {
+  [[ -f $STATE_DIR/schulportal.db && ! -f $STATE_DIR/setup-token ]]
+}
+
 configure() { # force
   local force=${1:-0}
-  if [[ $force == 0 ]] && config_complete; then return 0; fi
+  if [[ $force == 0 ]] && { config_complete || web_configured; }; then return 0; fi
   if [[ $interactive == 0 ]]; then
-    warn "Zugangsdaten fehlen. Bitte $CONFIG_FILE bearbeiten (SPH_USERNAME, SPH_PASSWORD, APP_PASSWORD_HASH)"
-    warn "oder 'bash $PREFIX/deploy/install.sh --configure' im Terminal ausführen."
+    say "Zugangsdaten fehlen: Einrichtung im Browser (Link folgt nach dem Start)"
+    return 0
+  fi
+  if [[ $force == 0 ]] && [[ $(ask "Jetzt im Terminal einrichten? Sonst im Browser (j/n)" "n") != [jJyY]* ]]; then
     return 0
   fi
 
@@ -326,12 +333,6 @@ start_service() {
   [[ $SKIP_SYSTEMD == 1 ]] && { say "(SKIP_SYSTEMD) Dienst nicht gestartet"; return 0; }
   systemctl daemon-reload
   systemctl enable "$APP" >/dev/null 2>&1
-  if ! config_complete; then
-    warn "Dienst ist aktiviert, startet aber erst, wenn die Zugangsdaten eingetragen sind:"
-    warn "  bash $PREFIX/deploy/install.sh --configure   und danach   systemctl restart $APP"
-    return 0
-  fi
-
   say "Starte Dienst"
   systemctl restart "$APP" || true
   if wait_healthy; then return 0; fi
@@ -383,6 +384,16 @@ summary() {
   else
     echo "  Web-Oberfläche: http://${ip:-<container-ip>}:${port:-8080}"
   fi
+  local token
+  token=$(cat "$STATE_DIR/setup-token" 2>/dev/null || true)
+  if [[ -n $token ]]; then
+    local base="http://${ip:-<container-ip>}:${port:-8080}"
+    [[ $host == 127.0.0.1 || $host == localhost ]] && base="http://127.0.0.1:${port:-8080}"
+    echo
+    say "Einrichtung im Browser öffnen (Schule, Zugangsdaten, Passwort):"
+    echo "  $base/einrichtung?token=$token"
+    echo
+  fi
   echo "  Status:         systemctl status $APP"
   echo "  Logs:           journalctl -u $APP -f"
   echo "  Konfiguration:  $CONFIG_FILE"
@@ -421,6 +432,13 @@ do_configure() {
   [[ $interactive == 1 ]] || die "--configure braucht ein Terminal."
   ensure_config
   configure 1
+  # Settings made in the web UI take precedence over config.env: let the
+  # server forget them for the keys just entered (applied on its next start).
+  if [[ -d $STATE_DIR ]]; then
+    printf '%s\n' SPH_SCHOOL_ID SPH_USERNAME SPH_PASSWORD APP_PASSWORD_HASH \
+      NTFY_URL NTFY_TOPIC NTFY_TOKEN APP_URL > "$STATE_DIR/reset-web-settings"
+    chmod 644 "$STATE_DIR/reset-web-settings"
+  fi
   if [[ $SKIP_SYSTEMD != 1 ]] && systemctl is-enabled --quiet "$APP" 2>/dev/null; then
     start_service
   fi

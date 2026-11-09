@@ -62,6 +62,13 @@ class SessionStore {
     return true;
   }
 
+  /// Ends all sessions except [keep] (e.g. after a password change).
+  void revokeAllExcept(String? keep) {
+    _sessions.removeWhere((t, _) => t != keep);
+    _persistedExpiry.removeWhere((t, _) => t != keep);
+    database?.deleteSessionsExcept(keep);
+  }
+
   void revoke(String? token) {
     if (token == null) return;
     _sessions.remove(token);

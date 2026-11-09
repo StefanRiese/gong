@@ -125,4 +125,129 @@ void main() {
     small.clear();
     expect((await small.get('c', ttl, () async => ++loads)).cached, isFalse);
   });
+
+  group('read (stale-while-revalidate)', () {
+    test(
+      'answers right away and refreshes expired entries in background',
+      () async {
+        var loads = 0;
+        final gate = Completer<void>();
+        Future<int> load() async {
+          loads++;
+          if (loads > 1) await gate.future;
+          return loads;
+        }
+
+        final first = await cache.read('k', ttl, load);
+        expect(
+          (first.value, first.cached),
+          (1, false),
+          reason: 'empty → waits',
+        );
+
+        now = now.add(const Duration(minutes: 11));
+        final second = await cache.read('k', ttl, load);
+        expect((second.value, second.cached, second.stale), (1, true, false));
+        expect(second.refreshing, isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(loads, 2);
+
+        final third = await cache.read('k', ttl, load);
+        expect(third.value, 1);
+        expect(loads, 2, reason: 'one background refresh at a time');
+
+        gate.complete();
+        while (cache.isLoading('k')) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        final fourth = await cache.read('k', ttl, load);
+        expect((fourth.value, fourth.refreshing), (2, false));
+      },
+    );
+
+    test('failed background refresh marks the entry as stale', () async {
+      await cache.read('k', ttl, () async => 1);
+      now = now.add(const Duration(minutes: 11));
+      await cache.read<int>(
+        'k',
+        ttl,
+        () async => throw const SphUnavailableException('down'),
+      );
+      while (cache.isLoading('k')) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      final r = await cache.read<int>(
+        'k',
+        ttl,
+        () => Completer<int>().future, // never finishes
+      );
+      expect((r.value, r.stale), (1, true));
+    });
+  });
+
+  test('updates report new and changed entries', () async {
+    final updates = <String>[];
+    cache.updates.listen((u) => updates.add(u.key));
+    await cache.get('a', ttl, () async => 1);
+    cache.put('b', 2);
+    cache.update<int>('b', (v) => v + 1);
+    expect(updates, ['a', 'b', 'b']);
+  });
+
+  test('entries with a codec survive a restart via the store', () async {
+    final db = AppDatabase.inMemory();
+    addTearDown(db.close);
+    ResponseCache create() => ResponseCache(
+      now: () => now,
+      serveStaleOn: (_) => false,
+      store: db,
+      codecFor: CacheKeys.codecFor,
+    );
+
+    final first = create();
+    final hw = [
+      Homework(
+        courseId: 'c1',
+        courseName: 'Mathe',
+        entryId: 'e1',
+        date: DateTime(2026, 11, 9),
+        topic: 'Brüche',
+        description: 'S. 12',
+        done: false,
+      ),
+    ];
+    first.put(CacheKeys.homework, hw);
+    first.put('no-codec', 42);
+    first.update<List<Homework>>(
+      CacheKeys.homework,
+      (l) => [for (final h in l) h.withDone(true)],
+    );
+
+    now = now.add(const Duration(hours: 1));
+    final second = create();
+    expect(second.fetchedAt(CacheKeys.homework), DateTime(2026, 11, 9, 12));
+    expect(second.fetchedAt('no-codec'), isNull);
+    final restored = (await second.read<List<Homework>>(
+      CacheKeys.homework,
+      const Duration(days: 1),
+      () => throw StateError('should not load'),
+    )).value;
+    expect(restored.single.toJson(), hw.single.withDone(true).toJson());
+
+    second.remove(CacheKeys.homework);
+    expect(create().fetchedAt(CacheKeys.homework), isNull);
+  });
+
+  test('damaged stored entries are dropped', () {
+    final db = AppDatabase.inMemory();
+    addTearDown(db.close);
+    db.save(CacheKeys.timetable, '{"slots": [', now);
+    final c = ResponseCache(
+      serveStaleOn: (_) => false,
+      store: db,
+      codecFor: CacheKeys.codecFor,
+    );
+    expect(c.fetchedAt(CacheKeys.timetable), isNull);
+    expect(db.loadAll(), isEmpty);
+  });
 }

@@ -1,6 +1,8 @@
 // HTTP server for schulportal-client.
 //
-// Configuration via environment variables or server/.env (see .env.example).
+// Configuration via environment variables or server/.env (see .env.example);
+// settings made in the web UI (setup page, Einstellungen → Server) are stored
+// in the database and take precedence.
 //
 //   server            run the server
 //   server check      verify the build (SQLite, embedded files); for CI
@@ -30,12 +32,6 @@ Future<void> main(List<String> args) async {
   final envFile = desktop == DesktopPlatform.macos
       ? desktopConfigPath()
       : Platform.environment['ENV_FILE'] ?? '.env';
-  if (desktop == DesktopPlatform.macos && !File(envFile).existsSync()) {
-    createDesktopConfig(envFile);
-    stderr.writeln('Created $envFile – fill in and start again.');
-    exit(exitConfigCreated);
-  }
-
   try {
     if (hashPlainPasswordInFile(envFile)) {
       _log('Replaced APP_PASSWORD with APP_PASSWORD_HASH in $envFile', false);
@@ -43,27 +39,27 @@ Future<void> main(List<String> args) async {
   } on FileSystemException catch (e) {
     _log('Cannot update $envFile (${e.message}); hashing in memory', true);
   }
-
-  final AppConfig config;
-  try {
-    config = AppConfig.fromEnv(loadEnv(path: envFile));
-  } on ConfigException catch (e) {
-    stderr.writeln(e);
-    exit(exitConfigInvalid);
-  }
+  var env = loadEnv(path: envFile);
+  if (desktop != null) env = withDesktopDefaults(env);
 
   final AppServer server;
   try {
-    server = await AppServer.start(config, log: _logRaw);
+    server = await AppServer.start(env, log: _logRaw);
   } on AppServerException catch (e) {
     stderr.writeln(e);
     exit(e.exitCode);
   } on SocketException catch (e) {
-    stderr.writeln('Cannot listen on ${config.host}:${config.port}: $e');
+    stderr.writeln('Cannot listen: $e');
     exit(69); // EX_UNAVAILABLE
   }
+  // The macOS menu bar app reads this line.
   if (desktop != null) _log('Web UI: ${server.localUrl}', false);
-  if (config.openBrowser) await openInBrowser(server.localUrl);
+  final setup = server.setupUrl;
+  if (setup != null && desktop != null) {
+    await openInBrowser(setup);
+  } else if (setup == null && server.config.openBrowser) {
+    await openInBrowser(server.localUrl);
+  }
 
   final done = Completer<void>();
   Future<void> shutdown(ProcessSignal signal) async {

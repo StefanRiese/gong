@@ -1,9 +1,11 @@
 // Menu bar app for the macOS build of schulportal-client.
 //
 // Starts the Dart server (Contents/Resources/bin/server-<arch>) as child process and
-// shows a menu bar icon with: open web UI, edit settings, show log, restart,
-// quit. Config and data live in ~/Library/Application Support/schulportal-client,
-// the log in ~/Library/Logs/Schulportal-Client.log.
+// shows a menu bar icon with: open web UI, settings (web UI), show log, restart,
+// quit. Data (and an optional config.env) live in
+// ~/Library/Application Support/schulportal-client, the log in
+// ~/Library/Logs/Schulportal-Client.log. On first start the server opens its
+// setup page in the browser.
 //
 // Built by deploy/build-macos-app.sh (swiftc, no Xcode project).
 
@@ -18,9 +20,8 @@ private let serverBinary = "bin/server-arm64"
 private let serverBinary = "bin/server-x86_64"
 #endif
 
-/// Exit codes of the server (see server/lib/src/desktop/desktop.dart).
+/// Exit code of the server for an invalid config.env (EX_CONFIG).
 private let exitConfigInvalid: Int32 = 78
-private let exitConfigCreated: Int32 = 79
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -53,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(menuItem("Schulportal-Client öffnen", #selector(openWebUI), "o"))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Einstellungen bearbeiten …", #selector(editSettings), ","))
+        menu.addItem(menuItem("Einstellungen …", #selector(openSettings), ","))
         menu.addItem(menuItem("Protokoll anzeigen", #selector(showLog), "l"))
         menu.addItem(.separator())
         menu.addItem(menuItem("Neu starten", #selector(restartServer), "r"))
@@ -145,20 +146,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         switch status {
-        case exitConfigCreated:
-            alert("Willkommen beim Schulportal-Client!\n\n"
-                + "Die Einstellungen werden jetzt geöffnet. Bitte die Zugangsdaten für das "
-                + "Schulportal und ein Passwort für die Web-Oberfläche eintragen, speichern "
-                + "und den Schulportal-Client erneut starten.\n\n\(configURL.path)",
-                  style: .informational, buttons: ["Einstellungen öffnen"])
-            editSettings()
-            NSApp.terminate(nil)
         case exitConfigInvalid:
-            let choice = alert("Die Einstellungen sind unvollständig oder fehlerhaft:\n\n"
+            let choice = alert("Die Konfigurationsdatei ist fehlerhaft:\n\n"
                 + problems() + "\n\nNach dem Speichern über das Menü „Neu starten“ wählen.",
-                               style: .warning, buttons: ["Einstellungen öffnen", "Beenden"])
+                               style: .warning, buttons: ["Datei öffnen", "Beenden"])
             if choice == .alertFirstButtonReturn {
-                editSettings()
+                editConfigFile()
             } else {
                 NSApp.terminate(nil)
             }
@@ -191,7 +184,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func editSettings() {
+    /// Server settings page of the web UI.
+    @objc private func openSettings() {
+        if let url = webURL?.appendingPathComponent("einstellungen/server") {
+            NSWorkspace.shared.open(url)
+        } else if server == nil {
+            restartServer()
+        }
+    }
+
+    /// Optional config.env (advanced settings, only on errors in it).
+    private func editConfigFile() {
         open(["-t", configURL.path]) // default text editor (TextEdit)
     }
 

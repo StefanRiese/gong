@@ -8,6 +8,17 @@ String _date(DateTime d) =>
     '${d.month.toString().padLeft(2, '0')}-'
     '${d.day.toString().padLeft(2, '0')}';
 
+DateTime? _parseDate(Object? v) => v is String ? DateTime.parse(v) : null;
+
+List<T> _list<T>(Object? v, T Function(Map<String, Object?>) f) => [
+  for (final e in (v as List? ?? const []))
+    f((e as Map).cast<String, Object?>()),
+];
+
+List<String> _strings(Object? v) => [
+  for (final e in (v as List? ?? const [])) e as String,
+];
+
 /// Features (SPH applets) the app knows about.
 enum SphFeature {
   timetable('stundenplan.php'),
@@ -34,6 +45,16 @@ class AccountInfo {
     required this.accountType,
     required this.features,
   });
+
+  factory AccountInfo.fromJson(Map<String, Object?> j) => AccountInfo(
+    schoolId: j['schoolId'] as int,
+    username: j['username'] as String,
+    accountType: j['accountType'] as String?,
+    features: {
+      for (final f in _strings(j['features']))
+        ...SphFeature.values.where((v) => v.name == f),
+    },
+  );
 
   Map<String, Object?> toJson() => {
     'schoolId': schoolId,
@@ -75,6 +96,18 @@ class TimetableLesson {
     required this.week,
   });
 
+  factory TimetableLesson.fromJson(Map<String, Object?> j) => TimetableLesson(
+    weekday: j['weekday'] as int,
+    period: j['period'] as int?,
+    duration: j['duration'] as int,
+    start: j['start'] as String,
+    end: j['end'] as String,
+    subject: j['subject'] as String?,
+    room: j['room'] as String?,
+    teacher: j['teacher'] as String?,
+    week: j['week'] as String?,
+  );
+
   Map<String, Object?> toJson() => {
     'weekday': weekday,
     'period': period,
@@ -107,6 +140,13 @@ class TimeSlot {
 
   bool get isBreak => period == null;
 
+  factory TimeSlot.fromJson(Map<String, Object?> j) => TimeSlot(
+    period: j['period'] as int?,
+    label: j['label'] as String,
+    start: j['start'] as String,
+    end: j['end'] as String,
+  );
+
   Map<String, Object?> toJson() => {
     'period': period,
     'label': label,
@@ -126,6 +166,12 @@ class Timetable {
     required this.slots,
     required this.lessons,
   });
+
+  factory Timetable.fromJson(Map<String, Object?> j) => Timetable(
+    currentWeek: j['currentWeek'] as String?,
+    slots: _list(j['slots'], TimeSlot.fromJson),
+    lessons: _list(j['lessons'], TimetableLesson.fromJson),
+  );
 
   Map<String, Object?> toJson() => {
     'currentWeek': currentWeek,
@@ -159,6 +205,19 @@ class Substitution {
     this.note,
   });
 
+  factory Substitution.fromJson(Map<String, Object?> j) => Substitution(
+    period: j['period'] as String,
+    type: j['type'] as String?,
+    subject: j['subject'] as String?,
+    previousSubject: j['previousSubject'] as String?,
+    teacher: j['teacher'] as String?,
+    substitute: j['substitute'] as String?,
+    room: j['room'] as String?,
+    previousRoom: j['previousRoom'] as String?,
+    className: j['className'] as String?,
+    note: j['note'] as String?,
+  );
+
   Map<String, Object?> toJson() => {
     'period': period,
     'type': type,
@@ -181,6 +240,12 @@ class SubstitutionNotice {
 
   const SubstitutionNotice({required this.title, required this.lines});
 
+  factory SubstitutionNotice.fromJson(Map<String, Object?> j) =>
+      SubstitutionNotice(
+        title: j['title'] as String,
+        lines: _strings(j['lines']),
+      );
+
   Map<String, Object?> toJson() => {'title': title, 'lines': lines};
 }
 
@@ -194,6 +259,12 @@ class SubstitutionDay {
     required this.entries,
     required this.notices,
   });
+
+  factory SubstitutionDay.fromJson(Map<String, Object?> j) => SubstitutionDay(
+    date: _parseDate(j['date'])!,
+    entries: _list(j['entries'], Substitution.fromJson),
+    notices: _list(j['notices'], SubstitutionNotice.fromJson),
+  );
 
   Map<String, Object?> toJson() => {
     'date': _date(date),
@@ -223,6 +294,17 @@ class CalendarEntry {
     this.category,
   });
 
+  factory CalendarEntry.fromJson(Map<String, Object?> j) => CalendarEntry(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    description: j['description'] as String,
+    start: _parseDate(j['start'])!,
+    end: _parseDate(j['end'])!,
+    allDay: j['allDay'] as bool,
+    place: j['place'] as String?,
+    category: j['category'] as String?,
+  );
+
   Map<String, Object?> toJson() => {
     'id': id,
     'title': title,
@@ -241,6 +323,12 @@ class Course {
   final List<String> teachers;
 
   const Course({required this.id, required this.name, required this.teachers});
+
+  factory Course.fromJson(Map<String, Object?> j) => Course(
+    id: j['id'] as String,
+    name: j['name'] as String,
+    teachers: _strings(j['teachers']),
+  );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -276,6 +364,16 @@ class Homework {
     topic: topic,
     description: description,
     done: value,
+  );
+
+  factory Homework.fromJson(Map<String, Object?> j) => Homework(
+    courseId: j['courseId'] as String,
+    courseName: j['courseName'] as String,
+    entryId: j['entryId'] as String,
+    date: _parseDate(j['date']),
+    topic: j['topic'] as String?,
+    description: j['description'] as String,
+    done: j['done'] as bool,
   );
 
   Map<String, Object?> toJson() => {
@@ -321,6 +419,17 @@ class LessonEntry {
     attendance: attendance,
   );
 
+  factory LessonEntry.fromJson(Map<String, Object?> j) => LessonEntry(
+    id: j['id'] as String,
+    date: _parseDate(j['date']),
+    periods: j['periods'] as String?,
+    topic: j['topic'] as String?,
+    description: j['description'] as String?,
+    homework: j['homework'] as String?,
+    homeworkDone: j['homeworkDone'] as bool? ?? false,
+    attendance: j['attendance'] as String?,
+  );
+
   Map<String, Object?> toJson() => {
     'id': id,
     'date': date == null ? null : _date(date!),
@@ -348,6 +457,13 @@ class Grade {
     this.comment,
   });
 
+  factory Grade.fromJson(Map<String, Object?> j) => Grade(
+    name: j['name'] as String,
+    date: j['date'] as String,
+    mark: j['mark'] as String,
+    comment: j['comment'] as String?,
+  );
+
   Map<String, Object?> toJson() => {
     'name': name,
     'date': date,
@@ -361,6 +477,9 @@ class Exam {
   final String? value;
 
   const Exam({required this.name, this.value});
+
+  factory Exam.fromJson(Map<String, Object?> j) =>
+      Exam(name: j['name'] as String, value: j['value'] as String?);
 
   Map<String, Object?> toJson() => {'name': name, 'value': value};
 }
@@ -388,6 +507,14 @@ class CourseDetails {
     attendance: attendance,
   );
 
+  factory CourseDetails.fromJson(Map<String, Object?> j) => CourseDetails(
+    course: Course.fromJson((j['course'] as Map).cast()),
+    history: _list(j['history'], LessonEntry.fromJson),
+    grades: _list(j['grades'], Grade.fromJson),
+    exams: _list(j['exams'], Exam.fromJson),
+    attendance: (j['attendance'] as Map? ?? const {}).cast<String, String>(),
+  );
+
   Map<String, Object?> toJson() => {
     'course': course.toJson(),
     'history': [for (final h in history) h.toJson()],
@@ -408,6 +535,12 @@ class CourseGrades {
     required this.grades,
     required this.exams,
   });
+
+  factory CourseGrades.fromJson(Map<String, Object?> j) => CourseGrades(
+    course: Course.fromJson((j['course'] as Map).cast()),
+    grades: _list(j['grades'], Grade.fromJson),
+    exams: _list(j['exams'], Exam.fromJson),
+  );
 
   Map<String, Object?> toJson() => {
     'course': course.toJson(),

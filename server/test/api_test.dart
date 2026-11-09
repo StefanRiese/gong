@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:async/async.dart';
 import 'package:schulportal_server/schulportal_server.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
@@ -245,10 +246,19 @@ void main() {
       now = now.add(const Duration(days: 1));
       await service.logout();
       gw.loginErrors.add(const SphUnavailableException('down'));
-      final r = await send('GET', '/api/timetable', cookie: cookie);
+      // Answered from the cache right away, refreshed in the background …
+      var r = await send('GET', '/api/timetable', cookie: cookie);
       expect(r.statusCode, 200);
-      final b = await body(r);
-      expect(b['stale'], isTrue);
+      var b = await body(r);
+      expect(b['data']['currentWeek'], 'B');
+      expect((b['stale'], b['refreshing']), (false, true));
+      while (api.cache.isLoading('timetable')) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      // … which failed: now the data is marked as stale (offline).
+      r = await send('GET', '/api/timetable', cookie: cookie);
+      b = await body(r);
+      expect((b['stale'], b['refreshing']), (true, true));
       expect(b['data']['currentWeek'], 'B');
     });
 
@@ -341,12 +351,13 @@ void main() {
       expect(gw.homeworkCalls, isEmpty);
     });
 
-    test('refresh clears the cache', () async {
+    test('refresh without sync clears the cache', () async {
       await send('GET', '/api/homework', cookie: cookie);
       final r = await send('POST', '/api/refresh', cookie: cookie);
       expect(r.statusCode, 204);
       final b = await body(await send('GET', '/api/homework', cookie: cookie));
       expect(b['cached'], isFalse);
+      expect(b['key'], 'homework');
     });
 
     test('unknown API path → JSON 404', () async {
@@ -538,6 +549,101 @@ void main() {
     test('empty embedded web → 404 for non-API paths', () async {
       handler = build(embeddedWeb: EmbeddedWeb.fromBase64({})).handler;
       expect((await send('GET', '/')).statusCode, 404);
+    });
+  });
+
+  group('sync and live updates', () {
+    late AppDatabase db;
+    late SyncService sync;
+    late String cookie;
+
+    setUp(() async {
+      db = AppDatabase.inMemory();
+      final cache = Api.createCache(now: () => now);
+      sync = SyncService(
+        service: service,
+        cache: cache,
+        db: db,
+        config: const SyncConfig(pause: Duration.zero),
+        now: () => now,
+      );
+      api = Api(
+        service: service,
+        passwordHash: _hash,
+        cache: cache,
+        sync: sync,
+        now: () => now,
+      );
+      handler = api.handler;
+      cookie = await login();
+    });
+
+    tearDown(() async {
+      await api.close();
+      await sync.stop();
+      db.close();
+    });
+
+    test('refresh starts a sync in the background (202)', () async {
+      final r = await send('POST', '/api/refresh', cookie: cookie);
+      expect(r.statusCode, 202);
+      expect(await body(r), {'refreshing': true});
+      expect(sync.running, isTrue);
+      await sync.refreshNow(const []); // waits for the running sync
+      final b = await body(await send('GET', '/api/grades', cookie: cookie));
+      expect(b['cached'], isTrue, reason: 'filled by the sync');
+    });
+
+    test('sync status lists all tasks', () async {
+      await sync.refreshNow([SyncTask.homework]);
+      final b = await body(await send('GET', '/api/sync', cookie: cookie));
+      expect(b['enabled'], isTrue);
+      expect(b['running'], isFalse);
+      expect((b['tasks'] as Map).keys, [
+        for (final t in SyncTask.values) t.name,
+      ]);
+      expect(b['tasks']['homework']['lastSuccess'], isNotNull);
+      expect(b['tasks']['homework']['intervalMinutes'], 15);
+      expect(b['tasks']['grades'], isNull);
+      expect(b['tasks']['lessons']['lastRun'], isNull);
+      expect((await send('GET', '/api/sync', cookie: 'x=y')).statusCode, 401);
+    });
+
+    test('events stream pushes sync state and cache updates', () async {
+      final r = await send('GET', '/api/events', cookie: cookie);
+      expect(r.statusCode, 200);
+      expect(r.headers['content-type'], startsWith('text/event-stream'));
+      expect(r.headers['content-encoding'], 'identity');
+      final lines = StreamQueue(
+        r.read().transform(utf8.decoder).transform(const LineSplitter()),
+      );
+      Future<String> next() async {
+        while (true) {
+          final l = await lines.next;
+          if (l.isNotEmpty) return l;
+        }
+      }
+
+      expect(await next(), 'retry: 5000');
+      expect(await next(), 'event: sync');
+      expect(await next(), 'data: {"running":false}');
+
+      final done = sync.refreshNow([SyncTask.timetable]);
+      expect(await next(), 'event: sync');
+      expect(await next(), 'data: {"running":true}');
+      expect(await next(), 'event: update');
+      expect(await next(), startsWith('data: {"key":"timetable"'));
+      expect(await next(), 'event: sync');
+      expect(await next(), 'data: {"running":false}');
+      await done;
+      await api.close();
+      // Stream ends on shutdown (only blank separator lines remain).
+      expect((await lines.rest.toList()).where((l) => l.isNotEmpty), isEmpty);
+    });
+
+    test('events need a login', () async {
+      final r = await send('GET', '/api/events');
+      expect(r.statusCode, 401);
     });
   });
 }

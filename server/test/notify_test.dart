@@ -222,6 +222,7 @@ void main() {
     late SphService service;
     late AppDatabase db;
     late RecordingNotifier notifier;
+    late SyncService sync;
     late Poller poller;
     late DateTime clock;
 
@@ -231,42 +232,20 @@ void main() {
       service = SphService(gw, now: () => clock);
       db = AppDatabase.inMemory();
       notifier = RecordingNotifier();
-      poller = Poller(
+      sync = SyncService(
         service: service,
         cache: Api.createCache(now: () => clock),
         db: db,
-        notifier: notifier,
+        config: const SyncConfig(pause: Duration.zero),
         now: () => clock,
       );
+      poller = Poller(sync: sync, db: db, notifier: notifier, now: () => clock);
     });
 
     tearDown(() async {
-      await poller.stop();
+      await sync.stop();
       await service.dispose();
       db.close();
-    });
-
-    test('homework run keeps the full homework list warm', () async {
-      final cache = Api.createCache(now: () => clock);
-      final p = Poller(
-        service: service,
-        cache: cache,
-        db: db,
-        notifier: notifier,
-        now: () => clock,
-      );
-      await p.runNow([WatchKind.homework]);
-      expect(cache.fetchedAt('homework:all'), clock);
-      final calls = gw.lessonDetailCalls;
-
-      clock = clock.add(const Duration(minutes: 20));
-      await p.runNow([WatchKind.homework]);
-      expect(gw.lessonDetailCalls, calls, reason: 'still fresh enough');
-
-      clock = clock.add(const Duration(minutes: 20));
-      await p.runNow([WatchKind.homework]);
-      expect(cache.fetchedAt('homework:all'), clock);
-      expect(gw.lessonDetailCalls, greaterThan(calls));
     });
 
     test('first run records baseline without notifications', () async {
@@ -287,6 +266,13 @@ void main() {
       expect(notifier.sent.single.message, contains('S. 99'));
 
       expect(await poller.runNow([WatchKind.homework]), 0, reason: 'seen');
+    });
+
+    test('also notifies for data synced in the background', () async {
+      await poller.runNow();
+      gw.lessonsData.first.currentEntry!.homework!.description = 'Neu';
+      await sync.refreshNow([SyncTask.homework]);
+      expect(notifier.sent, hasLength(1));
     });
 
     test('failed delivery is retried on the next run', () async {
@@ -313,46 +299,205 @@ void main() {
       );
     });
 
-    test('never-run kinds are due even with a ticking clock', () {
-      final ticking = Poller(
-        service: service,
-        cache: Api.createCache(),
-        db: db,
-        notifier: notifier,
-        // Every call returns a later time, like the real clock.
-        now: () => clock = clock.add(const Duration(microseconds: 1)),
-      );
-      expect(ticking.dueKinds(clock), WatchKind.values);
-    });
-
-    test('nothing is due outside active hours', () {
-      expect(poller.dueKinds(DateTime(2026, 11, 9, 23)), isEmpty);
-      expect(poller.dueKinds(DateTime(2026, 11, 9, 7)), WatchKind.values);
-    });
-
-    test('schedule: due after interval, only in active hours', () async {
+    test('next check follows the sync schedule', () async {
       await poller.runNow();
       expect(
         poller.nextRun(WatchKind.homework),
-        now.add(const Duration(minutes: 20)),
+        now.add(const Duration(minutes: 15)),
       );
-      expect(poller.dueKinds(now.add(const Duration(minutes: 19))), isEmpty);
-      expect(poller.dueKinds(now.add(const Duration(minutes: 20))), [
-        WatchKind.substitutions,
-        WatchKind.homework,
-      ]);
       expect(
         poller.nextRun(WatchKind.grades),
         now.add(const Duration(hours: 2)),
       );
-      const c = PollerConfig(activeFromHour: 6, activeToHour: 22);
+    });
+  });
+
+  group('SyncService', () {
+    late FakeGateway gw;
+    late SphService service;
+    late AppDatabase db;
+    late ResponseCache cache;
+    late SyncService sync;
+    late DateTime clock;
+
+    SyncService create({SyncConfig config = const SyncConfig()}) => SyncService(
+      service: service,
+      cache: cache,
+      db: db,
+      config: SyncConfig(
+        enabled: config.enabled,
+        activeFromHour: config.activeFromHour,
+        activeToHour: config.activeToHour,
+        pause: Duration.zero,
+      ),
+      now: () => clock,
+    );
+
+    setUp(() {
+      clock = now;
+      gw = FakeGateway();
+      service = SphService(gw, now: () => clock);
+      db = AppDatabase.inMemory();
+      cache = Api.createCache(now: () => clock);
+      sync = create();
+    });
+
+    tearDown(() async {
+      await sync.stop();
+      await service.dispose();
+      db.close();
+    });
+
+    test('fills all cache entries; course pages loaded once each', () async {
+      await sync.refreshNow();
+      for (final key in [
+        CacheKeys.account,
+        CacheKeys.timetable,
+        CacheKeys.substitutions,
+        CacheKeys.homework,
+        CacheKeys.allHomework,
+        CacheKeys.courses,
+        CacheKeys.grades,
+        CacheKeys.calendar(DateTime(2026, 11, 9), DateTime(2027, 1, 8)),
+      ]) {
+        expect(cache.fetchedAt(key), clock, reason: key);
+      }
+      final courses = (await cache.read<List<Course>>(
+        CacheKeys.courses,
+        const Duration(hours: 1),
+        () => throw StateError('not loaded'),
+      )).value;
+      expect(courses, isNotEmpty);
+      for (final c in courses) {
+        expect(cache.fetchedAt(CacheKeys.course(c.id)), clock);
+      }
+      expect(gw.lessonDetailCalls, courses.length);
+      for (final t in SyncTask.values) {
+        expect(sync.status(t).lastSuccess, clock, reason: t.name);
+      }
+    });
+
+    test(
+      'new homework from the overview is merged into the full list',
+      () async {
+        await sync.refreshNow();
+        final before = gw.lessonDetailCalls;
+        gw.lessonsData.first.currentEntry!.homework!.description = 'Brandneu';
+        await sync.refreshNow([SyncTask.homework]);
+        final all = (await cache.read<List<Homework>>(
+          CacheKeys.allHomework,
+          const Duration(hours: 1),
+          () => throw StateError('not loaded'),
+        )).value;
+        expect(
+          all.where((h) => h.description.contains('Brandneu')),
+          hasLength(1),
+        );
+        expect(gw.lessonDetailCalls, before, reason: 'no course page requests');
+      },
+    );
+
+    test('reports running state and notifies listeners', () async {
+      final states = <bool>[];
+      sync.runningChanges.listen(states.add);
+      final tasks = <SyncTask>[];
+      sync.addListener((t, _) async => tasks.add(t));
+      await sync.refreshNow([SyncTask.timetable, SyncTask.substitutions]);
+      expect(states, [true, false]);
+      expect(tasks, [SyncTask.timetable, SyncTask.substitutions]);
+      expect(sync.running, isFalse);
+    });
+
+    test('schedule: intervals, active hours, never-run tasks', () async {
+      expect(sync.dueTasks(now), SyncTask.values);
+      expect(sync.dueTasks(DateTime(2026, 11, 9, 23)), isEmpty);
+      await sync.refreshNow();
+      expect(sync.dueTasks(now.add(const Duration(minutes: 14))), isEmpty);
+      expect(sync.dueTasks(now.add(const Duration(minutes: 15))), [
+        SyncTask.substitutions,
+        SyncTask.homework,
+      ]);
+      expect(
+        sync.nextRun(SyncTask.calendar),
+        now.add(const Duration(hours: 1)),
+      );
+      expect(sync.nextRun(SyncTask.lessons), now.add(const Duration(hours: 2)));
+      expect(
+        sync.nextRun(SyncTask.timetable),
+        now.add(const Duration(hours: 6)),
+      );
+
+      const c = SyncConfig(activeFromHour: 6, activeToHour: 22);
       expect(c.isActive(DateTime(2026, 1, 1, 5, 59)), isFalse);
       expect(c.isActive(DateTime(2026, 1, 1, 6)), isTrue);
       expect(c.isActive(DateTime(2026, 1, 1, 21, 59)), isTrue);
       expect(c.isActive(DateTime(2026, 1, 1, 22)), isFalse);
-      const night = PollerConfig(activeFromHour: 20, activeToHour: 2);
+      const night = SyncConfig(activeFromHour: 20, activeToHour: 2);
       expect(night.isActive(DateTime(2026, 1, 1, 23)), isTrue);
       expect(night.isActive(DateTime(2026, 1, 1, 12)), isFalse);
+    });
+
+    test('never-run tasks are due even with a ticking clock', () {
+      final ticking = SyncService(
+        service: service,
+        cache: cache,
+        db: db,
+        // Every call returns a later time, like the real clock.
+        now: () => clock = clock.add(const Duration(microseconds: 1)),
+      );
+      expect(ticking.dueTasks(clock), SyncTask.values);
+    });
+
+    test('failures are retried with backoff, capped at the interval', () async {
+      await service.logout();
+      gw.loginErrors.addAll(
+        List.filled(3, const SphUnavailableException('down')),
+      );
+      await sync.refreshNow([SyncTask.homework]);
+      var s = sync.status(SyncTask.homework);
+      expect(s.lastError, 'Schulportal nicht erreichbar');
+      expect(s.failures, 1);
+      expect(
+        sync.nextRun(SyncTask.homework),
+        now.add(const Duration(minutes: 5)),
+      );
+
+      await sync.refreshNow([SyncTask.homework]);
+      expect(
+        sync.nextRun(SyncTask.homework),
+        now.add(const Duration(minutes: 10)),
+      );
+      await sync.refreshNow([SyncTask.homework]);
+      expect(
+        sync.nextRun(SyncTask.homework),
+        now.add(const Duration(minutes: 15)),
+        reason: 'capped at the interval',
+      );
+
+      await sync.refreshNow([SyncTask.homework]);
+      s = sync.status(SyncTask.homework);
+      expect((s.failures, s.lastError), (0, null));
+    });
+
+    test('freshFor: covered keys only while the sync is active', () {
+      expect(
+        sync.freshFor(CacheKeys.substitutions),
+        const Duration(minutes: 20),
+      );
+      expect(
+        sync.freshFor(CacheKeys.course('x')),
+        const Duration(hours: 2, minutes: 5),
+      );
+      expect(sync.freshFor('calendar:2020-01-01:2020-02-01'), isNotNull);
+      expect(sync.freshFor('unknown'), isNull);
+      clock = DateTime(2026, 11, 9, 23);
+      expect(sync.freshFor(CacheKeys.substitutions), isNull);
+      expect(
+        create(
+          config: const SyncConfig(enabled: false),
+        ).freshFor(CacheKeys.homework),
+        isNull,
+      );
     });
   });
 
@@ -450,7 +595,9 @@ void main() {
       expect(c.ntfy, isNull);
       expect(c.dataDir, '.');
       expect(c.poller.kinds, WatchKind.values.toSet());
-      expect(c.poller.interval, const Duration(minutes: 20));
+      expect(c.sync.enabled, isTrue);
+      expect(c.sync.interval, const Duration(minutes: 15));
+      expect(c.sync.detailsInterval, const Duration(hours: 2));
       expect(c.poller.includeGradeValues, isFalse);
     });
 
@@ -467,13 +614,16 @@ void main() {
         'ACTIVE_HOURS': '7-21',
         'NOTIFY_GRADE_VALUES': 'true',
         'DATA_DIR': '/var/lib/x',
+        'SYNC': 'false',
       });
       expect(c.ntfy!.server.host, 'ntfy.example.org');
       expect(c.ntfy!.topic, 'sph-abc_123');
       expect(c.appUrl.toString(), 'https://schule.example/app/');
       expect(c.poller.kinds, {WatchKind.homework, WatchKind.grades});
-      expect(c.poller.interval, const Duration(minutes: 15));
-      expect((c.poller.activeFromHour, c.poller.activeToHour), (7, 21));
+      expect(c.sync.enabled, isFalse);
+      expect(c.sync.interval, const Duration(minutes: 15));
+      expect(c.sync.detailsInterval, const Duration(minutes: 60));
+      expect((c.sync.activeFromHour, c.sync.activeToHour), (7, 21));
       expect(c.poller.includeGradeValues, isTrue);
       expect(c.databasePath, '/var/lib/x/schulportal.db');
     });
@@ -504,6 +654,7 @@ void main() {
     late SphService service;
     late AppDatabase db;
     late RecordingNotifier notifier;
+    late SyncService sync;
     late Poller poller;
     final hash = PasswordHasher.hash('richtig123', iterations: 100);
 
@@ -512,16 +663,18 @@ void main() {
       service = SphService(gw, now: () => now);
       db = AppDatabase.inMemory();
       notifier = RecordingNotifier();
-      poller = Poller(
+      sync = SyncService(
         service: service,
         cache: Api.createCache(now: () => now),
         db: db,
-        notifier: notifier,
+        config: const SyncConfig(pause: Duration.zero),
         now: () => now,
       );
+      poller = Poller(sync: sync, db: db, notifier: notifier, now: () => now);
     });
 
     tearDown(() async {
+      await sync.stop();
       await service.dispose();
       db.close();
     });

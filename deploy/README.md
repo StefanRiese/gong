@@ -30,23 +30,37 @@ The script
 1. downloads the latest release from GitHub and checks its SHA-256 checksum,
 2. creates the system user `schulportal`,
 3. installs the program to `/opt/schulportal-client`,
-4. asks for school number, Schulportal username/password and a password for the web UI,
-   and writes them to `/etc/schulportal-client/config.env` (readable by root only),
-5. installs and starts the systemd service `schulportal-client` and checks that it answers.
+4. installs and starts the systemd service `schulportal-client` and checks that it answers,
+5. prints the **setup link** `http://<container-ip>:8080/einrichtung?token=…`.
 
-Then open `http://<container-ip>:8080` and log in with the web UI password.
+Open the setup link in a browser: choose the school, enter the Schulportal login (it is
+tested right away) and a password for the web UI. The web UI then opens, logged in. Later
+changes: *Einstellungen → Server* in the web UI.
+
+The setup link only works until the setup is done; it is also in the log
+(`journalctl -u schulportal-client`) and in `/var/lib/schulportal-client/setup-token`.
+Without the token nobody else in the network can take over the unconfigured server.
+
+Alternatively, `install.sh` asks in the terminal whether to enter the credentials there; they
+are written to `/etc/schulportal-client/config.env` (readable by root only).
+`bash /opt/schulportal-client/deploy/install.sh --configure` does that again later.
+
+**Where settings live:** settings made in the web UI are stored in the database
+(`/var/lib/schulportal-client/schulportal.db`) and take precedence over `config.env`.
+`install.sh --configure` hands the keys it writes back to `config.env`.
 
 ## Push notifications (ntfy)
 
-`install.sh` asks whether to enable notifications and suggests a random topic name. On your
-phone, install the **ntfy** app (Android: Play Store/F-Droid, iOS: App Store), tap **+** and
+Set up in the web UI under *Einstellungen → Server → Benachrichtigungen* („Zufälliges Thema“
+creates a hard-to-guess topic), or with `install.sh --configure`. On your phone, install the **ntfy** app (Android: Play Store/F-Droid, iOS: App Store), tap **+** and
 subscribe to that topic on the same server (default `https://ntfy.sh`). Then open
 **Benachrichtigungen** (bell icon) in the web UI and press **Testnachricht senden**.
 
 What happens:
 
-- the server checks substitutions and homework every 20 min and grades every 2 h,
-  only between 6 and 22 o'clock;
+- the server keeps all data in sync in the background: substitutions and homework every
+  15 min, grades and course pages every 2 h, only between 6 and 22 o'clock; notifications
+  come from these syncs;
 - the first check after setup only records the current state (no flood of old entries);
 - new or changed substitutions, new homework and new grades are sent once each;
   tapping a notification opens the matching page of the web UI (`APP_URL`);
@@ -55,9 +69,10 @@ What happens:
 
 Privacy: on the public ntfy.sh server anyone who knows the topic name can read the messages.
 Keep the random name secret, or use your own ntfy server / an access token (`NTFY_TOKEN`).
-All settings: see `config.env.example` (`NOTIFY`, `POLL_INTERVAL_MINUTES`,
-`GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, …). Change them with `install.sh --configure` or by
-editing `config.env` and restarting the service.
+All settings: see `config.env.example` (`NOTIFY`, `SYNC`, `POLL_INTERVAL_MINUTES`,
+`GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, …). Change them in the web UI (*Einstellungen →
+Server*), with `install.sh --configure`, or by editing `config.env` and restarting the service
+(values set in the web UI take precedence over `config.env`).
 
 Without internet access on the container, copy a release archive over and use
 `bash install.sh --from schulportal-client-linux-x64.tar.gz`.

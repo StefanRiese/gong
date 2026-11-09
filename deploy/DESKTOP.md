@@ -8,8 +8,8 @@ it opens in the default browser.
 |---|---|---|
 | Download | `schulportal-client-windows-x64.exe` (single file) | `schulportal-client-macos-universal.zip` (Apple Silicon + Intel) |
 | Requires | Windows 10/11 x64 | macOS 11 or newer |
-| Config | `%LOCALAPPDATA%\schulportal-client\config.env` | `~/Library/Application Support/schulportal-client/config.env` |
-| Data (database) | same folder | same folder |
+| Data (database, settings) | `%LOCALAPPDATA%\schulportal-client` | `~/Library/Application Support/schulportal-client` |
+| Optional config file | `config.env` in that folder | `config.env` in that folder |
 | Log | `%LOCALAPPDATA%\schulportal-client\schulportal-client.log` | `~/Library/Logs/Schulportal-Client.log` |
 
 ## First start
@@ -19,18 +19,22 @@ it opens in the default browser.
    e.g. `C:\Users\<name>\Programme\`.
    **macOS:** unzip, move *Schulportal-Client* to *Programme*, then **right click → Öffnen**
    (the app is signed ad hoc, not notarized; a double click is blocked the first time).
-2. The app creates `config.env` and opens it in Notepad / TextEdit. Fill in:
-   - `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD` – the Schulportal login
-   - `APP_PASSWORD` – a password for the web UI (min. 8 characters). On the next start it is
-     replaced by `APP_PASSWORD_HASH`; to change it, enter a new `APP_PASSWORD`.
-3. Save and start the app again. The web UI opens in the browser (`OPEN_BROWSER=true`).
+2. The browser opens the **setup page** („Schulportal-Client einrichten“):
+   - choose the school (search by name, town or school number),
+   - enter the Schulportal username and password („Anmeldung prüfen“ tests them),
+   - choose a password for the web UI (min. 8 characters).
+3. „Einrichtung abschließen“ – the web UI opens, already logged in.
+
+Everything can be changed later in the web UI under *Einstellungen → Server* (also reachable
+from the tray / menu bar menu). Settings are stored in the database; a text editor is not needed.
 
 ## Menu
 
 Right click on the icon (macOS: click):
 
 - **Schulportal-Client öffnen** – web UI in the browser (Windows: also double click on the icon)
-- **Einstellungen bearbeiten** – opens `config.env`; afterwards choose *Neu starten*
+- **Einstellungen** – server settings in the web UI (Schulportal login, password, sync,
+  notifications, network)
 - **Protokoll anzeigen** – log file
 - **Neu starten**, **Beenden**
 
@@ -38,15 +42,18 @@ Starting the app a second time opens the web UI instead of a second server.
 
 ## Notes
 
-- By default the web UI is only reachable on this computer (`HOST=127.0.0.1`). With
-  `HOST=0.0.0.0` phones in the same network can use it too (Windows asks to allow it in the
-  firewall); use `http://<computer-ip>:8080`.
+- By default the web UI is only reachable on this computer. *Einstellungen → Server →
+  Netzwerk → „Auch von anderen Geräten im Netzwerk“* (then *Neu starten*) lets phones in the
+  same network use it too (Windows asks to allow it in the firewall): `http://<computer-ip>:8080`.
+- If port 8080 is taken by another program, the app offers to open `config.env`: enter e.g.
+  `PORT=8090` and start again. `config.env` is optional and only needed for such cases; values
+  set in the web UI take precedence over it.
 - Push notifications (ntfy) work as on the server, see [README.md](README.md#push-notifications-ntfy).
   They only arrive while the computer and the app are running – for notifications around the
   clock use the LXC installation.
 - **Autostart** – Windows: put a shortcut to the exe into `shell:startup` (Win+R).
   macOS: *Systemeinstellungen → Allgemein → Anmeldeobjekte → +*.
-- **Uninstall** – delete the exe / app and the config folder from the table above.
+- **Uninstall** – delete the exe / app and the data folder from the table above.
 - The Windows build uses the SQLite library that ships with Windows (`winsqlite3.dll`); the
   macOS app bundles its own.
 

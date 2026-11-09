@@ -19,10 +19,10 @@ export async function render() {
       back,
       pageHeader('Benachrichtigungen', badge('aus')),
       empty('Push-Benachrichtigungen sind nicht eingerichtet.'),
+      h('p', null, h('a', { href: '/einstellungen/server', class: 'settings-link' },
+        icon('settings'), 'In den Server-Einstellungen einrichten')),
       h('p', { class: 'hint' },
-        'Auf dem Server einrichten mit: ',
-        h('code', null, 'bash /opt/schulportal-client/deploy/install.sh --configure'),
-        ' (ntfy-Thema angeben). Danach die ntfy-App installieren und dasselbe Thema abonnieren.'),
+        'Dort ein ntfy-Thema angeben, dann die ntfy-App installieren und dasselbe Thema abonnieren.'),
     );
   }
 

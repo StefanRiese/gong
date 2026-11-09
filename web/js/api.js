@@ -22,15 +22,15 @@ export class ApiError extends Error {
 /**
  * Calls the API and returns the parsed JSON body (null for 204).
  * @param {string} path
- * @param {{method?: string, body?: any}} [options]
+ * @param {{method?: string, body?: any, headers?: Record<string, string>}} [options]
  */
-export async function api(path, { method = 'GET', body } = {}) {
+export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   let res;
   try {
     res = await fetch(path, {
       method,
       credentials: 'same-origin',
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      headers: body === undefined ? headers : { 'content-type': 'application/json', ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -76,6 +76,14 @@ export function errorMessage(err) {
       return 'Dieser Bereich ist für das Konto nicht freigeschaltet.';
     case 'not_found':
       return 'Nicht gefunden.';
+    case 'sph_login_failed':
+      return 'Die Anmeldung beim Schulportal ist fehlgeschlagen. Bitte Schule, Benutzername und Passwort prüfen.';
+    case 'setup_token_invalid':
+      return 'Der Einrichtungslink ist ungültig oder abgelaufen. Bitte den Link aus dem Protokoll des Servers verwenden.';
+    case 'setup_required':
+      return 'Der Server ist noch nicht eingerichtet.';
+    case 'invalid_settings':
+      return 'Einige Angaben sind ungültig.';
     default:
       return err.message || 'Unerwarteter Fehler.';
   }

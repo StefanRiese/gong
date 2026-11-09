@@ -88,25 +88,39 @@ class SphService {
 
   /// All homework (open and done) from the lesson histories of all courses,
   /// newest first. Needs one request per course.
-  Future<List<Homework>> allHomework() => _run(SphFeature.lessons, () async {
-    final lessons = await _loadLessons();
-    final byEntry = <String, Homework>{};
-    for (final l in lessons) {
-      final details = await _gateway.lessonDetails(l.courseURL);
-      for (final h in mapHomeworkHistory(l, details)) {
-        byEntry['${h.courseId}/${h.entryId}'] = h;
-      }
-      // The current entry may be newer than the history page.
-      for (final h in mapCurrentHomework([l])) {
-        byEntry['${h.courseId}/${h.entryId}'] = h;
-      }
-    }
-    final all = byEntry.values.toList()
-      ..sort(
-        (a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)),
-      );
-    return all;
-  });
+  Future<List<Homework>> allHomework() async =>
+      (await lessonsSnapshot()).allHomework;
+
+  /// Everything from the course pages in one pass (one request per course):
+  /// course details, grades and the full homework list. Used by the sync.
+  Future<LessonsSnapshot> lessonsSnapshot() =>
+      _run(SphFeature.lessons, () async {
+        final lessons = await _loadLessons();
+        final courses = <Course>[];
+        final details = <String, CourseDetails>{};
+        final grades = <CourseGrades>[];
+        final byEntry = <String, Homework>{};
+        for (final l in lessons) {
+          final page = await _gateway.lessonDetails(l.courseURL);
+          final course = mapCourse(l);
+          courses.add(course);
+          details[course.id] = mapCourseDetails(page);
+          grades.add(mapCourseGrades(course, page));
+          for (final h in mapHomeworkHistory(l, page)) {
+            byEntry['${h.courseId}/${h.entryId}'] = h;
+          }
+          // The current entry may be newer than the history page.
+          for (final h in mapCurrentHomework([l])) {
+            byEntry['${h.courseId}/${h.entryId}'] = h;
+          }
+        }
+        return LessonsSnapshot(
+          courses: courses,
+          details: details,
+          grades: grades,
+          allHomework: sortHomework(byEntry.values),
+        );
+      });
 
   /// Full course view: lesson history incl. homework, grades, exams.
   Future<CourseDetails> courseDetails(String courseId) =>
@@ -134,15 +148,7 @@ class SphService {
   }
 
   /// Grades and exams of all courses. Needs one request per course.
-  Future<List<CourseGrades>> grades() => _run(SphFeature.lessons, () async {
-    final lessons = await _loadLessons();
-    final result = <CourseGrades>[];
-    for (final l in lessons) {
-      final details = await _gateway.lessonDetails(l.courseURL);
-      result.add(mapCourseGrades(mapCourse(l), details));
-    }
-    return result;
-  });
+  Future<List<CourseGrades>> grades() async => (await lessonsSnapshot()).grades;
 
   /// Logs out now (e.g. on shutdown). The next request logs in again.
   Future<void> logout() async {
@@ -355,3 +361,22 @@ class SphService {
     };
   }
 }
+
+/// Data of all course pages (see [SphService.lessonsSnapshot]).
+class LessonsSnapshot {
+  final List<Course> courses;
+  final Map<String, CourseDetails> details;
+  final List<CourseGrades> grades;
+  final List<Homework> allHomework;
+
+  const LessonsSnapshot({
+    required this.courses,
+    required this.details,
+    required this.grades,
+    required this.allHomework,
+  });
+}
+
+/// Newest first; entries without date last.
+List<Homework> sortHomework(Iterable<Homework> items) => items.toList()
+  ..sort((a, b) => (b.date ?? DateTime(0)).compareTo(a.date ?? DateTime(0)));

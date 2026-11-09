@@ -6,6 +6,41 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- Background sync: the server keeps all data (Stundenplan, Vertretungen, Hausaufgaben, Noten,
+  Kalender, course pages) up to date on its own during `ACTIVE_HOURS`, also without ntfy.
+  Pages open right away from the cached data; expired data is refreshed in the background.
+  `SYNC=false` switches it off (data is then loaded on demand).
+- Cached data is stored in the database: available immediately after a restart and while the
+  portal is down.
+- Live updates: open pages update themselves when the server has new data (`/api/events`).
+- „Neu laden“ starts a sync in the background; the button spins while the server syncs and
+  the page updates when it is done. The status shows „· wird aktualisiert“ during a background
+  refresh.
+- `GET /api/sync` shows the sync status per data kind.
+- Setup page in the web UI: without Schulportal login or web UI password the server starts in
+  setup mode instead of failing. The setup page (school search by name, login test, web UI
+  password) is protected by a one-time token from the setup link: the desktop apps open it in
+  the browser on first start, `install.sh` and the log show it on the LXC server.
+- *Einstellungen → Server* in the web UI: Schulportal login (with school search and login
+  test), web UI password (needs the current one, logs out other devices), sync intervals and
+  active hours, ntfy notifications (random topic), network. Changes apply without restart,
+  except network settings. Stored in the database; they take precedence over `config.env`.
+  Another school or user discards the cached data and notification state of the old account.
+
+### Changed
+- Course pages are loaded once per sync for grades, the full homework list and the course
+  pages (previously separately), which halves the requests to the portal.
+- New homework appears in the full homework list right after the 15-minute sync, not only
+  after the next course page sync.
+- `POLL_INTERVAL_MINUTES` defaults to 15 (was 20) and now also applies without notifications.
+- `POST /api/refresh` answers `202` and syncs asynchronously (was: clear cache, `204`).
+- Desktop apps: first start opens the setup page in the browser instead of `config.env` in
+  Notepad / TextEdit; the tray / menu bar item „Einstellungen“ opens *Einstellungen → Server*.
+  `config.env` is optional.
+- `install.sh` starts the service also without credentials and prints the setup link; asking
+  for the credentials in the terminal is optional.
+
 ## [0.4.0] – 2026-11-09
 
 ### Added

@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../api/cache.dart';
+
 /// App state in SQLite: seen items for change detection, poll status,
-/// web UI sessions.
-class AppDatabase {
+/// web UI sessions, cached portal data.
+class AppDatabase implements CacheStore {
   final Database _db;
 
   AppDatabase._(this._db) {
@@ -23,7 +25,7 @@ class AppDatabase {
   /// In-memory database for tests.
   factory AppDatabase.inMemory() => AppDatabase._(sqlite3.openInMemory());
 
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
 
   void _migrate() {
     final version = _db.userVersion;
@@ -52,7 +54,43 @@ class AppDatabase {
       ''');
       _db.userVersion = 1;
     }
+    if (version < 2) {
+      _db.execute('''
+        CREATE TABLE cache (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          fetched_at INTEGER NOT NULL
+        );
+      ''');
+      _db.userVersion = 2;
+    }
   }
+
+  // --- cached portal data (CacheStore) ------------------------------------------
+
+  @override
+  Iterable<({String key, String json, DateTime fetchedAt})> loadAll() => [
+    for (final row in _db.select(
+      'SELECT key, value, fetched_at FROM cache ORDER BY fetched_at',
+    ))
+      (
+        key: row['key'] as String,
+        json: row['value'] as String,
+        fetchedAt: DateTime.fromMillisecondsSinceEpoch(
+          row['fetched_at'] as int,
+        ),
+      ),
+  ];
+
+  @override
+  void save(String key, String json, DateTime fetchedAt) => _db.execute(
+    'INSERT OR REPLACE INTO cache (key, value, fetched_at) VALUES (?, ?, ?)',
+    [key, json, fetchedAt.millisecondsSinceEpoch],
+  );
+
+  @override
+  void delete(String key) =>
+      _db.execute('DELETE FROM cache WHERE key = ?', [key]);
 
   // --- change detection ------------------------------------------------------
 
@@ -139,6 +177,24 @@ class AppDatabase {
     'ON CONFLICT(token_hash) DO UPDATE SET expires = excluded.expires',
     [hashToken(token), expires.millisecondsSinceEpoch],
   );
+
+  /// Deletes all sessions except [keep] (null = all).
+  void deleteSessionsExcept(String? keep) => keep == null
+      ? _db.execute('DELETE FROM sessions')
+      : _db.execute('DELETE FROM sessions WHERE token_hash != ?', [
+          hashToken(keep),
+        ]);
+
+  /// Forgets everything derived from the Schulportal account (seen items,
+  /// notification and sync status, cached data), e.g. after switching to
+  /// another account.
+  void resetPortalState() {
+    _db.execute('DELETE FROM seen');
+    _db.execute(
+      "DELETE FROM meta WHERE key LIKE 'poll:%' OR key LIKE 'sync:%'",
+    );
+    _db.execute('DELETE FROM cache');
+  }
 
   /// Expiry of the session, or null if unknown.
   DateTime? sessionExpiry(String token) {

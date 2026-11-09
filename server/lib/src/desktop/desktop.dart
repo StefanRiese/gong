@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../api/embedded_web.dart';
-import '../config/config_file.dart';
 import '../storage/app_database.dart';
 import 'build_info.g.dart';
 import 'win32.dart' as win32;
@@ -22,9 +21,6 @@ enum DesktopPlatform {
   }
 }
 
-/// Exit code: config file was created on first start and must be filled in.
-const exitConfigCreated = 79;
-
 /// Exit code: invalid configuration (EX_CONFIG).
 const exitConfigInvalid = 78;
 
@@ -40,23 +36,18 @@ String desktopDataDir() {
   return '${env['HOME'] ?? '.'}/Library/Application Support/schulportal-client';
 }
 
-/// Config file of the desktop builds (ENV_FILE overrides it).
+/// Optional config file of the desktop builds (ENV_FILE overrides it).
 String desktopConfigPath() =>
     Platform.environment['ENV_FILE'] ??
     '${desktopDataDir()}${Platform.pathSeparator}config.env';
 
-/// Writes the config template to [path] (first start); the database goes
-/// next to it.
-void createDesktopConfig(String path) {
-  final file = File(path);
-  file.parent.createSync(recursive: true);
-  file.writeAsStringSync(
-    desktopConfigTemplate(
-      dataDir: file.parent.absolute.path,
-      eol: Platform.isWindows ? '\r\n' : '\n',
-    ),
-  );
-}
+/// Defaults of the desktop builds: data in the user profile, open the
+/// browser on start. Values from the environment / config.env win.
+Map<String, String> withDesktopDefaults(Map<String, String> env) => {
+  'DATA_DIR': desktopDataDir(),
+  'OPEN_BROWSER': 'true',
+  ...env,
+};
 
 /// Opens [url] in the default browser.
 Future<void> openInBrowser(Uri url) async {

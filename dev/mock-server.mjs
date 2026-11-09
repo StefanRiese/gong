@@ -5,6 +5,11 @@
 //
 //   node dev/mock-server.mjs [port]      (default 8090)
 //   MOCK_STALE=1 node dev/mock-server.mjs   → responses marked as stale
+//   MOCK_SETUP=1 node dev/mock-server.mjs   → not set up yet: setup page at
+//                                             /einrichtung?token=demo-token
+//
+// "Neu laden" (POST /api/refresh) simulates a 2.5 s sync: /api/events pushes
+// sync start/end and an update for every data key the UI has loaded.
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -14,9 +19,27 @@ import { fileURLToPath } from 'node:url';
 const port = Number(process.argv[2] ?? 8090);
 const webDir = resolve(fileURLToPath(new URL('../web', import.meta.url)));
 const stale = process.env.MOCK_STALE === '1';
+let setupRequired = process.env.MOCK_SETUP === '1';
+const SETUP_TOKEN = 'demo-token';
+let appPassword = 'demo';
+const serverValues = {
+  SPH_SCHOOL_ID: 9999, SPH_USERNAME: 'max.muster', SYNC: true, POLL_INTERVAL_MINUTES: 15,
+  GRADES_INTERVAL_MINUTES: 120, ACTIVE_HOURS: '6-22', NTFY_URL: 'https://ntfy.sh', NTFY_TOPIC: '',
+  NOTIFY: 'substitutions,homework,grades', NOTIFY_GRADE_VALUES: false, APP_URL: '', HOST: '0.0.0.0',
+  PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false,
+};
+const SCHOOLS = [
+  { id: 9999, name: 'Musterschule', city: 'Musterstadt' },
+  { id: 1234, name: 'Beispiel-Gymnasium', city: 'Darmstadt' },
+  { id: 4321, name: 'Gesamtschule am Park', city: 'Frankfurt am Main' },
+  { id: 5555, name: 'Grundschule Sonnenschein', city: 'Kassel' },
+];
 const sessions = new Set();
 let settings = { subjectColors: {}, courseSubjects: {} };
 const doneOverrides = new Map(); // "course/entry" → done
+const fetched = new Map(); // cache key → fetchedAt (ISO)
+const eventClients = new Set();
+let syncRunning = false;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -169,12 +192,32 @@ const json = (res, status, body, headers = {}) => {
   res.end(JSON.stringify(body));
 };
 const error = (res, status, code, message) => json(res, status, { error: { code, message } });
-const data = (res, value) => json(res, 200, {
-  data: value,
-  fetchedAt: new Date(Date.now() - (stale ? 26 * 3600e3 : 4 * 60e3)).toISOString(),
-  cached: true,
-  stale,
-});
+const data = (res, key, value) => {
+  if (!fetched.has(key)) {
+    fetched.set(key, new Date(Date.now() - (stale ? 26 * 3600e3 : 4 * 60e3)).toISOString());
+  }
+  json(res, 200, { data: value, key, fetchedAt: fetched.get(key), cached: true, stale, refreshing: false });
+};
+
+function broadcast(event, payload) {
+  for (const c of eventClients) c.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
+/** Simulated sync: marks all loaded keys as fresh after 2.5 s. */
+function simulateSync() {
+  if (syncRunning) return;
+  syncRunning = true;
+  broadcast('sync', { running: true });
+  setTimeout(() => {
+    const now = new Date().toISOString();
+    for (const key of fetched.keys()) {
+      fetched.set(key, now);
+      broadcast('update', { key, fetchedAt: now });
+    }
+    syncRunning = false;
+    broadcast('sync', { running: false });
+  }, 2500);
+}
 
 function token(req) {
   return /(?:^|;\s*)sph_session=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
@@ -188,9 +231,19 @@ async function readBody(req) {
 
 async function handleApi(req, res, url) {
   const path = url.pathname;
+  if (path === '/api/setup') return json(res, 200, { setupRequired });
+  if (path === '/api/server-settings' || path.startsWith('/api/server-settings/') || path === '/api/schools') {
+    const allowed = setupRequired ? req.headers['x-setup-token'] === SETUP_TOKEN : sessions.has(token(req));
+    if (!allowed) {
+      return setupRequired ? error(res, 403, 'setup_token_invalid', 'Missing or wrong setup token')
+        : error(res, 401, 'unauthorized', 'Login required');
+    }
+    return handleServerSettings(req, res, url);
+  }
+  if (setupRequired) return error(res, 503, 'setup_required', 'Not set up');
   if (req.method === 'POST' && path === '/api/auth/login') {
     const { password } = JSON.parse((await readBody(req)) || '{}');
-    if (password !== 'demo') return error(res, 401, 'invalid_password', 'Wrong password');
+    if (password !== appPassword) return error(res, 401, 'invalid_password', 'Wrong password');
     const t = Math.random().toString(36).slice(2);
     sessions.add(t);
     return json(res, 200, { authenticated: true },
@@ -247,19 +300,38 @@ async function handleApi(req, res, url) {
   }
   if (req.method === 'POST' && path === '/api/notifications/check') return json(res, 200, { sent: 1 });
   if (req.method === 'POST' && path === '/api/refresh') {
-    res.writeHead(204);
-    return res.end();
+    simulateSync();
+    return json(res, 202, { refreshing: true });
+  }
+  if (path === '/api/sync') {
+    const ago = (min) => new Date(Date.now() - min * 60e3).toISOString();
+    const task = (interval, last) => ({ lastRun: ago(last), lastSuccess: ago(last), lastError: null,
+      failures: 0, intervalMinutes: interval, nextRun: ago(last - interval) });
+    return json(res, 200, { enabled: true, running: syncRunning, activeHours: [6, 22], tasks: {
+      account: task(360, 50), timetable: task(360, 50), substitutions: task(15, 4), homework: task(15, 4),
+      calendar: task(60, 20), lessons: task(120, 35) } });
+  }
+  if (path === '/api/events') {
+    res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store' });
+    res.write(`retry: 5000\n\nevent: sync\ndata: ${JSON.stringify({ running: syncRunning })}\n\n`);
+    eventClients.add(res);
+    const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+    req.on('close', () => {
+      clearInterval(ping);
+      eventClients.delete(res);
+    });
+    return;
   }
   switch (path) {
     case '/api/account':
-      return data(res, { schoolId: 9999, username: 'max.muster', accountType: 'student',
+      return data(res, 'account', { schoolId: 9999, username: 'max.muster', accountType: 'student',
         features: ['timetable', 'substitutions', 'calendar', 'lessons'] });
-    case '/api/timetable': return data(res, timetable);
-    case '/api/substitutions': return data(res, substitutions);
-    case '/api/courses': return data(res, courses);
+    case '/api/timetable': return data(res, 'timetable', timetable);
+    case '/api/substitutions': return data(res, 'substitutions', substitutions);
+    case '/api/courses': return data(res, 'courses', courses);
     case '/api/homework': {
       const withDone = (h) => ({ ...h, done: doneOverrides.get(`${h.courseId}/${h.entryId}`) ?? h.done });
-      if (url.searchParams.get('alle') !== '1') return data(res, homework.map(withDone));
+      if (url.searchParams.get('alle') !== '1') return data(res, 'homework', homework.map(withDone));
       // All homework: current entries plus older ones from the course histories.
       const all = [...homework.map(withDone)];
       for (const c of courses) {
@@ -269,21 +341,74 @@ async function handleApi(req, res, url) {
             description: e.homework, done: e.homeworkDone });
         }
       }
-      return data(res, all.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')));
+      return data(res, 'homework:all', all.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')));
     }
-    case '/api/grades': return data(res, grades);
+    case '/api/grades': return data(res, 'grades', grades);
     case '/api/calendar': {
       const from = url.searchParams.get('from') ? new Date(`${url.searchParams.get('from')}T00:00`) : today;
       const to = url.searchParams.get('to') ? new Date(`${url.searchParams.get('to')}T00:00`) : addDays(today, 60);
-      return data(res, calendar(from, to));
+      const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return data(res, `calendar:${ymd(from)}:${ymd(to)}`, calendar(from, to));
     }
   }
   const m = /^\/api\/courses\/([^/]+)$/.exec(path);
   if (m) {
     const d = courseDetails(decodeURIComponent(m[1]));
-    return d ? data(res, d) : error(res, 404, 'not_found', 'Unknown course');
+    return d ? data(res, `course:${decodeURIComponent(m[1])}`, d) : error(res, 404, 'not_found', 'Unknown course');
   }
   return error(res, 404, 'not_found', 'No such endpoint');
+}
+
+async function handleServerSettings(req, res, url) {
+  const path = url.pathname;
+  if (path === '/api/schools') {
+    const words = (url.searchParams.get('q') ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+    return json(res, 200, words.length === 0 ? [] : SCHOOLS.filter((s) =>
+      words.every((w) => `${s.id} ${s.name} ${s.city}`.toLowerCase().includes(w))));
+  }
+  if (path === '/api/server-settings/test-login') {
+    const b = JSON.parse((await readBody(req)) || '{}');
+    // Password "falsch" simulates wrong credentials.
+    if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
+    return json(res, 200, { ok: true });
+  }
+  if (req.method === 'GET') {
+    return json(res, 200, {
+      setupRequired, values: serverValues, desktop: false,
+      secrets: { SPH_PASSWORD: !setupRequired, NTFY_TOKEN: false, APP_PASSWORD: !setupRequired },
+      sources: {}, restartRequired: [],
+    });
+  }
+  const b = JSON.parse((await readBody(req)) || '{}');
+  const s = b.settings ?? {};
+  if (s.SPH_PASSWORD === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
+  if (s.POLL_INTERVAL_MINUTES && Number(s.POLL_INTERVAL_MINUTES) < 5) {
+    return json(res, 400, { error: { code: 'invalid_settings', message: 'Invalid settings',
+      problems: ['POLL_INTERVAL_MINUTES must be at least 5'] } });
+  }
+  if (b.appPassword) {
+    if (!setupRequired && b.currentPassword !== appPassword) {
+      return error(res, 403, 'invalid_password', 'Current password is wrong');
+    }
+    appPassword = b.appPassword;
+  }
+  const restart = [];
+  for (const [k, v] of Object.entries(s)) {
+    if (k === 'SPH_PASSWORD' || k === 'NTFY_TOKEN') continue;
+    if (['HOST', 'PORT'].includes(k) && String(serverValues[k]) !== String(v)) restart.push(k);
+    serverValues[k] = typeof serverValues[k] === 'number' ? Number(v)
+      : typeof serverValues[k] === 'boolean' ? v === 'true' : v;
+  }
+  const headers = {};
+  const wasSetup = setupRequired;
+  if (setupRequired) {
+    setupRequired = false;
+    const t = Math.random().toString(36).slice(2);
+    sessions.add(t);
+    headers['set-cookie'] = `sph_session=${t}; Path=/; HttpOnly; SameSite=Strict`;
+  }
+  return json(res, 200, { saved: true, setupRequired, restartRequired: restart,
+    accountChanged: !wasSetup && 'SPH_USERNAME' in s }, headers);
 }
 
 async function handleStatic(req, res, url) {
@@ -314,4 +439,5 @@ createServer(async (req, res) => {
   }
 }).listen(port, '127.0.0.1', () => {
   console.log(`Mock server: http://127.0.0.1:${port}  (password: demo${stale ? ', stale mode' : ''})`);
+  if (setupRequired) console.log(`Setup page: http://127.0.0.1:${port}/einrichtung?token=${SETUP_TOKEN}`);
 });

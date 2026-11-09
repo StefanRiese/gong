@@ -32,7 +32,8 @@ curl -fsSLO https://raw.githubusercontent.com/StefanRiese/schulportal-client/mai
 bash install.sh
 ```
 
-Full guide: [deploy/README.md](deploy/README.md).
+Then open the setup link that `install.sh` prints and set up school, Schulportal login and the
+web UI password in the browser. Full guide: [deploy/README.md](deploy/README.md).
 
 ## Windows / macOS
 

@@ -150,7 +150,7 @@ void main() {
         'APP_PASSWORD': 'neues-passwort',
         'APP_PASSWORD_HASH': hash,
         'OPEN_BROWSER': 'true',
-      });
+      }, passwordIterations: 10);
       expect(
         PasswordHasher.verify('neues-passwort', c.appPasswordHash),
         isTrue,
@@ -161,7 +161,7 @@ void main() {
           'SPH_USERNAME': 'u',
           'SPH_PASSWORD': 'p',
           'APP_PASSWORD': 'kurz',
-        }),
+        }, passwordIterations: 10),
         throwsA(
           isA<ConfigException>().having((e) => e.problems, 'problems', [
             contains('at least 8'),

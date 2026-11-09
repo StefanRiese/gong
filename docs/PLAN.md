@@ -169,6 +169,12 @@ LXC container.
    readable by anyone who knows the name). Web UI page „Benachrichtigungen“ (status, test,
    check now); `install.sh --configure` sets up ntfy with a random topic. 92 unit tests;
    end-to-end test with real data against a local fake ntfy server.
+   *Update (2026-11-09):* the poller became a general **background sync** (`lib/src/sync/`):
+   all data (timetable, substitutions, homework, calendar, course pages) is kept fresh at
+   per-kind intervals during active hours and stored in SQLite (`cache` table), so the API
+   answers from the cache right away (stale-while-revalidate) and survives restarts.
+   Notifications are derived from the synced data. `/api/events` (Server-Sent Events) pushes
+   updates to the web UI; „Neu laden“ starts an asynchronous sync.
 6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
    for Windows/Linux/macOS, docs.
    *Result (2026-11-09):* done. `deploy/schulportal-client.service` (own system user, systemd
