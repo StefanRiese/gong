@@ -131,8 +131,10 @@ LXC container.
 1. **Spike** – Dart project in `server/`, add liblanis, CLI script that logs into school 6128
    and dumps which applets exist and what timetable/substitutions/lessons return.
    Answers: does school 6128 provide Noten? Does SQLite work on all three OSes?
-   *Status:* `server/bin/spike.dart` done; SQLite + native build verified on Linux;
-   login against school 6128 pending (needs credentials).
+   *Result (2026-11-09):* login to school 6128 works (account type: student). Enabled applets:
+   Stundenplan, Vertretungsplan, Kalender, Mein Unterricht — all parsed successfully, including
+   Hausaufgaben, Noten and Klausuren. Nachrichten is **not enabled** for this account.
+   SQLite + native build verified on Linux.
 2. **Service layer** – `SphService` wrapping `EasyLanisClient`: login, re-login on session
    expiry, typed results for all needed modules; unit tests with mocked liblanis.
 3. **REST API** – shelf server with the endpoints above, app login, response caching.

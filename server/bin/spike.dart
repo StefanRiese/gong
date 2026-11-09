@@ -65,8 +65,17 @@ Future<void> main(List<String> args) async {
     }
 
     final results = <String, String>{};
-    Future<void> probe(String name, Future<String> Function() run) async {
+    Future<void> probe(
+      String name,
+      String applet,
+      Future<String> Function() run,
+    ) async {
       section(name);
+      if (!applets.contains(applet)) {
+        print('  skipped: $applet not enabled for this account');
+        results[name] = '--  not enabled';
+        return;
+      }
       try {
         final summary = await run();
         results[name] = 'OK  $summary';
@@ -78,7 +87,7 @@ Future<void> main(List<String> args) async {
 
     final p = client.parsers;
 
-    await probe('Stundenplan', () async {
+    await probe('Stundenplan', 'stundenplan.php', () async {
       final tt = await p.timetable.getHome();
       final own = tt.planForOwn ?? tt.planForAll ?? [];
       final lessons = own.fold<int>(0, (n, day) => n + day.length);
@@ -98,7 +107,7 @@ Future<void> main(List<String> args) async {
           '${tt.weekBadge != null ? ', week ${tt.weekBadge}' : ''}';
     });
 
-    await probe('Vertretungsplan', () async {
+    await probe('Vertretungsplan', 'vertretungsplan.php', () async {
       final plan = await p.substitutions.getHome();
       final count = plan.days.fold<int>(
         0,
@@ -118,7 +127,7 @@ Future<void> main(List<String> args) async {
       return '${plan.days.length} days, $count substitutions';
     });
 
-    await probe('Kalender', () async {
+    await probe('Kalender', 'kalender.php', () async {
       final events = await p.calendar.getHome();
       if (details) {
         for (final e in events.take(20)) {
@@ -131,45 +140,49 @@ Future<void> main(List<String> args) async {
       return '${events.length} events';
     });
 
-    await probe('Mein Unterricht (Hausaufgaben, Noten)', () async {
-      final lessons = await p.lessonsStudent.getHome();
-      var homework = 0, marks = 0, exams = 0, detailErrors = 0;
-      for (final l in lessons) {
-        final hw = l.currentEntry?.homework;
-        if (hw != null) {
-          homework++;
-          if (details) {
-            print(
-              '  [HA] ${l.name}: ${hw.description.trim()}'
-              '${hw.homeWorkDone ? ' (erledigt)' : ''}',
+    await probe(
+      'Mein Unterricht (Hausaufgaben, Noten)',
+      'meinunterricht.php',
+      () async {
+        final lessons = await p.lessonsStudent.getHome();
+        var homework = 0, marks = 0, exams = 0, detailErrors = 0;
+        for (final l in lessons) {
+          final hw = l.currentEntry?.homework;
+          if (hw != null) {
+            homework++;
+            if (details) {
+              print(
+                '  [HA] ${l.name}: ${hw.description.trim()}'
+                '${hw.homeWorkDone ? ' (erledigt)' : ''}',
+              );
+            }
+          }
+          try {
+            final d = await p.lessonsStudent.getDetailedCourseView(
+              l.courseURL.toString(),
             );
+            marks += d.marks.length;
+            exams += d.exams.length;
+            if (details) {
+              for (final m in d.marks) {
+                print('  [Note] ${l.name}: ${m.name} ${m.date} → ${m.mark}');
+              }
+              for (final x in d.exams) {
+                print('  [Klausur] ${l.name}: ${x.name} ${x.value ?? ''}');
+              }
+            }
+          } catch (e) {
+            detailErrors++;
+            print('  detail view failed for ${l.name}: ${e.runtimeType}');
           }
         }
-        try {
-          final d = await p.lessonsStudent.getDetailedCourseView(
-            l.courseURL.toString(),
-          );
-          marks += d.marks.length;
-          exams += d.exams.length;
-          if (details) {
-            for (final m in d.marks) {
-              print('  [Note] ${l.name}: ${m.name} ${m.date} → ${m.mark}');
-            }
-            for (final x in d.exams) {
-              print('  [Klausur] ${l.name}: ${x.name} ${x.value ?? ''}');
-            }
-          }
-        } catch (e) {
-          detailErrors++;
-          print('  detail view failed for ${l.name}: ${e.runtimeType}');
-        }
-      }
-      return '${lessons.length} courses, $homework current homework, '
-          '$marks marks, $exams exams'
-          '${detailErrors > 0 ? ', $detailErrors detail errors' : ''}';
-    });
+        return '${lessons.length} courses, $homework current homework, '
+            '$marks marks, $exams exams'
+            '${detailErrors > 0 ? ', $detailErrors detail errors' : ''}';
+      },
+    );
 
-    await probe('Nachrichten', () async {
+    await probe('Nachrichten', 'nachrichten.php', () async {
       final convs = await p.conversations.getHome();
       final unread = convs.where((c) => c.unread).length;
       if (details) {
