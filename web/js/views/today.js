@@ -8,7 +8,7 @@ import {
   periodRange, removeAnimated, section,
   substitutionCard, weekFor,
 } from './common.js';
-import { assignAutoColors, subjectStyle } from '../colors.js';
+import { courseStyle, initColors, subjectStyle } from '../colors.js';
 
 export const title = 'Heute';
 
@@ -22,7 +22,7 @@ export async function render(ctx) {
     load(ctx, 'calendar', '/api/calendar'),
   ]);
 
-  if (tt?.ok) assignAutoColors(tt.value.lessons.map((l) => l.subject));
+  if (tt?.ok) initColors({ subjects: tt.value.lessons.map((l) => l.subject) });
   const target = targetDay(now, tt?.ok ? tt.value : null);
   const week = tt?.ok ? weekFor(target, tt.value.currentWeek, now) : null;
   const lessons = tt?.ok ? lessonsOn(tt.value, isoWeekday(target), week) : [];
@@ -147,7 +147,7 @@ function homeworkList(items, now) {
     homeworkDoneToast(item, () => navigate(location.pathname + location.search, { replace: true }));
   };
   return [append(stack, recent.map((i) => {
-    const card = h('article', { class: 'card' });
+    const card = h('article', { class: 'card card-subject', style: courseStyle(i.courseId, i.courseName) });
     return append(card, [
       h('div', { class: 'card-title' },
         h('a', { href: `/kurse/${encodeURIComponent(i.courseId)}` }, i.courseName),

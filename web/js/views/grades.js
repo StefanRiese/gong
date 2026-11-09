@@ -1,5 +1,6 @@
 import { h, empty } from '../dom.js';
 import { pageHeader } from './common.js';
+import { courseStyle } from '../colors.js';
 
 export const title = 'Noten';
 
@@ -25,7 +26,7 @@ export async function render(ctx) {
 }
 
 function courseCard(c) {
-  return h('article', { class: 'card' },
+  return h('article', { class: 'card card-subject', style: courseStyle(c.course) },
     h('div', { class: 'card-title' },
       h('a', { href: `/kurse/${encodeURIComponent(c.course.id)}` }, c.course.name)),
     c.course.teachers.length ? h('div', { class: 'muted' }, c.course.teachers.join(', ')) : null,

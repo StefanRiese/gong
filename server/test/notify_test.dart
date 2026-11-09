@@ -139,6 +139,28 @@ void main() {
       expect(d.pending.single.fingerprints, hasLength(1));
     });
 
+    test('plainText strips markup and decodes entities', () {
+      expect(
+        plainText('Aufgabe&nbsp;1 &amp; 2<br>S. 12<br/><b>bis Freitag</b>'),
+        'Aufgabe 1 & 2\nS. 12\nbis Freitag',
+      );
+      final d = detectHomework([
+        const Homework(
+          courseId: 'c',
+          courseName: 'Deutsch',
+          entryId: 'x',
+          date: null,
+          topic: null,
+          description: 'Lesen &amp; zusammenfassen<br>S. 3',
+          done: false,
+        ),
+      ], {});
+      expect(
+        d.pending.single.notification.message,
+        'Lesen & zusammenfassen\nS. 3',
+      );
+    });
+
     test('homework: new open items only, done flag ignored', () {
       Homework hw(String id, {bool done = false}) => Homework(
         courseId: 'c1',

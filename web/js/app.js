@@ -15,7 +15,7 @@ import * as calendar from './views/calendar.js';
 import * as notifications from './views/notifications.js';
 import * as settings from './views/settings.js';
 import * as subjects from './views/subjects.js';
-import { setSubjectColors } from './colors.js';
+import { initColors } from './colors.js';
 
 route('/', today);
 route('/stundenplan', timetable);
@@ -53,11 +53,7 @@ async function boot() {
     if (!me.authenticated) return showLogin();
     const acc = await api('/api/account');
     account = { features: new Set(acc.data.features), username: acc.data.username };
-    try {
-      setSubjectColors((await api('/api/settings')).subjectColors);
-    } catch {
-      // automatic colors only
-    }
+    await loadColors();
     showShell();
   } catch (err) {
     if (err instanceof ApiError && err.isUnauthorized) return showLogin();
@@ -66,6 +62,22 @@ async function boot() {
         h('button', { class: 'button', onclick: boot }, 'Erneut versuchen')),
     );
   }
+}
+
+/** Loads what subject colors are derived from (one assignment app-wide). */
+async function loadColors() {
+  const optional = (enabled, path) =>
+    (enabled ? api(path).then((r) => r.data ?? r, () => null) : Promise.resolve(null));
+  const [settings, timetable, courses] = await Promise.all([
+    api('/api/settings').catch(() => null),
+    optional(account.features.has('timetable'), '/api/timetable'),
+    optional(account.features.has('lessons'), '/api/courses'),
+  ]);
+  initColors({
+    settings: settings ?? undefined,
+    subjects: timetable?.lessons?.map((l) => l.subject) ?? [],
+    courses: courses ?? [],
+  });
 }
 
 function showLogin() {

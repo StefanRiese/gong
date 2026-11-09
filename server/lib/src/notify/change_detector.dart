@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 import '../models/models.dart';
 import 'notifier.dart';
@@ -46,6 +47,20 @@ String _dayLabel(DateTime date, DateTime today) {
   if (diff == 1) return 'morgen ($wd, $dm)';
   return '$wd, $dm';
 }
+
+final _unescape = HtmlUnescape();
+final _breaks = RegExp(r'<br\s*/?>|</(p|div|li|tr)>', caseSensitive: false);
+final _tags = RegExp(r'<[^>]*>');
+
+/// Text from a portal HTML fragment (homework descriptions may contain
+/// markup and entities) for push notifications.
+String plainText(String html) => _unescape
+    .convert(html.replaceAll(_breaks, '\n').replaceAll(_tags, ''))
+    .split('\n')
+    .map((line) => line.replaceAll(RegExp(r'[ \t\u00a0]+'), ' ').trim())
+    .join('\n')
+    .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+    .trim();
 
 String _truncate(String s, int max) {
   final t = s.trim();
@@ -172,7 +187,10 @@ Detection detectHomework(List<Homework> items, Set<String> seen) {
         AppNotification(
           title: 'Hausaufgabe ${h.courseName}',
           message: _truncate(
-            [if (h.topic != null) '${h.topic}:', h.description].join('\n'),
+            [
+              if (h.topic != null) '${h.topic}:',
+              plainText(h.description),
+            ].join('\n'),
             500,
           ),
           tags: const ['books'],

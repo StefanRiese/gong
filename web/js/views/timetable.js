@@ -1,7 +1,7 @@
 import { h, empty } from '../dom.js';
 import { isoWeekday, minutesOf } from '../format.js';
 import { badge, lessonsOn, pageHeader } from './common.js';
-import { assignAutoColors, subjectStyle } from '../colors.js';
+import { initColors, subjectStyle } from '../colors.js';
 
 export const title = 'Stundenplan';
 
@@ -9,7 +9,7 @@ const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 
 export async function render(ctx) {
   const tt = await ctx.get('/api/timetable');
-  assignAutoColors(tt.lessons.map((l) => l.subject));
+  initColors({ subjects: tt.lessons.map((l) => l.subject) });
   const hasWeeks = tt.lessons.some((l) => l.week);
   const requested = ctx.query.get('woche');
   const week = !hasWeeks ? null

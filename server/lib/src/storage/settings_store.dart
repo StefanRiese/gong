@@ -2,16 +2,27 @@ import 'app_database.dart';
 
 /// User settings shared by all browsers (stored in the database).
 class AppSettings {
-  /// Subject name → color "#rrggbb".
+  /// Subject (timetable abbreviation or course name) → color "#rrggbb".
   final Map<String, String> subjectColors;
 
-  const AppSettings({this.subjectColors = const {}});
+  /// Course ID → timetable subject it belongs to ("" = none). Courses not
+  /// listed are matched automatically by the web UI.
+  final Map<String, String> courseSubjects;
+
+  const AppSettings({
+    this.subjectColors = const {},
+    this.courseSubjects = const {},
+  });
 
   static const maxSubjects = 100;
   static const maxNameLength = 60;
   static final colorPattern = RegExp(r'^#[0-9a-fA-F]{6}$');
+  static final _idPattern = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
 
-  Map<String, Object?> toJson() => {'subjectColors': subjectColors};
+  Map<String, Object?> toJson() => {
+    'subjectColors': subjectColors,
+    'courseSubjects': courseSubjects,
+  };
 
   /// Parses and validates [json]; throws [FormatException] with a message.
   factory AppSettings.fromJson(Object? json) {
@@ -36,7 +47,25 @@ class AppSettings {
       }
       colors[name] = value.toLowerCase();
     }
-    return AppSettings(subjectColors: colors);
+
+    final rawCourses = json['courseSubjects'] ?? const {};
+    if (rawCourses is! Map) {
+      throw const FormatException('courseSubjects must be an object');
+    }
+    if (rawCourses.length > maxSubjects) {
+      throw const FormatException('Too many courses (max. $maxSubjects)');
+    }
+    final courses = <String, String>{};
+    for (final MapEntry(:key, :value) in rawCourses.entries) {
+      if (key is! String || !_idPattern.hasMatch(key)) {
+        throw const FormatException('Invalid course id in courseSubjects');
+      }
+      if (value is! String || value.trim().length > maxNameLength) {
+        throw FormatException('Invalid subject for course "$key"');
+      }
+      courses[key] = value.trim();
+    }
+    return AppSettings(subjectColors: colors, courseSubjects: courses);
   }
 }
 

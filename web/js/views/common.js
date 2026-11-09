@@ -3,6 +3,7 @@
 import { api, errorMessage } from '../api.js';
 import { h, errorBox } from '../dom.js';
 import { minutesOf, startOfWeek } from '../format.js';
+import { subjectStyle } from '../colors.js';
 
 /** Awaits a promise without throwing: {ok, value} or {ok: false, error}. */
 export async function settle(promise) {
@@ -206,6 +207,9 @@ export function substitutionCard(s) {
     h('div', { class: 'sub-period' }, s.period.replace(/\s*-\s*/, '–'), h('small', null, 'Std.')),
     h('div', { class: 'sub-body' },
       h('div', { class: 'sub-title' },
+        s.subject ?? s.previousSubject
+          ? h('span', { class: 'subject-dot', style: subjectStyle(s.subject ?? s.previousSubject), 'aria-hidden': 'true' })
+          : null,
         h('strong', null, s.subject ?? s.previousSubject ?? 'Unterricht'),
         s.type ? badge(s.type, cancelled ? 'danger' : 'warn') : null),
       changes.length

@@ -1,13 +1,25 @@
 // Pure functions mapping liblanis models to app models.
 
+import 'package:html_unescape/html_unescape.dart';
 import 'package:liblanis/easy_client.dart' as lanis;
 
 import '../models/models.dart';
 
+final _unescape = HtmlUnescape();
+
+/// Trimmed text, null if empty. For fields that may contain HTML markup
+/// (descriptions, homework); the web UI converts those to text itself.
 String? _clean(String? s) {
   final t = s?.trim();
   return (t == null || t.isEmpty) ? null : t;
 }
+
+/// Plain-text field: trimmed, HTML entities decoded ("&amp;" → "&"), null if
+/// empty. The portal delivers some names and categories HTML-escaped.
+String? _text(String? s) => _clean(s == null ? null : _unescape.convert(s));
+
+/// Like [_text] for required fields.
+String _name(String s) => _unescape.convert(s).trim();
 
 final _leadingNumber = RegExp(r'^\s*(\d+)');
 
@@ -25,7 +37,7 @@ Timetable mapTimetable(lanis.TimeTable tt) {
     slots.add(
       TimeSlot(
         period: period,
-        label: row.label.trim(),
+        label: _name(row.label),
         start: row.startTime.toString(),
         end: row.endTime.toString(),
       ),
@@ -47,10 +59,10 @@ Timetable mapTimetable(lanis.TimeTable tt) {
           duration: s.duration,
           start: s.startTime.toString(),
           end: s.endTime.toString(),
-          subject: _clean(s.name),
-          room: _clean(s.raum),
-          teacher: _clean(s.lehrer),
-          week: _clean(s.badge),
+          subject: _text(s.name),
+          room: _text(s.raum),
+          teacher: _text(s.lehrer),
+          week: _text(s.badge),
         ),
       );
     }
@@ -60,7 +72,7 @@ Timetable mapTimetable(lanis.TimeTable tt) {
     return d != 0 ? d : a.start.compareTo(b.start);
   });
   return Timetable(
-    currentWeek: _clean(tt.weekBadge),
+    currentWeek: _text(tt.weekBadge),
     slots: slots,
     lessons: lessons,
   );
@@ -75,15 +87,15 @@ List<SubstitutionDay> mapSubstitutions(lanis.SubstitutionPlan plan) {
           for (final s in d.substitutions)
             Substitution(
               period: s.stunde.trim(),
-              type: _clean(s.art),
-              subject: _clean(s.fach),
-              previousSubject: _clean(s.fach_alt),
-              teacher: _clean(s.lehrer),
-              substitute: _clean(s.vertreter),
-              room: _clean(s.raum),
-              previousRoom: _clean(s.raum_alt),
-              className: _clean(s.klasse),
-              note: [_clean(s.hinweis), _clean(s.hinweis2)]
+              type: _text(s.art),
+              subject: _text(s.fach),
+              previousSubject: _text(s.fach_alt),
+              teacher: _text(s.lehrer),
+              substitute: _text(s.vertreter),
+              room: _text(s.raum),
+              previousRoom: _text(s.raum_alt),
+              className: _text(s.klasse),
+              note: [_text(s.hinweis), _text(s.hinweis2)]
                   .whereType<String>()
                   .join(' – ')
                   .let((n) => n.isEmpty ? null : n),
@@ -91,7 +103,7 @@ List<SubstitutionDay> mapSubstitutions(lanis.SubstitutionPlan plan) {
         ],
         notices: [
           for (final info in d.infos ?? const <lanis.SubstitutionInfo>[])
-            SubstitutionNotice(title: info.header, lines: info.values),
+            SubstitutionNotice(title: _name(info.header), lines: info.values),
         ],
       ),
   ];
@@ -104,13 +116,13 @@ List<CalendarEntry> mapCalendar(List<lanis.CalendarEvent> events) {
     for (final e in events)
       CalendarEntry(
         id: e.id,
-        title: e.title.trim(),
+        title: _name(e.title),
         description: e.description.trim(),
         start: e.startTime,
         end: e.endTime,
         allDay: e.allDay,
-        place: _clean(e.place),
-        category: _clean(e.category?.name),
+        place: _text(e.place),
+        category: _text(e.category?.name),
       ),
   ];
   entries.sort((a, b) => a.start.compareTo(b.start));
@@ -118,12 +130,12 @@ List<CalendarEntry> mapCalendar(List<lanis.CalendarEvent> events) {
 }
 
 List<String> _teachers(List<lanis.LessonTeacher> teachers) => [
-  for (final t in teachers) ?(_clean(t.teacher) ?? _clean(t.teacherKuerzel)),
+  for (final t in teachers) ?(_text(t.teacher) ?? _text(t.teacherKuerzel)),
 ];
 
 Course mapCourse(lanis.Lesson l) => Course(
   id: l.courseID,
-  name: l.name.trim(),
+  name: _name(l.name),
   teachers: _teachers(l.teachers),
 );
 
@@ -135,10 +147,10 @@ List<Homework> mapCurrentHomework(lanis.Lessons lessons) => [
         if (_clean(hw.description) case final text?)
           Homework(
             courseId: l.courseID,
-            courseName: l.name.trim(),
+            courseName: _name(l.name),
             entryId: entry.entryID,
             date: entry.topicDate,
-            topic: _clean(entry.topicTitle),
+            topic: _text(entry.topicTitle),
             description: text,
             done: hw.homeWorkDone,
           ),
@@ -152,10 +164,10 @@ List<Homework> mapHomeworkHistory(lanis.Lesson l, lanis.DetailedLesson d) {
         if (_clean(hw.description) case final text?)
           Homework(
             courseId: l.courseID,
-            courseName: l.name.trim(),
+            courseName: _name(l.name),
             entryId: e.entryID,
             date: e.topicDate,
-            topic: _clean(e.topicTitle),
+            topic: _text(e.topicTitle),
             description: text,
             done: hw.homeWorkDone,
           ),
@@ -169,38 +181,41 @@ List<Homework> mapHomeworkHistory(lanis.Lesson l, lanis.DetailedLesson d) {
 LessonEntry _mapEntry(lanis.CurrentEntry e) => LessonEntry(
   id: e.entryID,
   date: e.topicDate,
-  periods: _clean(e.schoolHours),
-  topic: _clean(e.topicTitle),
+  periods: _text(e.schoolHours),
+  topic: _text(e.topicTitle),
   description: _clean(e.description),
   homework: _clean(e.homework?.description),
   homeworkDone: e.homework?.homeWorkDone ?? false,
-  attendance: _clean(e.presence),
+  attendance: _text(e.presence),
 );
 
 List<Grade> _grades(lanis.DetailedLesson d) => [
   for (final m in d.marks)
     Grade(
-      name: m.name.trim(),
-      date: m.date.trim(),
-      mark: m.mark.trim(),
-      comment: _clean(m.comment),
+      name: _name(m.name),
+      date: _name(m.date),
+      mark: _name(m.mark),
+      comment: _text(m.comment),
     ),
 ];
 
 List<Exam> _exams(lanis.DetailedLesson d) => [
-  for (final x in d.exams) Exam(name: x.name.trim(), value: _clean(x.value)),
+  for (final x in d.exams) Exam(name: _name(x.name), value: _text(x.value)),
 ];
 
 CourseDetails mapCourseDetails(lanis.DetailedLesson d) => CourseDetails(
   course: Course(
     id: d.courseID,
-    name: d.name.trim(),
+    name: _name(d.name),
     teachers: _teachers(d.teachers),
   ),
   history: [for (final e in d.history) _mapEntry(e)],
   grades: _grades(d),
   exams: _exams(d),
-  attendance: d.attendances,
+  attendance: {
+    for (final MapEntry(:key, :value) in d.attendances.entries)
+      _name(key): _name(value),
+  },
 );
 
 CourseGrades mapCourseGrades(Course course, lanis.DetailedLesson d) =>

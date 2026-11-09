@@ -35,8 +35,11 @@ course:
 - Heute: open homework of the last 14 days (older ones are linked), loaded after the page.
 - Fächer: open-homework badges per course, loaded after the page.
 
-Subject colors: automatic (distinct for up to 16 subjects) or set on the settings page; stored
-on the server so all devices use the same colors. Navigation items are hidden when the feature is not enabled for the account.
+Subject colors (`js/colors.js`): one assignment for the whole app. Color keys are the timetable
+subjects (often abbreviations like „M“, „BIO“); courses („Mathematik 05eg“) are matched to them
+automatically (exact, prefix, word start, letters in order; one-to-one, longest abbreviation
+first) or by the user on the settings page. Colors are automatic (distinct for up to 16 keys)
+or user-defined; both settings are stored on the server (`/api/settings`). Navigation items are hidden when the feature is not enabled for the account.
 
 The calendar can be filtered by text (`?suche=…`, searches title, description, place and
 category), by category (chips) and by hiding past events. Hidden categories and "hide past" are

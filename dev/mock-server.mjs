@@ -15,7 +15,7 @@ const port = Number(process.argv[2] ?? 8090);
 const webDir = resolve(fileURLToPath(new URL('../web', import.meta.url)));
 const stale = process.env.MOCK_STALE === '1';
 const sessions = new Set();
-let settings = { subjectColors: {} };
+let settings = { subjectColors: {}, courseSubjects: {} };
 const doneOverrides = new Map(); // "course/entry" → done
 
 const TYPES = {
@@ -220,7 +220,12 @@ async function handleApi(req, res, url) {
       if (!/^#[0-9a-f]{6}$/i.test(v) || !k.trim()) return error(res, 400, 'bad_request', `Invalid color for ${k}`);
       colors[k.trim()] = v.toLowerCase();
     }
-    settings = { subjectColors: colors };
+    const courseSubjects = {};
+    for (const [k, v] of Object.entries(body.courseSubjects ?? {})) {
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(k) || typeof v !== 'string') return error(res, 400, 'bad_request', `Invalid course ${k}`);
+      courseSubjects[k] = v.trim();
+    }
+    settings = { subjectColors: colors, courseSubjects };
     return json(res, 200, settings);
   }
   if (path === '/api/notifications' && req.method === 'GET') {

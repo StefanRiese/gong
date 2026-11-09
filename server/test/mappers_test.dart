@@ -90,6 +90,40 @@ void main() {
     expect(hw.first.courseName, 'Mathematik');
   });
 
+  test('HTML entities are decoded in plain-text fields only', () {
+    final cal = mapCalendar([
+      lanis.CalendarEvent(
+        id: '1',
+        title: 'Theater &amp; Musik',
+        description: 'Treffpunkt &lt;b&gt;Aula&lt;/b&gt;',
+        startTime: DateTime(2026, 11, 20),
+        endTime: DateTime(2026, 11, 21),
+        allDay: true,
+        secret: false,
+        isNew: false,
+        public: true,
+        private: false,
+        place: 'Aula &quot;Nord&quot;',
+        category: lanis.CalendarEventCategory(
+          id: 3,
+          colorArgb: 0,
+          name: 'schulische Veranstaltungen &amp; Fahrten',
+        ),
+      ),
+    ]).single;
+    expect(cal.title, 'Theater & Musik');
+    expect(cal.place, 'Aula "Nord"');
+    expect(cal.category, 'schulische Veranstaltungen & Fahrten');
+    expect(
+      cal.description,
+      'Treffpunkt &lt;b&gt;Aula&lt;/b&gt;',
+      reason: 'HTML fields stay as delivered; the web UI converts them',
+    );
+
+    final lesson = sampleLessons().first..name = 'Politik &amp; Wirtschaft';
+    expect(mapCourse(lesson).name, 'Politik & Wirtschaft');
+  });
+
   test('mapCourse falls back to teacher abbreviation', () {
     final courses = sampleLessons().map(mapCourse).toList();
     expect(courses[0].teachers, ['Müller']);

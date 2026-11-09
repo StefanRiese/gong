@@ -1,17 +1,12 @@
 import { h, empty } from '../dom.js';
-import { assignAutoColors, subjectForCourse, subjectStyle } from '../colors.js';
-import { badge, load, pageHeader, settle } from './common.js';
+import { courseStyle, initColors } from '../colors.js';
+import { badge, pageHeader, settle } from './common.js';
 
 export const title = 'Fächer';
 
 export async function render(ctx) {
-  const [courses, timetable] = await Promise.all([
-    ctx.get('/api/courses'),
-    load(ctx, 'timetable', '/api/timetable'),
-  ]);
-
-  const subjects = timetable?.ok ? timetable.value.lessons.map((l) => l.subject) : [];
-  assignAutoColors(subjects);
+  const courses = await ctx.get('/api/courses');
+  initColors({ courses });
 
   // Open-homework badges come from the full homework list (one portal request
   // per course), so they are added once it has loaded.
@@ -38,7 +33,7 @@ export async function render(ctx) {
         return h('a', {
           href: `/kurse/${encodeURIComponent(c.id)}`,
           class: 'subject-card',
-          style: subjectStyle(subjectForCourse(c.name, subjects)),
+          style: courseStyle(c),
         },
         h('strong', null, c.name),
         c.teachers.length ? h('span', { class: 'muted' }, c.teachers.join(', ')) : null,

@@ -371,15 +371,20 @@ void main() {
       'defaults to no colors; saves and returns normalized colors',
       () async {
         var r = await send('GET', '/api/settings', cookie: cookie);
-        expect(await body(r), {'subjectColors': <String, Object?>{}});
+        expect(await body(r), {
+          'subjectColors': <String, Object?>{},
+          'courseSubjects': <String, Object?>{},
+        });
 
         r = await put({
           'subjectColors': {' Mathematik ': '#1D5BB8', 'Sport': '#00aa00'},
+          'courseSubjects': {'3481': ' M ', '3739': ''},
         });
         expect(r.statusCode, 200);
         r = await send('GET', '/api/settings', cookie: cookie);
         expect(await body(r), {
           'subjectColors': {'Mathematik': '#1d5bb8', 'Sport': '#00aa00'},
+          'courseSubjects': {'3481': 'M', '3739': ''},
         });
       },
     );
@@ -396,6 +401,13 @@ void main() {
           'subjectColors': {'': '#123456'},
         },
         {'subjectColors': []},
+        {
+          'courseSubjects': {'a&b': 'M'},
+        },
+        {
+          'courseSubjects': {'1': 5},
+        },
+        {'courseSubjects': []},
         'not json',
       ]) {
         final r = await put(bad);

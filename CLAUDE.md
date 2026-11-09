@@ -1,0 +1,86 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+## Project
+
+Self-hosted client for **Schulportal Hessen** (school 6128): a Dart server (portal access via
+[liblanis](https://pub.dev/packages/liblanis), REST API, ntfy notifications) plus a plain
+HTML/JS web UI. Deployed as a native binary + systemd service in a Proxmox LXC container.
+License GPL-3.0 (required by liblanis). Plan and decisions: `docs/PLAN.md`.
+
+## Layout
+
+```
+server/                 Dart package (own pubspec)
+  bin/server.dart       HTTP server entry point
+  bin/sph.dart          CLI: prints API data as JSON (debugging against the real portal)
+  bin/hash_password.dart  creates APP_PASSWORD_HASH
+  bin/spike.dart        milestone-1 probe
+  lib/src/sph/          SphGateway (liblanis seam), SphService (session policy), mappers, errors
+  lib/src/api/          shelf API (api.dart) and ResponseCache
+  lib/src/notify/       poller, change detection, ntfy notifier
+  lib/src/storage/      SQLite (AppDatabase), SettingsStore
+  lib/src/models/       app models (JSON) — independent of liblanis
+  test/                 unit tests; test/support/fake_gateway.dart replaces the portal
+web/                    web UI: index.html, css/app.css, js/ (ES modules, no build step)
+  js/views/             one module per page
+  js/colors.js          subject colors + course ↔ timetable-abbreviation matching
+dev/mock-server.mjs     Node mock API with invented data (password "demo")
+deploy/                 systemd unit, install.sh, build-release.sh, deployment guide
+.github/workflows/      CI (ci.yml) and release on tag v* (release.yml)
+```
+
+## Commands
+
+Dart SDK: `~/.local/bin/dart` (3.13.x). Run server commands in `server/`.
+
+```sh
+dart pub get
+dart format --output=none --set-exit-if-changed .   # CI requires formatted code
+dart analyze --fatal-infos                          # CI fails on infos
+dart test
+WEB_DIR=../web dart run bin/server.dart             # needs server/.env (see .env.example)
+dart run bin/sph.dart timetable                     # JSON from the real portal
+```
+
+Web UI / scripts (repo root):
+
+```sh
+node dev/mock-server.mjs                            # UI dev without portal, :8090, password demo
+for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
+shellcheck -s bash deploy/install.sh deploy/build-release.sh
+bash deploy/build-release.sh                        # → dist/schulportal-client-<os>-<arch>.tar.gz
+```
+
+Native builds use `dart build cli` (not `dart compile exe`, which lacks native assets/SQLite).
+
+## Rules
+
+- **Web UI security:** never use `innerHTML`, `outerHTML`, `insertAdjacentHTML` or
+  `document.write` (CI greps for them). Build DOM with `h()` from `js/dom.js`; portal HTML goes
+  through `htmlToText()`. No inline scripts/styles (strict CSP); set styles via `h(…, {style})`.
+- **Server mappers:** plain-text fields use `_text()`/`_name()` (decode HTML entities); fields
+  that contain HTML (descriptions, homework) use `_clean()` and are converted in the UI.
+- **liblanis** is pinned (pre-1.0). Keep all access behind `SphGateway` so tests use the fake.
+- **UI texts are German; code, comments, docs and commit messages are English.**
+- **Personal data:** `server/.env`, `*.db` and `dist/` are git-ignored — never commit them.
+  Do not print grades, homework or messages from the real portal into logs or output; use
+  counts. Delete test data and screenshots with real data after use.
+- **Writes to the real portal** (marking homework done) only when the user asks for it.
+- **ntfy:** do not send to the public ntfy.sh server without the user's consent; test with a
+  local fake ntfy server.
+- **Tests:** add/adjust unit tests for server changes; UI changes are checked against the mock
+  server in headless Firefox (Marionette).
+- **Processes:** stop servers by PID (e.g. from `ss -ltnp`), not with `pkill -f <pattern>` —
+  the pattern also matches the shell running the command.
+
+## Workflow
+
+- Solo repository: commit directly to `main`, only when the user asks; push after committing.
+- Never mention Claude in commits or PRs (no `Co-Authored-By: Claude`).
+- Update `CHANGELOG.md` (section *Unreleased*) with every user-visible change.
+- Releases: move *Unreleased* to a new version section, then tag `vX.Y.Z` and push the tag
+  (only on request) — GitHub Actions builds Linux x64/arm64, Windows and macOS archives.
+- Deployment target: `bash /opt/schulportal-client/deploy/install.sh` in the LXC container
+  updates to the latest release.

@@ -1,8 +1,8 @@
 import { append, h, empty, textBlock } from '../dom.js';
 import { parseYmd, shortDate } from '../format.js';
 import { navigate } from '../router.js';
-import { assignAutoColors, subjectForCourse, subjectStyle } from '../colors.js';
-import { homeworkDoneToast, homeworkToggle, load, pageHeader, removeAnimated } from './common.js';
+import { courseStyle } from '../colors.js';
+import { homeworkDoneToast, homeworkToggle, pageHeader, removeAnimated } from './common.js';
 
 export const title = 'Hausaufgaben';
 
@@ -32,12 +32,7 @@ export async function render(ctx) {
 
   // All homework from the course histories (the portal's overview only has the
   // latest lesson per course, so older open homework would be missing).
-  const [items, timetable] = await Promise.all([
-    ctx.get('/api/homework?alle=1'),
-    load(ctx, 'timetable', '/api/timetable'),
-  ]);
-  const subjects = timetable?.ok ? timetable.value.lessons.map((l) => l.subject) : [];
-  assignAutoColors(subjects);
+  const items = await ctx.get('/api/homework?alle=1');
 
   const openCount = items.filter((i) => !i.done).length;
   const doneCount = items.length - openCount;
@@ -91,7 +86,7 @@ export async function render(ctx) {
   };
 
   if (sortedGroups.length) {
-    list.append(...sortedGroups.map((g) => courseGroup(g, subjects, changed)));
+    list.append(...sortedGroups.map((g) => courseGroup(g, changed)));
   }
 
   return h('div', null,
@@ -101,7 +96,7 @@ export async function render(ctx) {
   );
 }
 
-function courseGroup(group, subjects, changed) {
+function courseGroup(group, changed) {
   const items = [...group.items].sort((a, b) => Number(a.done) - Number(b.done) || byDateDesc(a, b));
   const count = h('span', { class: 'muted' });
   const state = {
@@ -113,7 +108,7 @@ function courseGroup(group, subjects, changed) {
     },
   };
   state.setOpen(group.open);
-  state.el = h('section', { class: 'hw-group', style: subjectStyle(subjectForCourse(group.name, subjects)) },
+  state.el = h('section', { class: 'hw-group', style: courseStyle(group.id, group.name) },
     h('div', { class: 'hw-group-head' },
       h('a', { href: `/kurse/${encodeURIComponent(group.id)}` }, group.name),
       count),

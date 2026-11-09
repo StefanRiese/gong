@@ -1,6 +1,7 @@
 import { append, h, empty, icon, textBlock } from '../dom.js';
 import { parseYmd, shortDate } from '../format.js';
 import { homeworkToggle, pageHeader } from './common.js';
+import { courseStyle } from '../colors.js';
 import { examList, gradeTable } from './grades.js';
 
 export const title = 'Kurs';
@@ -13,7 +14,8 @@ export async function render(ctx) {
 
   return h('div', null,
     h('a', { href: '/faecher', class: 'back-link' }, icon('back'), 'Fächer'),
-    pageHeader(d.course.name,
+    pageHeader(h('span', { class: 'course-title', style: courseStyle(d.course) },
+      h('span', { class: 'subject-dot', 'aria-hidden': 'true' }), d.course.name),
       d.course.teachers.length ? h('p', { class: 'subtitle' }, d.course.teachers.join(', ')) : null),
     h('div', { class: 'course-grid' },
       h('div', null,
