@@ -1,5 +1,5 @@
 import { api, errorMessage } from '../api.js';
-import { h, empty, errorBox } from '../dom.js';
+import { h, empty, errorBox, icon } from '../dom.js';
 import { age } from '../format.js';
 import { badge, pageHeader } from './common.js';
 
@@ -13,8 +13,10 @@ const KIND_LABELS = {
 
 export async function render() {
   const info = await api('/api/notifications');
+  const back = h('a', { href: '/einstellungen', class: 'back-link' }, icon('back'), 'Einstellungen');
   if (!info.enabled) {
     return h('div', null,
+      back,
       pageHeader('Benachrichtigungen', badge('aus')),
       empty('Push-Benachrichtigungen sind nicht eingerichtet.'),
       h('p', { class: 'hint' },
@@ -65,6 +67,7 @@ export async function render() {
   const [from, to] = info.activeHours;
 
   return h('div', null,
+    back,
     pageHeader('Benachrichtigungen', badge('aktiv', 'ok')),
     h('section', { class: 'section' },
       h('dl', { class: 'facts' },

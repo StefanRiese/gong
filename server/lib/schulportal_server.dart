@@ -16,3 +16,4 @@ export 'src/sph/liblanis_gateway.dart';
 export 'src/sph/sph_gateway.dart';
 export 'src/sph/sph_service.dart';
 export 'src/storage/app_database.dart';
+export 'src/storage/settings_store.dart';

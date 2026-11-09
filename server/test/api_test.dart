@@ -275,6 +275,74 @@ void main() {
     });
   });
 
+  group('settings', () {
+    late String cookie;
+    setUp(() async => cookie = await login());
+
+    Future<Response> put(Object body, {String type = 'application/json'}) =>
+        Future.value(
+          handler(
+            Request(
+              'PUT',
+              Uri.parse('http://localhost/api/settings'),
+              body: body is String ? body : jsonEncode(body),
+              headers: {'content-type': type, 'cookie': cookie},
+            ),
+          ),
+        );
+
+    test(
+      'defaults to no colors; saves and returns normalized colors',
+      () async {
+        var r = await send('GET', '/api/settings', cookie: cookie);
+        expect(await body(r), {'subjectColors': <String, Object?>{}});
+
+        r = await put({
+          'subjectColors': {' Mathematik ': '#1D5BB8', 'Sport': '#00aa00'},
+        });
+        expect(r.statusCode, 200);
+        r = await send('GET', '/api/settings', cookie: cookie);
+        expect(await body(r), {
+          'subjectColors': {'Mathematik': '#1d5bb8', 'Sport': '#00aa00'},
+        });
+      },
+    );
+
+    test('rejects invalid input', () async {
+      for (final bad in [
+        {
+          'subjectColors': {'M': 'red'},
+        },
+        {
+          'subjectColors': {'M': '#12345'},
+        },
+        {
+          'subjectColors': {'': '#123456'},
+        },
+        {'subjectColors': []},
+        'not json',
+      ]) {
+        final r = await put(bad);
+        expect(r.statusCode, 400, reason: '$bad');
+      }
+      expect((await put({}, type: 'text/plain')).statusCode, 415);
+    });
+
+    test('requires login', () async {
+      final r = await send('GET', '/api/settings');
+      expect(r.statusCode, 401);
+    });
+
+    test('persists in the database', () {
+      final db = AppDatabase.inMemory();
+      SettingsStore(
+        db,
+      ).save(const AppSettings(subjectColors: {'Kunst': '#ff8800'}));
+      expect(SettingsStore(db).load().subjectColors, {'Kunst': '#ff8800'});
+      db.close();
+    });
+  });
+
   group('static web UI', () {
     late Directory dir;
 

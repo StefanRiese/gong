@@ -69,6 +69,7 @@ Future<void> main(List<String> args) async {
     trustProxy: config.trustProxy,
     webDir: config.webDir,
     poller: poller,
+    settings: SettingsStore(db),
   );
 
   final handler = const Pipeline()

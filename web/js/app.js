@@ -13,6 +13,8 @@ import * as grades from './views/grades.js';
 import * as course from './views/course.js';
 import * as calendar from './views/calendar.js';
 import * as notifications from './views/notifications.js';
+import * as settings from './views/settings.js';
+import { setSubjectColors } from './colors.js';
 
 route('/', today);
 route('/stundenplan', timetable);
@@ -22,6 +24,7 @@ route('/noten', grades);
 route('/kurse/:id', course);
 route('/kalender', calendar);
 route('/benachrichtigungen', notifications);
+route('/einstellungen', settings);
 
 const NAV = [
   { path: '/', label: 'Heute', icon: 'today' },
@@ -46,6 +49,11 @@ async function boot() {
     if (!me.authenticated) return showLogin();
     const acc = await api('/api/account');
     account = { features: new Set(acc.data.features), username: acc.data.username };
+    try {
+      setSubjectColors((await api('/api/settings')).subjectColors);
+    } catch {
+      // automatic colors only
+    }
     showShell();
   } catch (err) {
     if (err instanceof ApiError && err.isUnauthorized) return showLogin();
@@ -81,9 +89,9 @@ function showShell() {
     h('div', { class: 'topbar-actions' },
       refreshButton,
       h('a', {
-        href: '/benachrichtigungen', class: 'icon-button', title: 'Benachrichtigungen',
-        'aria-label': 'Benachrichtigungen',
-      }, icon('bell')),
+        href: '/einstellungen', class: 'icon-button', title: 'Einstellungen',
+        'aria-label': 'Einstellungen',
+      }, icon('settings')),
       h('button', {
         class: 'icon-button', title: 'Abmelden', 'aria-label': 'Abmelden', onclick: logout,
       }, icon('logout')),

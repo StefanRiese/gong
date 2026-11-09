@@ -6,6 +6,7 @@ import {
   badge, isCancellation, lessonsOn, load, pageHeader, periodRange, section,
   substitutionCard, weekFor,
 } from './common.js';
+import { assignAutoColors, subjectStyle } from '../colors.js';
 
 export const title = 'Heute';
 
@@ -18,6 +19,7 @@ export async function render(ctx) {
     load(ctx, 'calendar', '/api/calendar'),
   ]);
 
+  if (tt?.ok) assignAutoColors(tt.value.lessons.map((l) => l.subject));
   const target = targetDay(now, tt?.ok ? tt.value : null);
   const week = tt?.ok ? weekFor(target, tt.value.currentWeek, now) : null;
   const lessons = tt?.ok ? lessonsOn(tt.value, isoWeekday(target), week) : [];
@@ -71,7 +73,10 @@ function lessonList(lessons, subDay) {
       return r && l.period != null && r[0] <= to && r[1] >= from;
     });
     const cancelled = matching.some(isCancellation);
-    return h('li', { class: ['lesson', matching.length && 'changed', cancelled && 'cancelled'] },
+    return h('li', {
+      class: ['lesson', matching.length && 'changed', cancelled && 'cancelled'],
+      style: subjectStyle(l.subject),
+    },
       h('div', { class: 'lesson-time' },
         h('span', null, l.start), h('span', null, l.end)),
       h('div', { class: 'lesson-body' },

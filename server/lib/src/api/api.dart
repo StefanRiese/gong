@@ -13,6 +13,7 @@ import '../notify/notifier.dart';
 import '../notify/poller.dart';
 import '../sph/errors.dart';
 import '../sph/sph_service.dart';
+import '../storage/settings_store.dart';
 import 'cache.dart';
 
 /// How long each kind of data is cached before Schulportal is asked again.
@@ -29,6 +30,7 @@ class CacheTtl {
 
 const sessionCookie = 'sph_session';
 const _maxLoginBody = 4096;
+const _maxSettingsBody = 32 * 1024;
 const _maxCalendarRange = Duration(days: 400);
 
 /// HTTP API (and optional static web UI) on top of [SphService].
@@ -42,6 +44,8 @@ const _maxCalendarRange = Duration(days: 400);
 ///   GET  /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
 ///   GET  /api/courses/{id}
 ///   POST /api/refresh       clears the cache
+///   GET  /api/settings      user settings (subject colors)
+///   PUT  /api/settings      replace settings (JSON)
 ///   GET  /api/notifications          notification settings + poll status
 ///   POST /api/notifications/test     send a test notification
 ///   POST /api/notifications/check    check for changes now
@@ -59,6 +63,7 @@ class Api {
 
   /// Background polling + notifications; null = disabled.
   final Poller? poller;
+  final SettingsStore settings;
   final DateTime Function() _now;
 
   Api({
@@ -71,8 +76,10 @@ class Api {
     this.trustProxy = false,
     this.webDir,
     this.poller,
+    SettingsStore? settings,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
+       settings = settings ?? SettingsStore(),
        sessions = sessions ?? SessionStore(now: now),
        limiter = limiter ?? LoginRateLimiter(now: now),
        cache = cache ?? createCache(now: now);
@@ -129,6 +136,8 @@ class Api {
         _data('grades', CacheTtl.grades, (_) => service.grades()),
       )
       ..post('/api/refresh', _refresh)
+      ..get('/api/settings', _getSettings)
+      ..put('/api/settings', _putSettings)
       ..get('/api/notifications', _notifications)
       ..post('/api/notifications/test', _notificationTest)
       ..post('/api/notifications/check', _notificationCheck);
@@ -298,6 +307,34 @@ class Api {
     }
     cache.clear();
     return Response(204);
+  }
+
+  // --- settings ----------------------------------------------------------------
+
+  Response _getSettings(Request request) {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    return _json(200, settings.load().toJson());
+  }
+
+  Future<Response> _putSettings(Request request) async {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    if (!_isJson(request)) {
+      return _error(415, 'unsupported_media_type', 'Use application/json');
+    }
+    final AppSettings parsed;
+    try {
+      parsed = AppSettings.fromJson(
+        jsonDecode(await _readLimited(request, _maxSettingsBody)),
+      );
+    } on FormatException catch (e) {
+      return _error(400, 'bad_request', e.message);
+    }
+    settings.save(parsed);
+    return _json(200, parsed.toJson());
   }
 
   // --- notifications -----------------------------------------------------------

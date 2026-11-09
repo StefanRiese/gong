@@ -1,6 +1,7 @@
 import { h, empty } from '../dom.js';
 import { isoWeekday, minutesOf } from '../format.js';
 import { badge, lessonsOn, pageHeader } from './common.js';
+import { assignAutoColors, subjectStyle } from '../colors.js';
 
 export const title = 'Stundenplan';
 
@@ -8,6 +9,7 @@ const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 
 export async function render(ctx) {
   const tt = await ctx.get('/api/timetable');
+  assignAutoColors(tt.lessons.map((l) => l.subject));
   const hasWeeks = tt.lessons.some((l) => l.week);
   const requested = ctx.query.get('woche');
   const week = !hasWeeks ? null
@@ -97,7 +99,7 @@ function grid(tt, week, today) {
 }
 
 function lessonBox(l) {
-  return h('div', { class: 'tt-lesson' },
+  return h('div', { class: 'tt-lesson', style: subjectStyle(l.subject) },
     h('strong', null, l.subject ?? '—', l.week ? badge(l.week, 'info') : null),
     h('span', null, [l.room, l.teacher].filter(Boolean).join(' · ')));
 }
@@ -112,7 +114,7 @@ function dayList(tt, week, today) {
       h('h2', null, DAYS[d - 1], d === today ? badge('heute', 'info') : null),
       lessons.length === 0 ? empty('Kein Unterricht.') :
         h('ol', { class: 'lesson-list' }, lessons.map((l) =>
-          h('li', { class: 'lesson' },
+          h('li', { class: 'lesson', style: subjectStyle(l.subject) },
             h('div', { class: 'lesson-time' }, h('span', null, l.start), h('span', null, l.end)),
             h('div', { class: 'lesson-body' },
               h('div', { class: 'lesson-title' }, h('strong', null, l.subject ?? '—'),

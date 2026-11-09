@@ -15,6 +15,7 @@ const port = Number(process.argv[2] ?? 8090);
 const webDir = resolve(fileURLToPath(new URL('../web', import.meta.url)));
 const stale = process.env.MOCK_STALE === '1';
 const sessions = new Set();
+let settings = { subjectColors: {} };
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -200,6 +201,17 @@ async function handleApi(req, res, url) {
   if (path === '/api/auth/me') return json(res, 200, { authenticated: sessions.has(token(req)) });
   if (!sessions.has(token(req))) return error(res, 401, 'unauthorized', 'Login required');
 
+  if (path === '/api/settings' && req.method === 'GET') return json(res, 200, settings);
+  if (path === '/api/settings' && req.method === 'PUT') {
+    const body = JSON.parse((await readBody(req)) || '{}');
+    const colors = {};
+    for (const [k, v] of Object.entries(body.subjectColors ?? {})) {
+      if (!/^#[0-9a-f]{6}$/i.test(v) || !k.trim()) return error(res, 400, 'bad_request', `Invalid color for ${k}`);
+      colors[k.trim()] = v.toLowerCase();
+    }
+    settings = { subjectColors: colors };
+    return json(res, 200, settings);
+  }
   if (path === '/api/notifications' && req.method === 'GET') {
     const ago = (min) => new Date(Date.now() - min * 60e3).toISOString();
     const ahead = (min) => new Date(Date.now() + min * 60e3).toISOString();
