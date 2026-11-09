@@ -118,7 +118,7 @@ Query parameter for all of them: `?refresh=1` – wait for fresh data from the p
 |---|---|---|---|
 | `GET /api/account` | [AccountInfo](#accountinfo) | `account` | 6 h |
 | `GET /api/timetable` | [Timetable](#timetable) | `timetable` | 6 h |
-| `GET /api/substitutions` | [SubstitutionDay](#substitutionday)`[]` | `substitutions` | 15 min |
+| `GET /api/substitutions` | [SubstitutionDay](#substitutionday)`[]`, filtered | `substitutions` | 15 min |
 | `GET /api/calendar` | [CalendarEntry](#calendarentry)`[]` | `calendar:<from>:<to>` | 1 h (default range) |
 | `GET /api/courses` | [Course](#course)`[]` | `courses` | 2 h |
 | `GET /api/courses/{id}` | [CourseDetails](#coursedetails) | `course:<id>` | 2 h |
@@ -132,6 +132,28 @@ background when it is requested.
 
 Endpoints of portal areas that are not enabled for the account answer
 `404 feature_disabled`. Which areas are enabled: `features` in `/api/account`.
+
+### `GET /api/substitutions`
+
+The portal's plan contains **all classes** of the school. The server applies the permanent
+filter from the [settings](#get-apisettings-put-apisettings) (`substitutionFilter`: own classes,
+hidden types) and adds a `filter` field to the envelope:
+
+```json
+{
+  "data": [ … ],
+  "filter": {"active": true, "hidden": 41, "classes": ["05eG"]},
+  "key": "substitutions", …
+}
+```
+
+| Parameter | |
+|---|---|
+| `alle=1` | the full plan without the permanent filter (`"filter": {"active": false, "hidden": 0}`) |
+
+An entry matches if one of its classes (`className`, several separated by `,` `;` `?` `/`) is one
+of the own classes, compared case-insensitively; entries without class only if
+`showUnassigned` is set. Notices of a day are always kept.
 
 ### `GET /api/calendar`
 
@@ -168,12 +190,13 @@ updated right away. If the portal does not confirm the change: `502 sph_bad_resp
 
 ### `GET /api/settings`, `PUT /api/settings`
 
-Display settings of the web UI, shared by all devices.
+Settings of the web UI, shared by all devices.
 
 ```json
 {
   "subjectColors": {"M": "#3b6fd8", "BIO": "#2e9e5b"},
-  "courseSubjects": {"104": "M"}
+  "courseSubjects": {"104": "M"},
+  "substitutionFilter": {"classes": ["05eG"], "showUnassigned": false, "hiddenTypes": ["Pausenaufsicht"]}
 }
 ```
 
@@ -181,9 +204,16 @@ Display settings of the web UI, shared by all devices.
 |---|---|
 | `subjectColors` | subject (timetable abbreviation) → color `#rrggbb`; at most 100, names up to 60 characters |
 | `courseSubjects` | course id → timetable abbreviation (manual assignment) |
+| `substitutionFilter.classes` | own classes as in the plan (e.g. `05eG`); empty = all classes; at most 30 |
+| `substitutionFilter.showUnassigned` | also show entries without class (break supervision, care) while `classes` is set |
+| `substitutionFilter.hiddenTypes` | types to hide (e.g. `Pausenaufsicht`), case-insensitive; at most 30 |
 
-`PUT` replaces the settings completely and answers with the stored version. Invalid values →
-`400 bad_request`.
+The `substitutionFilter` is applied by the server to
+[`/api/substitutions`](#get-apisubstitutions) and to the substitution notifications; the web
+UI's Heute page only shows entries of the own classes in the lessons.
+
+`PUT` changes the fields that are sent – fields not sent keep their value – and answers with the
+stored version. Invalid values → `400 bad_request`.
 
 ## Sync and live updates
 
@@ -302,7 +332,9 @@ Without ntfy: `200 {"enabled": false}`. Otherwise:
 ```
 
 `baseline: true` means the first check is done (it only records the current state, without
-notifications). `sent` counts the notifications sent so far.
+notifications). `sent` counts the notifications sent so far. Substitution notifications only
+cover entries that match the permanent `substitutionFilter`.
+
 
 ### `POST /api/notifications/test`
 

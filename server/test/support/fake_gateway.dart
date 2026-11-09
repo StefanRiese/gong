@@ -204,6 +204,21 @@ lanis.SubstitutionPlan sampleSubstitutions() => lanis.SubstitutionPlan(
           raum_alt: 'R1',
           hinweis: 'Buch mitbringen',
           hinweis2: '',
+          klasse: '05eG',
+        ),
+        lanis.Substitution(
+          tag: 'Mittwoch',
+          tag_en: 'Wednesday',
+          stunde: '5',
+          fach: 'D',
+          art: 'Fällt aus',
+          klasse: '07aG, 07bG',
+        ),
+        lanis.Substitution(
+          tag: 'Mittwoch',
+          tag_en: 'Wednesday',
+          stunde: '2',
+          art: 'Pausenaufsicht',
         ),
       ],
       infos: [

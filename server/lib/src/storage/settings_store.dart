@@ -1,4 +1,104 @@
+import '../models/models.dart';
 import 'app_database.dart';
+
+/// Which entries of the substitution plan are shown and notified. The plan
+/// of Schulportal contains all classes of the school.
+class SubstitutionFilter {
+  /// Own classes as in the plan (e.g. "05eG"); empty = all classes.
+  final List<String> classes;
+
+  /// Show entries without class (break supervision, care, …) while
+  /// [classes] is set.
+  final bool showUnassigned;
+
+  /// Types to hide (e.g. "Pausenaufsicht"), compared case-insensitively.
+  final List<String> hiddenTypes;
+
+  const SubstitutionFilter({
+    this.classes = const [],
+    this.showUnassigned = false,
+    this.hiddenTypes = const [],
+  });
+
+  static const maxEntries = 30;
+  static const maxLength = 40;
+
+  bool get isActive => classes.isNotEmpty || hiddenTypes.isNotEmpty;
+
+  /// Classes of an entry: "05aG, 05bG" → [05aG, 05bG].
+  static List<String> classesOf(String? className) => [
+    for (final part in (className ?? '').split(RegExp(r'[,;?/]+')))
+      if (part.trim().isNotEmpty) part.trim(),
+  ];
+
+  bool matches(Substitution s) {
+    final type = (s.type ?? '').trim().toLowerCase();
+    if (type.isNotEmpty && hiddenTypes.any((t) => t.toLowerCase() == type)) {
+      return false;
+    }
+    if (classes.isEmpty) return true;
+    final own = classesOf(s.className);
+    if (own.isEmpty) return showUnassigned;
+    final wanted = {for (final c in classes) c.toLowerCase()};
+    return own.any((c) => wanted.contains(c.toLowerCase()));
+  }
+
+  /// [days] with only the matching entries, and how many were left out.
+  (List<SubstitutionDay>, int) apply(List<SubstitutionDay> days) {
+    if (!isActive) return (days, 0);
+    var hidden = 0;
+    final result = <SubstitutionDay>[];
+    for (final d in days) {
+      final entries = d.entries.where(matches).toList();
+      hidden += d.entries.length - entries.length;
+      result.add(
+        SubstitutionDay(date: d.date, entries: entries, notices: d.notices),
+      );
+    }
+    return (result, hidden);
+  }
+
+  Map<String, Object?> toJson() => {
+    'classes': classes,
+    'showUnassigned': showUnassigned,
+    'hiddenTypes': hiddenTypes,
+  };
+
+  factory SubstitutionFilter.fromJson(Object? json) {
+    if (json is! Map) {
+      throw const FormatException('substitutionFilter must be an object');
+    }
+    List<String> list(String key) {
+      final raw = json[key] ?? const [];
+      if (raw is! List || raw.length > maxEntries) {
+        throw FormatException(
+          'substitutionFilter.$key: list of max. $maxEntries',
+        );
+      }
+      final result = <String>[];
+      for (final v in raw) {
+        final t = v is String ? v.trim() : '';
+        if (t.isEmpty || t.length > maxLength) {
+          throw FormatException(
+            'substitutionFilter.$key: entries need 1–$maxLength characters',
+          );
+        }
+        if (!result.contains(t)) result.add(t);
+      }
+      return result;
+    }
+
+    final unassigned = json['showUnassigned'] ?? false;
+    if (unassigned is! bool) {
+      throw const FormatException('substitutionFilter.showUnassigned: bool');
+    }
+    return SubstitutionFilter(
+      classes: list('classes'),
+      showUnassigned: unassigned,
+      hiddenTypes: list('hiddenTypes'),
+    );
+  }
+}
 
 /// User settings shared by all browsers (stored in the database).
 class AppSettings {
@@ -9,9 +109,13 @@ class AppSettings {
   /// listed are matched automatically by the web UI.
   final Map<String, String> courseSubjects;
 
+  /// Filter of the substitution plan (web UI and notifications).
+  final SubstitutionFilter substitutionFilter;
+
   const AppSettings({
     this.subjectColors = const {},
     this.courseSubjects = const {},
+    this.substitutionFilter = const SubstitutionFilter(),
   });
 
   static const maxSubjects = 100;
@@ -22,12 +126,17 @@ class AppSettings {
   Map<String, Object?> toJson() => {
     'subjectColors': subjectColors,
     'courseSubjects': courseSubjects,
+    'substitutionFilter': substitutionFilter.toJson(),
   };
 
   /// Parses and validates [json]; throws [FormatException] with a message.
-  factory AppSettings.fromJson(Object? json) {
+  /// Fields missing in [json] are taken from [base] (partial updates).
+  factory AppSettings.fromJson(
+    Object? json, {
+    AppSettings base = const AppSettings(),
+  }) {
     if (json is! Map) throw const FormatException('Expected a JSON object');
-    final raw = json['subjectColors'] ?? const {};
+    final raw = json['subjectColors'] ?? base.subjectColors;
     if (raw is! Map) {
       throw const FormatException('subjectColors must be an object');
     }
@@ -48,7 +157,7 @@ class AppSettings {
       colors[name] = value.toLowerCase();
     }
 
-    final rawCourses = json['courseSubjects'] ?? const {};
+    final rawCourses = json['courseSubjects'] ?? base.courseSubjects;
     if (rawCourses is! Map) {
       throw const FormatException('courseSubjects must be an object');
     }
@@ -65,7 +174,14 @@ class AppSettings {
       }
       courses[key] = value.trim();
     }
-    return AppSettings(subjectColors: colors, courseSubjects: courses);
+    final filter = json.containsKey('substitutionFilter')
+        ? SubstitutionFilter.fromJson(json['substitutionFilter'])
+        : base.substitutionFilter;
+    return AppSettings(
+      subjectColors: colors,
+      courseSubjects: courses,
+      substitutionFilter: filter,
+    );
   }
 }
 

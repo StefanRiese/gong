@@ -6,6 +6,22 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- Substitution plan filter in *Einstellungen → Vertretungsplan*: choose the own classes (from the
+  classes in the current plan, or entered by hand), whether entries without class (break
+  supervision, care) are shown, and which types to hide. Stored on the server: Vertretungen,
+  Heute and notifications only show / report these entries, on all devices
+  (`substitutionFilter` in `/api/settings`; `/api/substitutions?alle=1` for the full plan).
+- Vertretungen: additional filters on the page – all classes, a single class, search
+  (subject, teacher, room, note, …) and type chips; the page shows how many entries the
+  permanent filter hides.
+
+### Changed
+- Heute only shows substitutions in the lessons for entries that name one of the own classes
+  exactly and match period and subject. Before, any entry of the school's plan in the same
+  period changed the lesson. Without own classes, Heute only lists the substitutions.
+- `PUT /api/settings` keeps fields that are not sent (was: replace everything).
+
 ## [0.5.0] – 2026-11-09
 
 ### Added

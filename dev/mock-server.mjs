@@ -35,7 +35,10 @@ const SCHOOLS = [
   { id: 5555, name: 'Grundschule Sonnenschein', city: 'Kassel' },
 ];
 const sessions = new Set();
-let settings = { subjectColors: {}, courseSubjects: {} };
+let settings = {
+  subjectColors: {}, courseSubjects: {},
+  substitutionFilter: { classes: [], showUnassigned: false, hiddenTypes: [] },
+};
 const doneOverrides = new Map(); // "course/entry" → done
 const fetched = new Map(); // cache key → fetchedAt (ISO)
 const eventClients = new Set();
@@ -109,6 +112,15 @@ const substitutions = [
         substitute: 'Schmitt', room: 'A112', previousRoom: 'A104', className: '7b', note: 'Arbeitsblätter im Fach' },
       { period: '6', type: 'Entfall', subject: 'Musik', previousSubject: null, teacher: 'Schuster',
         substitute: null, room: null, previousRoom: 'M1', className: '7b', note: null },
+      // Other classes: the portal's plan contains the whole school.
+      { period: '2', type: 'Vertretung', subject: 'Mathematik', previousSubject: null, teacher: 'Becker',
+        substitute: 'Wolf', room: 'A104', previousRoom: null, className: '7a, 7b, 7c', note: 'Test verschoben' },
+      { period: '3', type: 'Fällt aus', subject: 'Englisch', previousSubject: null, teacher: 'Novak',
+        substitute: null, room: null, previousRoom: 'B012', className: '8a', note: null },
+      { period: '5', type: 'Vertretung', subject: 'Deutsch', previousSubject: null, teacher: 'Yilmaz',
+        substitute: 'Peters', room: 'A110', previousRoom: null, className: '9a?9b', note: null },
+      { period: '1 - 2', type: 'Pausenaufsicht', subject: null, previousSubject: null, teacher: 'Lange',
+        substitute: 'Krüger', room: 'Hof', previousRoom: null, className: null, note: null },
     ],
     notices: [{ title: 'Allgemein', lines: ['Wandertag der Klassen 9a und 9b.', '<b>Bitte Sportzeug</b> nicht vergessen!'] }],
   },
@@ -117,6 +129,10 @@ const substitutions = [
     entries: [
       { period: '1', type: 'Raumänderung', subject: 'Biologie', previousSubject: null, teacher: 'Hartmann',
         substitute: null, room: 'N201', previousRoom: 'N203', className: '7b', note: null },
+      { period: '4', type: 'Betreuung', subject: null, previousSubject: null, teacher: null,
+        substitute: 'Fischer', room: 'Mensa', previousRoom: null, className: null, note: null },
+      { period: '6', type: 'Fällt aus', subject: 'Sport', previousSubject: null, teacher: 'Krüger',
+        substitute: null, room: null, previousRoom: 'Halle 2', className: '10a', note: null },
     ],
     notices: [],
   },
@@ -192,11 +208,11 @@ const json = (res, status, body, headers = {}) => {
   res.end(JSON.stringify(body));
 };
 const error = (res, status, code, message) => json(res, status, { error: { code, message } });
-const data = (res, key, value) => {
+const data = (res, key, value, extra = {}) => {
   if (!fetched.has(key)) {
     fetched.set(key, new Date(Date.now() - (stale ? 26 * 3600e3 : 4 * 60e3)).toISOString());
   }
-  json(res, 200, { data: value, key, fetchedAt: fetched.get(key), cached: true, stale, refreshing: false });
+  json(res, 200, { data: value, ...extra, key, fetchedAt: fetched.get(key), cached: true, stale, refreshing: false });
 };
 
 function broadcast(event, payload) {
@@ -267,18 +283,24 @@ async function handleApi(req, res, url) {
   }
   if (path === '/api/settings' && req.method === 'GET') return json(res, 200, settings);
   if (path === '/api/settings' && req.method === 'PUT') {
+    // Fields not sent keep their value (like the real server).
     const body = JSON.parse((await readBody(req)) || '{}');
     const colors = {};
-    for (const [k, v] of Object.entries(body.subjectColors ?? {})) {
+    for (const [k, v] of Object.entries(body.subjectColors ?? settings.subjectColors)) {
       if (!/^#[0-9a-f]{6}$/i.test(v) || !k.trim()) return error(res, 400, 'bad_request', `Invalid color for ${k}`);
       colors[k.trim()] = v.toLowerCase();
     }
     const courseSubjects = {};
-    for (const [k, v] of Object.entries(body.courseSubjects ?? {})) {
+    for (const [k, v] of Object.entries(body.courseSubjects ?? settings.courseSubjects)) {
       if (!/^[A-Za-z0-9_-]{1,64}$/.test(k) || typeof v !== 'string') return error(res, 400, 'bad_request', `Invalid course ${k}`);
       courseSubjects[k] = v.trim();
     }
-    settings = { subjectColors: colors, courseSubjects };
+    const f = body.substitutionFilter ?? settings.substitutionFilter;
+    const list = (v) => [...new Set((Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter(Boolean))];
+    settings = {
+      subjectColors: colors, courseSubjects,
+      substitutionFilter: { classes: list(f.classes), showUnassigned: f.showUnassigned === true, hiddenTypes: list(f.hiddenTypes) },
+    };
     return json(res, 200, settings);
   }
   if (path === '/api/notifications' && req.method === 'GET') {
@@ -327,7 +349,30 @@ async function handleApi(req, res, url) {
       return data(res, 'account', { schoolId: 9999, username: 'max.muster', accountType: 'student',
         features: ['timetable', 'substitutions', 'calendar', 'lessons'] });
     case '/api/timetable': return data(res, 'timetable', timetable);
-    case '/api/substitutions': return data(res, 'substitutions', substitutions);
+    case '/api/substitutions': {
+      // Permanent filter from the settings, like the real server.
+      const f = settings.substitutionFilter;
+      const active = f.classes.length > 0 || f.hiddenTypes.length > 0;
+      if (!active || url.searchParams.get('alle') === '1') {
+        return data(res, 'substitutions', substitutions, { filter: { active: false, hidden: 0 } });
+      }
+      const classesOf = (c) => (c ?? '').split(/[,;?/]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+      const wanted = new Set(f.classes.map((c) => c.toLowerCase()));
+      const hiddenTypes = new Set(f.hiddenTypes.map((t) => t.toLowerCase()));
+      const keep = (e) => {
+        if (e.type && hiddenTypes.has(e.type.toLowerCase())) return false;
+        if (wanted.size === 0) return true;
+        const own = classesOf(e.className);
+        return own.length === 0 ? f.showUnassigned : own.some((c) => wanted.has(c));
+      };
+      let hidden = 0;
+      const days = substitutions.map((d) => {
+        const entries = d.entries.filter(keep);
+        hidden += d.entries.length - entries.length;
+        return { ...d, entries };
+      });
+      return data(res, 'substitutions', days, { filter: { active: true, hidden, classes: f.classes } });
+    }
     case '/api/courses': return data(res, 'courses', courses);
     case '/api/homework': {
       const withDone = (h) => ({ ...h, done: doneOverrides.get(`${h.courseId}/${h.entryId}`) ?? h.done });

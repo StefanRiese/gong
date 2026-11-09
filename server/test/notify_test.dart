@@ -139,6 +139,48 @@ void main() {
       expect(d.pending.single.fingerprints, hasLength(1));
     });
 
+    test('substitutions: only included entries are notified', () {
+      final day = SubstitutionDay(
+        date: DateTime(2026, 11, 10),
+        entries: [
+          const Substitution(period: '1', subject: 'M', className: '05eG'),
+          const Substitution(period: '2', subject: 'D', className: '07aG'),
+        ],
+        notices: const [],
+      );
+      const filter = SubstitutionFilter(classes: ['05eG']);
+      final d = detectSubstitutions([day], {}, now, include: filter.matches);
+      expect(d.current, hasLength(2), reason: 'both are recorded as seen');
+      expect(d.pending.single.notification.title, contains('Vertretung'));
+      expect(d.pending.single.fingerprints, hasLength(1));
+    });
+
+    test('SubstitutionFilter matching', () {
+      Substitution s(String? klasse, [String? type]) =>
+          Substitution(period: '1', className: klasse, type: type);
+      const f = SubstitutionFilter(classes: ['05eG']);
+      expect(SubstitutionFilter.classesOf('05kF?05aG, 05eG'), [
+        '05kF',
+        '05aG',
+        '05eG',
+      ]);
+      expect(f.matches(s('05aG, 05eG')), isTrue);
+      expect(f.matches(s('05kF?05eg')), isTrue);
+      expect(f.matches(s('05e')), isFalse);
+      expect(f.matches(s(null, 'Pausenaufsicht')), isFalse);
+      expect(
+        const SubstitutionFilter(
+          classes: ['05eG'],
+          showUnassigned: true,
+        ).matches(s(null)),
+        isTrue,
+      );
+      const types = SubstitutionFilter(hiddenTypes: ['Betreuung']);
+      expect(types.matches(s('07aG', 'betreuung')), isFalse);
+      expect(types.matches(s('07aG', 'Vertretung')), isTrue);
+      expect(const SubstitutionFilter().isActive, isFalse);
+    });
+
     test('plainText strips markup and decodes entities', () {
       expect(
         plainText('Aufgabe&nbsp;1 &amp; 2<br>S. 12<br/><b>bis Freitag</b>'),

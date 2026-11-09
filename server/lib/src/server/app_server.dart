@@ -172,6 +172,7 @@ class AppServer implements ServerControl {
     // Cached portal data lives in the database, so it is there right after
     // a restart and while the portal is down.
     final cache = Api.createCache(store: db);
+    final settings = SettingsStore(db);
     final service = SphService(makeGateway(config.sph));
     final sync = _createSync(service, cache, db, config, info);
     final api = Api(
@@ -183,9 +184,9 @@ class AppServer implements ServerControl {
       trustProxy: config.trustProxy,
       webDir: webDir,
       embeddedWeb: embedded,
-      poller: _createPoller(sync, db, config, info),
+      poller: _createPoller(sync, db, settings, config, info),
       sync: sync,
-      settings: SettingsStore(db),
+      settings: settings,
       passwordIterations: passwordIterations,
     );
 
@@ -299,6 +300,7 @@ class AppServer implements ServerControl {
   static Poller? _createPoller(
     SyncService sync,
     AppDatabase db,
+    SettingsStore settings,
     AppConfig config,
     void Function(String) info,
   ) {
@@ -314,6 +316,7 @@ class AppServer implements ServerControl {
         appUrl: config.appUrl,
       ),
       config: config.poller,
+      substitutionFilter: () => settings.load().substitutionFilter,
       log: info,
     );
   }
@@ -496,7 +499,7 @@ class AppServer implements ServerControl {
     _api
       ..service = _service
       ..sync = _sync
-      ..poller = _createPoller(_sync, _db, next, _info)
+      ..poller = _createPoller(_sync, _db, _api.settings, next, _info)
       ..passwordHash = next.appPasswordHash;
     _config = next;
     if (!next.needsSetup) {

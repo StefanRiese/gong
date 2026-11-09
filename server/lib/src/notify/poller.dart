@@ -3,6 +3,7 @@ import 'dart:async';
 import '../models/models.dart';
 import '../sph/sph_service.dart';
 import '../storage/app_database.dart';
+import '../storage/settings_store.dart';
 import '../sync/sync_service.dart';
 import 'change_detector.dart';
 import 'notifier.dart';
@@ -88,6 +89,9 @@ class Poller {
   final void Function(String message) log;
   final DateTime Function() _now;
 
+  /// Permanent filter of the substitution plan (own classes); null = all.
+  final SubstitutionFilter Function()? substitutionFilter;
+
   int _sentTotal = 0;
 
   /// Forgotten fingerprints are pruned after this time.
@@ -98,6 +102,7 @@ class Poller {
     required this.db,
     required this.notifier,
     this.config = const PollerConfig(),
+    this.substitutionFilter,
     void Function(String message)? log,
     DateTime Function()? now,
   }) : log = log ?? ((_) {}),
@@ -144,6 +149,7 @@ class Poller {
         data as List<SubstitutionDay>,
         seen,
         _now(),
+        include: substitutionFilter?.call().matches,
       ),
       WatchKind.homework => detectHomework(data as List<Homework>, seen),
       WatchKind.grades => detectGrades(

@@ -54,6 +54,7 @@ const _eventPing = Duration(seconds: 25);
 ///   POST /api/auth/logout
 ///   GET  /api/auth/me
 ///   GET  /api/account | timetable | substitutions | courses | homework | grades
+///   GET  /api/substitutions?alle=1  without the permanent class filter
 ///   GET  /api/homework?alle=1   all homework incl. done and older entries
 ///   GET  /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
 ///   GET  /api/courses/{id}
@@ -70,7 +71,7 @@ const _eventPing = Duration(seconds: 25);
 /// While the server is not set up, the settings endpoints need the setup
 /// token (header X-Setup-Token) instead of a login.
 ///   GET  /api/settings      user settings (subject colors)
-///   PUT  /api/settings      replace settings (JSON)
+///   PUT  /api/settings      change settings (fields not sent are kept)
 ///   GET  /api/notifications          notification settings + poll status
 ///   POST /api/notifications/test     send a test notification
 ///   POST /api/notifications/check    check for changes now
@@ -184,6 +185,7 @@ class Api {
           CacheKeys.substitutions,
           CacheTtl.substitutions,
           (_) => service.substitutions(),
+          present: _filterSubstitutions,
         ),
       )
       ..get('/api/calendar', _calendar)
@@ -339,11 +341,14 @@ class Api {
 
   // --- data ------------------------------------------------------------------
 
+  /// Data endpoint over the cache. [present] can adapt the cached value for
+  /// the response (e.g. apply a filter) and add fields to the envelope.
   Handler _data(
     String key,
     Duration ttl,
-    Future<Object?> Function(Request request) load,
-  ) {
+    Future<Object?> Function(Request request) load, {
+    Map<String, Object?> Function(Object? value, Request request)? present,
+  }) {
     return (Request request) async {
       if (control?.setupRequired ?? false) return _setupRequired();
       if (!_authorized(request)) {
@@ -368,6 +373,7 @@ class Api {
               );
         return _json(200, {
           'data': result.value,
+          ...?present?.call(result.value, request),
           'key': key,
           'fetchedAt': result.fetchedAt.toUtc().toIso8601String(),
           'cached': result.cached,
@@ -379,6 +385,26 @@ class Api {
       } on ArgumentError catch (e) {
         return _error(400, 'bad_request', '${e.message}');
       }
+    };
+  }
+
+  /// The permanent filter from the settings (own classes, hidden types);
+  /// `?alle=1` returns the full plan.
+  Map<String, Object?> _filterSubstitutions(Object? value, Request request) {
+    final filter = settings.load().substitutionFilter;
+    final all = const {
+      '1',
+      'true',
+    }.contains(request.url.queryParameters['alle']);
+    if (all || !filter.isActive || value is! List<SubstitutionDay>) {
+      return {
+        'filter': {'active': false, 'hidden': 0},
+      };
+    }
+    final (days, hidden) = filter.apply(value);
+    return {
+      'data': days,
+      'filter': {'active': true, 'hidden': hidden, 'classes': filter.classes},
     };
   }
 
@@ -787,8 +813,10 @@ class Api {
     }
     final AppSettings parsed;
     try {
+      // Fields not sent keep their stored value.
       parsed = AppSettings.fromJson(
         jsonDecode(await _readLimited(request, _maxSettingsBody)),
+        base: settings.load(),
       );
     } on FormatException catch (e) {
       return _error(400, 'bad_request', e.message);

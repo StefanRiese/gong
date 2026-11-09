@@ -32,7 +32,7 @@ export function match(pathname) {
 }
 
 export function navigate(path, { replace = false } = {}) {
-  if (path !== location.pathname + location.search) {
+  if (path !== location.pathname + location.search + location.hash) {
     history[replace ? 'replaceState' : 'pushState'](null, '', path);
   }
   onChange();
@@ -51,6 +51,6 @@ export function startRouter(callback) {
     const url = new URL(a.href);
     if (url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
     e.preventDefault();
-    navigate(url.pathname + url.search);
+    navigate(url.pathname + url.search + url.hash);
   });
 }

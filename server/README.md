@@ -135,7 +135,7 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | GET | `/api/auth/me` | `{"authenticated": bool}` |
 | GET | `/api/account` | enabled features |
 | GET | `/api/timetable` | |
-| GET | `/api/substitutions` | |
+| GET | `/api/substitutions` | filtered by the permanent class filter (`substitutionFilter` in `/api/settings`); `?alle=1` = full plan |
 | GET | `/api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | default today … +60 days, max 400 days |
 | GET | `/api/courses` | |
 | GET | `/api/courses/{id}` | history, grades, exams, attendance |
@@ -143,7 +143,7 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | GET | `/api/homework?alle=1` | all homework incl. done and older entries (course histories) |
 | PUT | `/api/courses/{id}/entries/{entry}/homework` | body `{"done": true\|false}`; marks homework as done/undone **in Schulportal**; cached lists are patched, not reloaded |
 | GET | `/api/grades` | grades and exams of all courses |
-| GET / PUT | `/api/settings` | UI settings: `subjectColors`, `courseSubjects` |
+| GET / PUT | `/api/settings` | `subjectColors`, `courseSubjects`, `substitutionFilter`; PUT keeps fields not sent |
 | POST | `/api/refresh` | starts a sync of all data in the background → `202 {"refreshing": true}` |
 | GET | `/api/sync` | sync status per task (last run/success/error, interval, next run) |
 | GET | `/api/events` | Server-Sent Events: `update {key, fetchedAt}`, `sync {running}` |

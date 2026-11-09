@@ -714,3 +714,11 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 }
 .pick-item:hover, .pick-item:focus-visible { background: var(--accent-soft); border-color: var(--accent); }
 .sync-status { margin: 0; }
+
+/* --- substitution filter --- */
+/* Selection chips: pressed = chosen (no strike-through like the calendar's). */
+.chip.pick { text-decoration: none; }
+.chip.pick[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.filter-scope { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.filter-scope > span { flex: 1 1 auto; }
+.input.class-input { width: 10rem; }

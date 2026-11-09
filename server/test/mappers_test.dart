@@ -45,8 +45,10 @@ void main() {
       DateTime(2026, 11, 10),
       DateTime(2026, 11, 11),
     ]);
-    final s = days[1].entries.single;
+    expect(days[1].entries, hasLength(3));
+    final s = days[1].entries.first;
     expect(s.period, '3');
+    expect(s.className, '05eG');
     expect(s.previousRoom, 'R1');
     expect(s.substitute, 'SCH');
     expect(s.note, 'Buch mitbringen');

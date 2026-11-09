@@ -390,6 +390,11 @@ void main() {
         expect(await body(r), {
           'subjectColors': <String, Object?>{},
           'courseSubjects': <String, Object?>{},
+          'substitutionFilter': {
+            'classes': <Object?>[],
+            'showUnassigned': false,
+            'hiddenTypes': <Object?>[],
+          },
         });
 
         r = await put({
@@ -398,12 +403,38 @@ void main() {
         });
         expect(r.statusCode, 200);
         r = await send('GET', '/api/settings', cookie: cookie);
-        expect(await body(r), {
-          'subjectColors': {'Mathematik': '#1d5bb8', 'Sport': '#00aa00'},
-          'courseSubjects': {'3481': 'M', '3739': ''},
+        final b = await body(r);
+        expect(b['subjectColors'], {
+          'Mathematik': '#1d5bb8',
+          'Sport': '#00aa00',
         });
+        expect(b['courseSubjects'], {'3481': 'M', '3739': ''});
       },
     );
+
+    test('fields not sent keep their value', () async {
+      await put({
+        'subjectColors': {'M': '#112233'},
+      });
+      await put({
+        'substitutionFilter': {
+          'classes': [' 05eG ', '05eG'],
+          'hiddenTypes': ['Pausenaufsicht'],
+        },
+      });
+      var b = await body(await send('GET', '/api/settings', cookie: cookie));
+      expect(b['subjectColors'], {'M': '#112233'});
+      expect(b['substitutionFilter'], {
+        'classes': ['05eG'],
+        'showUnassigned': false,
+        'hiddenTypes': ['Pausenaufsicht'],
+      });
+      await put({
+        'subjectColors': {'M': '#445566'},
+      });
+      b = await body(await send('GET', '/api/settings', cookie: cookie));
+      expect((b['substitutionFilter'] as Map)['classes'], ['05eG']);
+    });
 
     test('rejects invalid input', () async {
       for (final bad in [
@@ -424,6 +455,15 @@ void main() {
           'courseSubjects': {'1': 5},
         },
         {'courseSubjects': []},
+        {'substitutionFilter': []},
+        {
+          'substitutionFilter': {
+            'classes': [''],
+          },
+        },
+        {
+          'substitutionFilter': {'showUnassigned': 'ja'},
+        },
         'not json',
       ]) {
         final r = await put(bad);
@@ -435,6 +475,49 @@ void main() {
     test('requires login', () async {
       final r = await send('GET', '/api/settings');
       expect(r.statusCode, 401);
+    });
+
+    test('substitutions are filtered by the permanent filter', () async {
+      Future<Map<String, dynamic>> subs([String q = '']) async =>
+          body(await send('GET', '/api/substitutions$q', cookie: cookie));
+      List<String?> periods(Map<String, dynamic> b) => [
+        for (final d in b['data'] as List)
+          for (final e in (d as Map)['entries'] as List) (e as Map)['period'],
+      ];
+
+      var b = await subs();
+      expect(periods(b), ['3', '5', '2']);
+      expect(b['filter'], {'active': false, 'hidden': 0});
+
+      await put({
+        'substitutionFilter': {
+          'classes': ['07bG'],
+        },
+      });
+      b = await subs();
+      expect(periods(b), ['5'], reason: '"07aG, 07bG" contains 07bG');
+      expect(b['filter'], {
+        'active': true,
+        'hidden': 2,
+        'classes': ['07bG'],
+      });
+      expect(
+        (b['data'] as List).any(
+          (d) => ((d as Map)['notices'] as List).isNotEmpty,
+        ),
+        isTrue,
+        reason: 'notices are kept',
+      );
+
+      await put({
+        'substitutionFilter': {
+          'classes': ['05EG'],
+          'showUnassigned': true,
+          'hiddenTypes': ['pausenaufsicht'],
+        },
+      });
+      expect(periods(await subs()), ['3']);
+      expect(periods(await subs('?alle=1')), ['3', '5', '2']);
     });
 
     test('persists in the database', () {

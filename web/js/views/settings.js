@@ -5,6 +5,7 @@ import {
   getSubjectColors, getSubjects, initColors, subjectColor,
 } from '../colors.js';
 import { pageHeader } from './common.js';
+import { planValues, sortClasses } from '../substitution-filter.js';
 
 export const title = 'Einstellungen';
 
@@ -14,10 +15,14 @@ export const live = false;
 let rowCounter = 0;
 
 export async function render(ctx) {
-  const [settings, timetable, courses] = await Promise.all([
+  const [settings, timetable, courses, plan] = await Promise.all([
     api('/api/settings'),
     ctx.features.has('timetable') ? ctx.get('/api/timetable') : Promise.resolve(null),
     ctx.features.has('lessons') ? ctx.get('/api/courses') : Promise.resolve([]),
+    // The full plan (all classes) to choose from.
+    ctx.features.has('substitutions')
+      ? api('/api/substitutions?alle=1').then((r) => r.data, () => [])
+      : Promise.resolve(null),
   ]);
   initColors({
     settings,
@@ -124,6 +129,7 @@ export async function render(ctx) {
   const hasData = getCourses().length > 0 || getSubjects().length > 0;
   return h('div', null,
     pageHeader('Einstellungen'),
+    plan ? substitutionFilterSection(settings.substitutionFilter, plan) : null,
     h('section', { class: 'section' },
       h('h2', null, 'Server'),
       h('p', null, h('a', { href: '/einstellungen/server', class: 'settings-link' },
@@ -143,4 +149,104 @@ export async function render(ctx) {
         icon('bell'), 'Push-Benachrichtigungen: Status, Testnachricht')),
     ),
   );
+}
+
+/**
+ * Permanent filter of the substitution plan, stored on the server: applies to
+ * Vertretungen, Heute (only these entries are shown in the lessons) and
+ * notifications, on all devices.
+ */
+function substitutionFilterSection(saved, plan) {
+  const filter = {
+    classes: [...(saved?.classes ?? [])],
+    showUnassigned: saved?.showUnassigned === true,
+    hiddenTypes: [...(saved?.hiddenTypes ?? [])],
+  };
+  const values = planValues(plan);
+  const status = h('span', { class: 'muted', 'aria-live': 'polite' });
+
+  let saving = Promise.resolve();
+  const save = () => {
+    saving = saving.then(async () => {
+      status.textContent = 'Speichern …';
+      try {
+        await api('/api/settings', { method: 'PUT', body: { substitutionFilter: filter } });
+        status.textContent = 'Gespeichert';
+      } catch (err) {
+        status.replaceChildren(errorBox(errorMessage(err)));
+      }
+    });
+    renderAll();
+  };
+
+  const toggle = (list, value) => {
+    const i = list.indexOf(value);
+    if (i >= 0) list.splice(i, 1); else list.push(value);
+    save();
+  };
+
+  const classChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Meine Klassen' });
+  const typeChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Ausgeblendete Arten' });
+  const unassigned = h('input', {
+    type: 'checkbox', id: 'sub-unassigned',
+    onchange: (e) => {
+      filter.showUnassigned = e.target.checked;
+      save();
+    },
+  });
+  const addInput = h('input', {
+    class: 'input class-input', placeholder: 'z. B. 05eG', 'aria-label': 'Klasse hinzufügen', maxlength: '40',
+  });
+  const add = h('button', {
+    type: 'button', class: 'button small',
+    onclick: () => {
+      const c = addInput.value.trim();
+      if (c && !filter.classes.includes(c)) {
+        filter.classes.push(c);
+        save();
+      }
+      addInput.value = '';
+    },
+  }, 'Hinzufügen');
+  addInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      add.click();
+    }
+  });
+
+  function renderAll() {
+    const classes = sortClasses([...new Set([...values.classes, ...filter.classes])]);
+    classChips.replaceChildren(...classes.map((c) => h('button', {
+      type: 'button', class: 'chip pick', 'aria-pressed': String(filter.classes.includes(c)),
+      onclick: () => toggle(filter.classes, c),
+    }, c)));
+    const types = [...new Set([...values.types, ...filter.hiddenTypes])].sort((a, b) => a.localeCompare(b, 'de'));
+    typeChips.replaceChildren(...types.map((t) => h('button', {
+      type: 'button', class: 'chip pick', 'aria-pressed': String(filter.hiddenTypes.includes(t)),
+      onclick: () => toggle(filter.hiddenTypes, t),
+    }, t)));
+    unassigned.checked = filter.showUnassigned;
+    unassigned.disabled = filter.classes.length === 0;
+  }
+  renderAll();
+
+  return h('section', { class: 'section', id: 'vertretungsplan' },
+    h('div', { class: 'section-head' }, h('h2', null, 'Vertretungsplan'), status),
+    h('p', { class: 'hint' },
+      'Der Vertretungsplan enthält alle Klassen der Schule. Mit eigenen Klassen zeigen Vertretungen, ',
+      'Heute und die Benachrichtigungen nur deren Einträge, und Heute trägt sie in die Stunden ein. ',
+      'Gilt auf allen Geräten; auf der Seite Vertretungen lassen sich zusätzlich alle Klassen anzeigen.'),
+    h('div', { class: 'card settings-form' },
+      h('div', { class: 'field' },
+        h('span', { class: 'field-label' }, 'Meine Klassen'),
+        values.classes.length || filter.classes.length
+          ? classChips
+          : h('span', { class: 'muted' }, 'Im aktuellen Plan stehen keine Klassen.'),
+        h('div', { class: 'inline-fields' }, addInput, add)),
+      h('label', { class: 'check', for: 'sub-unassigned' }, unassigned,
+        'Einträge ohne Klasse anzeigen (z. B. Pausenaufsicht, Betreuung)'),
+      h('div', { class: 'field' },
+        h('span', { class: 'field-label' }, 'Diese Arten ausblenden'),
+        typeChips)));
 }

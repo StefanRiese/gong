@@ -205,17 +205,21 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
 
   const metas = [];
   const keys = new Set();
+  /** Loads a data endpoint (whole response) and records freshness and cache key. */
+  const getFull = async (path) => {
+    const res = await api(path);
+    metas.push(res);
+    if (res.key) keys.add(res.key);
+    return res;
+  };
   const ctx = {
     params: found.params,
     query: new URLSearchParams(location.search),
     features: account.features,
-    /** Loads a data endpoint and records its freshness and cache key. */
-    async get(path) {
-      const res = await api(path);
-      metas.push(res);
-      if (res.key) keys.add(res.key);
-      return res.data;
-    },
+    /** Loads a data endpoint and returns its data. */
+    get: async (path) => (await getFull(path)).data,
+    /** Like get(), but returns the whole response (e.g. with `filter`). */
+    getFull,
   };
 
   if (!quiet) {
@@ -239,6 +243,8 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
   main.removeAttribute('aria-busy');
   main.replaceChildren(content);
   if (focus) main.focus({ preventScroll: true });
+  // Links like /einstellungen#vertretungsplan jump to the section.
+  if (!quiet && location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   // Same Set object: data a page loads later (e.g. Heute) is tracked too.
   liveKeys = keys;
   updateStatus(metas);

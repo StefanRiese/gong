@@ -87,11 +87,14 @@ String substitutionLine(Substitution s) {
 }
 
 /// New or changed substitutions for today and later, one notification per day.
+/// Entries not accepted by [include] (e.g. other classes) are recorded as
+/// seen without notification.
 Detection detectSubstitutions(
   List<SubstitutionDay> days,
   Set<String> seen,
-  DateTime now,
-) {
+  DateTime now, {
+  bool Function(Substitution s)? include,
+}) {
   final today = DateTime(now.year, now.month, now.day);
   final current = <String>{};
   final pending = <PendingNotification>[];
@@ -115,7 +118,7 @@ Detection detectSubstitutions(
         s.note,
       ]);
       current.add(f);
-      if (!seen.contains(f)) {
+      if (!seen.contains(f) && (include == null || include(s))) {
         newEntries.add(s);
         newFps.add(f);
       }

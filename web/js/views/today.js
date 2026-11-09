@@ -5,10 +5,11 @@ import {
 } from '../format.js';
 import {
   badge, homeworkDoneToast, homeworkToggle, isCancellation, lazySection, lessonsOn, load, pageHeader,
-  periodRange, removeAnimated, section,
+  periodRange, removeAnimated, section, settle,
   substitutionCard, weekFor,
 } from './common.js';
 import { courseStyle, initColors, subjectStyle } from '../colors.js';
+import { classesOf } from '../substitution-filter.js';
 
 export const title = 'Heute';
 
@@ -16,11 +17,14 @@ export async function render(ctx) {
   const now = new Date();
   // Homework is loaded lazily (see below): the full list needs one portal
   // request per course and should not delay the rest of the page.
-  const [tt, subs, cal] = await Promise.all([
+  const [tt, subsRes, cal] = await Promise.all([
     load(ctx, 'timetable', '/api/timetable'),
-    load(ctx, 'substitutions', '/api/substitutions'),
+    // Filtered by the server to the own classes (settings).
+    ctx.features.has('substitutions') ? settle(ctx.getFull('/api/substitutions')) : null,
     load(ctx, 'calendar', '/api/calendar'),
   ]);
+  const subs = subsRes && (subsRes.ok ? { ok: true, value: subsRes.value.data } : subsRes);
+  const ownClasses = subsRes?.ok ? subsRes.value.filter?.classes ?? [] : [];
 
   if (tt?.ok) initColors({ subjects: tt.value.lessons.map((l) => l.subject) });
   const target = targetDay(now, tt?.ok ? tt.value : null);
@@ -37,8 +41,8 @@ export async function render(ctx) {
       week ? badge(`Woche ${week}`, 'info') : null),
     h('div', { class: 'today-grid' },
       h('div', null,
-        section('Stundenplan', tt, () => lessonList(lessons, subDay)),
-        subs ? substitutionsSection(subs, subDay, target) : null,
+        section('Stundenplan', tt, () => lessonList(lessons, subDay, ownClasses)),
+        subs ? substitutionsSection(subs, subDay, target, ownClasses) : null,
       ),
       h('div', null,
         lazySection('Hausaufgaben',
@@ -67,16 +71,29 @@ function targetDay(now, timetable) {
   return day;
 }
 
-function lessonList(lessons, subDay) {
+const same = (a, b) => (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+
+/**
+ * Whether substitution [s] belongs to lesson [l]: only with own classes set
+ * in the settings, and only if the entry names one of them exactly, the
+ * periods overlap and – where both are known – the subject matches.
+ */
+function belongsTo(s, l, ownClasses, from, to) {
+  if (ownClasses.length === 0 || l.period == null) return false;
+  if (!classesOf(s.className).some((c) => ownClasses.some((o) => same(c, o)))) return false;
+  const r = periodRange(s.period);
+  if (!r || r[0] > to || r[1] < from) return false;
+  const subjects = [s.subject, s.previousSubject].filter(Boolean);
+  return !l.subject || subjects.length === 0 || subjects.some((x) => same(x, l.subject));
+}
+
+function lessonList(lessons, subDay, ownClasses) {
   if (lessons.length === 0) return empty('Kein Unterricht.');
   const entries = subDay?.entries ?? [];
   return h('ol', { class: 'lesson-list' }, lessons.map((l) => {
     const from = l.period ?? 0;
     const to = from + Math.max(1, l.duration) - 1;
-    const matching = entries.filter((s) => {
-      const r = periodRange(s.period);
-      return r && l.period != null && r[0] <= to && r[1] >= from;
-    });
+    const matching = entries.filter((s) => belongsTo(s, l, ownClasses, from, to));
     const cancelled = matching.some(isCancellation);
     return h('li', {
       class: ['lesson', matching.length && 'changed', cancelled && 'cancelled'],
@@ -101,9 +118,15 @@ function lessonList(lessons, subDay) {
   }));
 }
 
-function substitutionsSection(subs, subDay, target) {
+function substitutionsSection(subs, subDay, target, ownClasses) {
   return section(`Vertretungen ${shortDate(target)}`, subs, () => {
     const parts = [];
+    if (ownClasses.length === 0) {
+      parts.push(h('p', { class: 'hint' },
+        'Ganzer Vertretungsplan der Schule. ',
+        h('a', { href: '/einstellungen#vertretungsplan' }, 'Eigene Klasse festlegen'),
+        ', damit Vertretungen im Stundenplan erscheinen.'));
+    }
     for (const n of subDay?.notices ?? []) {
       parts.push(h('div', { class: 'notice' }, h('strong', null, n.title),
         textBlock(n.lines.join('<br>'))));
