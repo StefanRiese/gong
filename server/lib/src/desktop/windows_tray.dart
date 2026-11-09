@@ -229,7 +229,11 @@ void _runTray(_TrayArgs args, Arena arena) {
       ..uID = 1
       ..uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
       ..uCallbackMessage = _callbackMessage
-      ..hIcon = _loadIcon(args.icon.materialize().asUint8List(), arena);
+      ..hIcon = _loadIcon(
+        hInstance,
+        args.icon.materialize().asUint8List(),
+        arena,
+      );
     setFixedString(nid.ref.szTip, 128, 'Schulportal-Client');
     if (Shell_NotifyIcon(NIM_ADD, nid) == 0) {
       throw StateError('Shell_NotifyIcon failed');
@@ -259,9 +263,20 @@ void _runTray(_TrayArgs args, Arena arena) {
   }
 }
 
-/// Icon from PNG data in the small-icon size of the current DPI; falls back
-/// to the generic application icon.
-Pointer _loadIcon(Uint8List png, Arena arena) {
+/// Small icon for the current DPI: the exe's icon resource (set by
+/// tool/set_exe_icon.dart, has hand-tuned small sizes), else the embedded
+/// PNG, else the generic application icon.
+Pointer _loadIcon(Pointer hInstance, Uint8List png, Arena arena) {
+  final cx = GetSystemMetrics(SM_CXSMICON), cy = GetSystemMetrics(SM_CYSMICON);
+  final fromExe = LoadImage(
+    hInstance,
+    Pointer.fromAddress(1),
+    IMAGE_ICON,
+    cx,
+    cy,
+    0,
+  );
+  if (fromExe != nullptr) return fromExe;
   if (png.isNotEmpty) {
     final data = arena<Uint8>(png.length);
     data.asTypedList(png.length).setAll(0, png);
@@ -270,8 +285,8 @@ Pointer _loadIcon(Uint8List png, Arena arena) {
       png.length,
       1,
       0x00030000,
-      GetSystemMetrics(SM_CXSMICON),
-      GetSystemMetrics(SM_CYSMICON),
+      cx,
+      cy,
       LR_DEFAULTCOLOR,
     );
     if (icon != nullptr) return icon;

@@ -54,7 +54,8 @@ Starting the app a second time opens the web UI instead of a second server.
 
 - `deploy/build-release.sh` on Windows embeds the web UI and tray icon
   (`server/tool/embed_assets.dart`), builds `server.exe` with `winsqlite3` instead of a bundled
-  SQLite (hook user define), runs `server check --desktop` and marks the exe as GUI application
+  SQLite (hook user define), writes `deploy/desktop/app-icon.ico` into the exe
+  (`server/tool/set_exe_icon.dart`), runs `server check --desktop` and marks the exe as GUI application
   (`server/tool/set_gui_subsystem.dart`). The tray icon is implemented with Win32 calls via
   `dart:ffi` (`server/lib/src/desktop/`).
 - On macOS it builds the server per architecture; `deploy/build-macos-app.sh` merges the arm64
@@ -63,3 +64,6 @@ Starting the app a second time opens the web UI instead of a second server.
   (`Contents/Resources/bin/server`) as child process with `ENV_FILE` set.
 - The release workflow builds macOS arm64 on `macos-latest` and x64 on `macos-15-intel`, then
   merges them in the `macos-app` job.
+- Icons: `python3 deploy/desktop/make-icons.py` (Pillow) regenerates all icon files in
+  `deploy/desktop/` (exe `.ico`, tray PNG, macOS app icon source, menu bar template images);
+  the generated files are committed.

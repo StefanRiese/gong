@@ -72,12 +72,10 @@ echo "$version" > "$contents/Resources/VERSION"
 
 iconset="$work/AppIcon.iconset"
 mkdir -p "$iconset"
+icon="$ROOT/deploy/desktop/app-icon-macos.png" # 1024 px, see make-icons.py
 for s in 16 32 128 256 512; do
-  sips -z "$s" "$s" "$ROOT/web/icon-512.png" --out "$iconset/icon_${s}x${s}.png" >/dev/null
-  d=$((s * 2))
-  if [[ $d -le 512 ]]; then
-    sips -z "$d" "$d" "$ROOT/web/icon-512.png" --out "$iconset/icon_${s}x${s}@2x.png" >/dev/null
-  fi
+  sips -z "$s" "$s" "$icon" --out "$iconset/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) "$icon" --out "$iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$iconset" -o "$contents/Resources/AppIcon.icns"
 

@@ -35,6 +35,7 @@ const IDYES = 6;
 const SW_SHOWNORMAL = 1;
 const SM_CXSMICON = 49, SM_CYSMICON = 50;
 const IDI_APPLICATION = 32512;
+const IMAGE_ICON = 1;
 const LR_DEFAULTCOLOR = 0;
 const SYNCHRONIZE = 0x00100000;
 
@@ -278,6 +279,12 @@ final LoadIcon = _user32
       Pointer Function(Pointer, Pointer),
       Pointer Function(Pointer, Pointer)
     >('LoadIconW');
+
+final LoadImage = _user32
+    .lookupFunction<
+      Pointer Function(Pointer, Pointer, Uint32, Int32, Int32, Uint32),
+      Pointer Function(Pointer, Pointer, int, int, int, int)
+    >('LoadImageW');
 
 final DestroyIcon = _user32
     .lookupFunction<Int32 Function(Pointer), int Function(Pointer)>(

@@ -8,8 +8,8 @@
 #              deploy/                         systemd unit, install.sh, README
 #              config.env.example, LICENSE, VERSION
 #   Windows: dist/schulportal-client-windows-<arch>.exe (+ .sha256)
-#              single file: tray app with embedded web UI, SQLite from
-#              Windows (winsqlite3.dll), no console window
+#              single file: tray app with embedded web UI and icon, SQLite
+#              from Windows (winsqlite3.dll), no console window
 #   macOS:   dist/macos-<arch>/ (bin/server, lib/, VERSION) with embedded web UI;
 #              deploy/build-macos-app.sh turns one or two of these (arm64 + x64)
 #              into the (universal) app bundle
@@ -78,6 +78,10 @@ dart pub get
 dart run tool/embed_assets.dart "${embed[@]}"
 rm -rf build/release
 dart build cli -t bin/server.dart -o build/release/server
+if [[ $os == windows ]]; then
+  # Before the check, so it verifies the exe still works with the icon.
+  dart run tool/set_exe_icon.dart build/release/server/bundle/bin/server.exe ../deploy/desktop/app-icon.ico
+fi
 "build/release/server/bundle/bin/server$exe" "${check[@]}"
 
 case $os in
