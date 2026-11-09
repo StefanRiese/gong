@@ -1,4 +1,4 @@
-import 'package:ranzen_server/ranzen_server.dart';
+import 'package:gong_server/gong_server.dart';
 import 'package:test/test.dart';
 
 void main() {

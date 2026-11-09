@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ranzen_server/ranzen_server.dart';
+import 'package:gong_server/gong_server.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
@@ -667,7 +667,7 @@ void main() {
       expect(c.sync.detailsInterval, const Duration(minutes: 60));
       expect((c.sync.activeFromHour, c.sync.activeToHour), (7, 21));
       expect(c.poller.includeGradeValues, isTrue);
-      expect(c.databasePath, '/var/lib/x/ranzen.db');
+      expect(c.databasePath, '/var/lib/x/gong.db');
     });
 
     test('rejects invalid values', () {

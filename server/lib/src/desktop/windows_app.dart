@@ -10,15 +10,15 @@ import 'desktop.dart';
 import 'win32.dart';
 import 'windows_tray.dart';
 
-const _title = 'Ranzen';
+const _title = 'Gong';
 
 /// Windows desktop build: GUI subsystem (no console), tray icon, log file and
-/// config in %LOCALAPPDATA%\ranzen. Never returns.
+/// config in %LOCALAPPDATA%\gong. Never returns.
 Future<Never> runWindowsApp(List<String> args) async {
   final dir = desktopDataDir();
   Directory(dir).createSync(recursive: true);
   final configPath = desktopConfigPath();
-  final logPath = '$dir\\ranzen.log';
+  final logPath = '$dir\\gong.log';
   final log = _openLog(logPath);
 
   // Without a console, writes to stdout/stderr fail: route print() and
@@ -66,11 +66,11 @@ Future<Never> _run(
   final urlFile = File('${env['DATA_DIR']}\\last-url');
 
   // --- one instance per user: a second start opens the browser --------------
-  var single = acquireSingleInstanceMutex(r'Local\Ranzen');
+  var single = acquireSingleInstanceMutex(r'Local\Gong');
   // After "Neu starten" the old process may still be shutting down.
   for (var i = 0; !single && args.contains('--restarted') && i < 40; i++) {
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    single = acquireSingleInstanceMutex(r'Local\Ranzen');
+    single = acquireSingleInstanceMutex(r'Local\Gong');
   }
   if (!single) {
     info('Already running, opening the web UI');
@@ -95,7 +95,7 @@ Future<Never> _run(
   } on AppServerException catch (e) {
     info('$e');
     final answer = messageBox(
-      'Ranzen konnte nicht starten:\n\n${e.message}\n\n'
+      'Gong konnte nicht starten:\n\n${e.message}\n\n'
       'Konfigurationsdatei öffnen?\n$configPath',
       _title,
       MB_YESNO | MB_ICONERROR,
@@ -108,7 +108,7 @@ Future<Never> _run(
       'Der Port der Web-Oberfläche ist bereits belegt (läuft ein anderes '
       'Programm auf Port 8080?).\n\n'
       'In der Konfigurationsdatei einen anderen Port eintragen, z. B. '
-      'PORT=8090, und Ranzen erneut starten.\n\n'
+      'PORT=8090, und Gong erneut starten.\n\n'
       'Konfigurationsdatei jetzt öffnen?',
       _title,
       MB_YESNO | MB_ICONERROR,
@@ -156,7 +156,7 @@ Future<Never> _run(
     info('Tray icon failed: $e');
     messageBox(
       'Das Symbol im Infobereich konnte nicht angezeigt werden. Der '
-      'Ranzen läuft trotzdem unter $url (Beenden über den '
+      'Gong läuft trotzdem unter $url (Beenden über den '
       'Task-Manager).',
       _title,
       MB_OK | MB_ICONWARNING,
@@ -194,7 +194,7 @@ IOSink _openLog(String path) {
   }
   final sink = file.openWrite(mode: FileMode.append);
   sink.write(
-    '${DateTime.now().toIso8601String()} Ranzen '
+    '${DateTime.now().toIso8601String()} Gong '
     '${buildVersion ?? 'dev'} starting\n',
   );
   return sink;
@@ -206,7 +206,7 @@ void _openConfigFile(String path) {
   if (!file.existsSync()) {
     file.parent.createSync(recursive: true);
     file.writeAsStringSync(
-      '# Ranzen – erweiterte Einstellungen (optional).\r\n'
+      '# Gong – erweiterte Einstellungen (optional).\r\n'
       '# Normalerweise werden alle Einstellungen in der Web-Oberfläche\r\n'
       '# vorgenommen (Einstellungen → Server). Beispiel:\r\n'
       '# PORT=8090\r\n',

@@ -1,4 +1,4 @@
-// HTTP server for ranzen.
+// HTTP server for gong.
 //
 // Configuration via environment variables or server/.env (see .env.example);
 // settings made in the web UI (setup page, Einstellungen → Server) are stored
@@ -14,8 +14,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ranzen_server/desktop.dart';
-import 'package:ranzen_server/ranzen_server.dart';
+import 'package:gong_server/desktop.dart';
+import 'package:gong_server/gong_server.dart';
 
 Future<void> main(List<String> args) async {
   switch (args.firstOrNull) {

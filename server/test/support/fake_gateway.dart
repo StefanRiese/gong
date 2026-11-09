@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:liblanis/easy_client.dart' as lanis;
-import 'package:ranzen_server/ranzen_server.dart';
+import 'package:gong_server/gong_server.dart';
 
 /// In-memory [SphGateway] with scriptable failures.
 class FakeGateway implements SphGateway {

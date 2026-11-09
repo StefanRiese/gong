@@ -5,17 +5,17 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>de</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ranzen</string>
+	<string>Gong</string>
 	<key>CFBundleExecutable</key>
-	<string>Ranzen</string>
+	<string>Gong</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.stefanriese.ranzen</string>
+	<string>io.github.stefanriese.gong</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Ranzen</string>
+	<string>Gong</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -29,6 +29,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>GPL-3.0 – https://github.com/StefanRiese/ranzen</string>
+	<string>GPL-3.0 – https://github.com/StefanRiese/gong</string>
 </dict>
 </plist>

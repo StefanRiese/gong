@@ -8,7 +8,7 @@ export const title = 'Kurs';
 
 export async function render(ctx) {
   const d = await ctx.get(`/api/courses/${encodeURIComponent(ctx.params.id)}`);
-  document.title = `${d.course.name} – Ranzen`;
+  document.title = `${d.course.name} – Gong`;
   const history = [...d.history].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   const attendance = Object.entries(d.attendance);
 

@@ -2,20 +2,20 @@
   <img src="deploy/desktop/app-icon-macos.png" alt="" width="128" height="128">
 </p>
 
-<h1 align="center">Ranzen</h1>
+<h1 align="center">Gong</h1>
 
 <p align="center"><em>dein Schulportal-Begleiter für Hessen</em></p>
 
 <p align="center">
-  <a href="https://github.com/StefanRiese/ranzen/actions/workflows/ci.yml"><img src="https://github.com/StefanRiese/ranzen/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="https://github.com/StefanRiese/ranzen/actions/workflows/release.yml"><img src="https://github.com/StefanRiese/ranzen/actions/workflows/release.yml/badge.svg?event=push" alt="Release build"></a>
-  <a href="https://github.com/StefanRiese/ranzen/releases/latest"><img src="https://img.shields.io/github/v/release/StefanRiese/ranzen" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/StefanRiese/ranzen" alt="License: GPL-3.0"></a>
+  <a href="https://github.com/StefanRiese/gong/actions/workflows/ci.yml"><img src="https://github.com/StefanRiese/gong/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/StefanRiese/gong/actions/workflows/release.yml"><img src="https://github.com/StefanRiese/gong/actions/workflows/release.yml/badge.svg?event=push" alt="Release build"></a>
+  <a href="https://github.com/StefanRiese/gong/releases/latest"><img src="https://img.shields.io/github/v/release/StefanRiese/gong" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/StefanRiese/gong" alt="License: GPL-3.0"></a>
 </p>
 
-**Ranzen** is a self-hosted companion app for **Schulportal Hessen**: a Dart server (using
+**Gong** is a self-hosted companion app for **Schulportal Hessen**: a Dart server (using
 [liblanis](https://pub.dev/packages/liblanis)) plus a web UI for Stundenplan, Vertretungsplan,
-Hausaufgaben, Noten, Klausuren and Kalender – everything in one school bag. It is not an
+Hausaufgaben, Noten, Klausuren and Kalender – and it rings when something changes. It is not an
 official app of the state of Hesse.
 
 > **Status:** in use. Server with background sync, web UI, push notifications (ntfy), setup in
@@ -39,7 +39,7 @@ official app of the state of Hesse.
 ## Project structure
 
 ```
-ranzen/
+gong/
 ├── server/     # Dart backend (uses liblanis)
 ├── web/        # Web UI (plain HTML/CSS/JS, no build step)
 ├── dev/        # Mock API server for UI development
@@ -50,7 +50,7 @@ ranzen/
 ## Installation (Proxmox LXC / Debian)
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/StefanRiese/ranzen/main/deploy/install.sh
+curl -fsSLO https://raw.githubusercontent.com/StefanRiese/gong/main/deploy/install.sh
 bash install.sh
 ```
 
@@ -59,8 +59,8 @@ web UI password in the browser. Full guide: [deploy/README.md](deploy/README.md)
 
 ## Windows / macOS
 
-Download `ranzen-windows-x64.exe` or `ranzen-macos-universal.zip` from the
-[releases](https://github.com/StefanRiese/ranzen/releases). The app runs in the
+Download `gong-windows-x64.exe` or `gong-macos-universal.zip` from the
+[releases](https://github.com/StefanRiese/gong/releases). The app runs in the
 notification area / menu bar; right click on the icon to open the web UI. See
 [deploy/DESKTOP.md](deploy/DESKTOP.md).
 

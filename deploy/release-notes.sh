@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-REPO=${REPO:-StefanRiese/ranzen}
+REPO=${REPO:-StefanRiese/gong}
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 version=${1:?usage: release-notes.sh vX.Y.Z}
 version=${version#v}
@@ -49,12 +49,12 @@ curl -fsSLO https://raw.githubusercontent.com/$REPO/main/deploy/install.sh
 bash install.sh
 
 # update an existing installation
-bash /opt/ranzen/deploy/install.sh
+bash /opt/gong/deploy/install.sh
 \`\`\`
 
-**Windows (x64):** download \`ranzen-windows-x64.exe\` and start it – it runs in the
+**Windows (x64):** download \`gong-windows-x64.exe\` and start it – it runs in the
 notification area (right click on the icon for the menu).
-**macOS (Apple Silicon + Intel):** unzip \`ranzen-macos-universal.zip\`, move the app
+**macOS (Apple Silicon + Intel):** unzip \`gong-macos-universal.zip\`, move the app
 to Programme and open it with right click → Öffnen the first time; it runs in the menu bar.
 See [deploy/DESKTOP.md](https://github.com/$REPO/blob/v$version/deploy/DESKTOP.md).
 

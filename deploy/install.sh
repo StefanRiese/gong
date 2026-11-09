@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs or updates ranzen on Debian/Ubuntu with systemd
+# Installs or updates gong on Debian/Ubuntu with systemd
 # (e.g. a Proxmox LXC container). Run as root.
 #
 #   install.sh                       install/update to the latest GitHub release
@@ -9,15 +9,15 @@
 #   install.sh --rollback            switch back to the previously installed version
 #   install.sh --uninstall [--purge] remove the program (--purge: also config + data)
 #   install.sh --auto-update         install the version requested in the web UI
-#                                    (run by ranzen-update.service)
+#                                    (run by gong-update.service)
 #
 # Options: --non-interactive (never prompt), -h/--help
 
 set -euo pipefail
 
-APP=ranzen
-REPO=${REPO:-StefanRiese/ranzen}
-SERVICE_USER=${SERVICE_USER:-ranzen}
+APP=gong
+REPO=${REPO:-StefanRiese/gong}
+SERVICE_USER=${SERVICE_USER:-gong}
 PREFIX=${PREFIX:-/opt/$APP}
 CONFIG_DIR=${CONFIG_DIR:-/etc/$APP}
 CONFIG_FILE="$CONFIG_DIR/config.env"
@@ -221,7 +221,7 @@ config_complete() {
 
 # Set up in the web UI: settings are in the database, no setup token left.
 web_configured() {
-  [[ -f $STATE_DIR/ranzen.db && ! -f $STATE_DIR/setup-token ]]
+  [[ -f $STATE_DIR/gong.db && ! -f $STATE_DIR/setup-token ]]
 }
 
 configure() { # force
@@ -440,7 +440,7 @@ do_install() {
   summary
 }
 
-# Run by ranzen-update.service when the web UI asked for an update
+# Run by gong-update.service when the web UI asked for an update
 # (file $STATE_DIR/update-request with the version, written by the server).
 do_auto_update() {
   need_root

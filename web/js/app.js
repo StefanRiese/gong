@@ -141,7 +141,7 @@ function showLogin() {
   stopLive();
   account = null;
   shell = null;
-  document.title = 'Anmelden – Ranzen';
+  document.title = 'Anmelden – Gong';
   root.replaceChildren(login.render({ onSuccess: boot }));
 }
 
@@ -163,7 +163,7 @@ function showShell() {
       h('span', { class: 'label-short', 'aria-hidden': 'true' }, n.short ?? n.label))),
   );
   const header = h('header', { class: 'topbar' },
-    h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Ranzen'),
+    h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Gong'),
     status,
     h('div', { class: 'topbar-actions' },
       refreshButton,
@@ -202,7 +202,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
   }
 
   if (!found) {
-    document.title = 'Nicht gefunden – Ranzen';
+    document.title = 'Nicht gefunden – Gong';
     main.replaceChildren(h('h1', null, 'Seite nicht gefunden'), h('a', { href: '/' }, 'Zur Startseite'));
     return;
   }
@@ -230,7 +230,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
     status.textContent = '';
     main.setAttribute('aria-busy', 'true');
     main.replaceChildren(h('div', { class: 'loading' }, 'Laden …'));
-    document.title = `${found.view.title} – Ranzen`;
+    document.title = `${found.view.title} – Gong`;
   }
 
   let content;

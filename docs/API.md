@@ -1,6 +1,6 @@
 # REST API
 
-The server of Ranzen offers a JSON API over HTTP. The web UI uses it exclusively, so
+The server of Gong offers a JSON API over HTTP. The web UI uses it exclusively, so
 everything the web UI shows is available to other programs too: scripts, Home Assistant,
 Node-RED, Grafana and similar.
 
@@ -85,7 +85,7 @@ Ends the session and deletes the cookie. → `200 {"authenticated": false}`
 
 ### `GET /healthz`
 
-`200 {"status": "ok", "app": "ranzen"}`. Needs no login; for monitoring and to
+`200 {"status": "ok", "app": "gong"}`. Needs no login; for monitoring and to
 detect a running instance.
 
 ## Data endpoints
@@ -474,7 +474,7 @@ cannot be loaded.
 
 ## App updates
 
-The server looks for new releases of Ranzen on GitHub (every 12 hours with
+The server looks for new releases of Gong on GitHub (every 12 hours with
 `UPDATE_CHECK`, and on request) and can install them. All endpoints need the login.
 
 ### `GET /api/update`
@@ -485,7 +485,7 @@ The server looks for new releases of Ranzen on GitHub (every 12 hours with
   "latest": "v0.7.0",
   "available": true,
   "notes": "### Added\n- …",
-  "url": "https://github.com/StefanRiese/ranzen/releases/tag/v0.7.0",
+  "url": "https://github.com/StefanRiese/gong/releases/tag/v0.7.0",
   "publishedAt": "2026-11-10T08:00:00Z",
   "checkedAt": "2026-11-10T09:12:44Z",
   "checkError": null,
@@ -517,7 +517,7 @@ nothing to install. Downloads come only from the GitHub releases of this project
 checked against the published `.sha256` file.
 
 - `systemd`: the server writes the version to `DATA_DIR/update-request`; the root unit
-  `ranzen-update.path` runs `install.sh --auto-update`, which installs only newer
+  `gong-update.path` runs `install.sh --auto-update`, which installs only newer
   releases and restarts the service. A failure is reported in `error`.
 - `windows`: the exe downloads the new exe, swaps itself and restarts.
 - `macos`: the server unpacks the new app and exits; the menu bar app swaps the bundle and

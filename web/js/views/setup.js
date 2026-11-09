@@ -41,7 +41,7 @@ function forgetToken() {
  * @param {{token: string | null, onDone: () => void}} options
  */
 export function render({ token, onDone }) {
-  document.title = 'Einrichtung – Ranzen';
+  document.title = 'Einrichtung – Gong';
   if (!token) return noToken();
   const headers = { 'x-setup-token': token };
 
@@ -79,7 +79,7 @@ export function render({ token, onDone }) {
 
   const form = h('form', { class: 'setup-card card' },
     h('img', { src: '/icon.svg', alt: '', class: 'login-logo' }),
-    h('h1', null, 'Ranzen einrichten'),
+    h('h1', null, 'Gong einrichten'),
     h('p', { class: 'muted' },
       'Der Server meldet sich mit diesen Zugangsdaten beim Schulportal Hessen an und hält die Daten aktuell. ',
       'Alles lässt sich später unter Einstellungen → Server ändern.'),
@@ -152,8 +152,8 @@ function noToken() {
       h('h1', null, 'Einrichtung'),
       h('p', null, 'Dieser Server ist noch nicht eingerichtet. Zum Schutz funktioniert die Einrichtung nur über den Einrichtungslink:'),
       h('ul', { class: 'plain-list' },
-        h('li', null, h('strong', null, 'Windows / macOS: '), 'Der Link öffnet sich beim Start von Ranzen automatisch im Browser.'),
+        h('li', null, h('strong', null, 'Windows / macOS: '), 'Der Link öffnet sich beim Start von Gong automatisch im Browser.'),
         h('li', null, h('strong', null, 'Server (LXC): '), 'Der Link steht im Protokoll (',
-          h('code', null, 'journalctl -u ranzen'), ') und wird von ',
+          h('code', null, 'journalctl -u gong'), ') und wird von ',
           h('code', null, 'install.sh'), ' angezeigt.'))));
 }

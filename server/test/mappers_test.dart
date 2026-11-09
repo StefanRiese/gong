@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:liblanis/easy_client.dart' as lanis;
-import 'package:ranzen_server/src/sph/mappers.dart';
+import 'package:gong_server/src/sph/mappers.dart';
 import 'package:test/test.dart';
 
 import 'support/fake_gateway.dart';

@@ -1,5 +1,5 @@
-name: ranzen_server
-description: Ranzen – self-hosted companion for Schulportal Hessen (uses liblanis).
+name: gong_server
+description: Gong – self-hosted companion for Schulportal Hessen (uses liblanis).
 publish_to: none
 version: 0.1.0
 

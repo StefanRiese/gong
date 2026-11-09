@@ -1,4 +1,4 @@
-/// Backend library for ranzen.
+/// Backend library for gong.
 library;
 
 export 'src/api/api.dart';

@@ -18,7 +18,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ranzen_server/ranzen_server.dart';
+import 'package:gong_server/gong_server.dart';
 
 const _usage = '''
 Usage: dart run bin/sph.dart <command> [args]

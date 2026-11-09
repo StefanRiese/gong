@@ -85,7 +85,7 @@ class NtfyNotifier implements Notifier {
   Future<void> send(AppNotification notification) async {
     final client = _clientFactory()
       ..connectionTimeout = const Duration(seconds: 10)
-      ..userAgent = 'ranzen';
+      ..userAgent = 'gong';
     try {
       final request = await client
           .postUrl(server)
