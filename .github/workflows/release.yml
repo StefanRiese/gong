@@ -31,7 +31,7 @@ jobs:
           - { name: macos-x64, os: macos-15-intel, publish: false }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # git describe for VERSION
       - uses: dart-lang/setup-dart@v1
@@ -42,7 +42,7 @@ jobs:
         run: bash deploy/build-release.sh
       - name: Upload release files
         if: matrix.publish
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.name }}
           path: |
@@ -51,7 +51,7 @@ jobs:
           if-no-files-found: error
       - name: Upload server build for the macOS app
         if: ${{ !matrix.publish }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-${{ matrix.name }}
           path: dist/${{ matrix.name }}
@@ -62,12 +62,12 @@ jobs:
     needs: build
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: build-macos-arm64
           path: dist/macos-arm64
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: build-macos-x64
           path: dist/macos-x64
@@ -76,7 +76,7 @@ jobs:
           # Artifacts lose the executable bit.
           chmod +x dist/macos-*/bin/server
           bash deploy/build-macos-app.sh dist/macos-arm64 dist/macos-x64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-macos-universal
           path: dist/*.zip*
@@ -90,10 +90,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # previous tag for the compare link
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: release-*
