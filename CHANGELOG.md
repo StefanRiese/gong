@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.5.0] – 2026-11-09
+
 ### Added
 - Background sync: the server keeps all data (Stundenplan, Vertretungen, Hausaufgaben, Noten,
   Kalender, course pages) up to date on its own during `ACTIVE_HOURS`, also without ntfy.
@@ -134,7 +136,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.2.0...v0.3.0
