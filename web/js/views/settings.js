@@ -130,23 +130,15 @@ export async function render(ctx) {
   return h('div', null,
     pageHeader('Einstellungen'),
     plan ? substitutionFilterSection(settings.substitutionFilter, plan) : null,
-    h('section', { class: 'section' },
-      h('h2', null, 'Server'),
-      h('p', null, h('a', { href: '/einstellungen/server', class: 'settings-link' },
-        icon('settings'), 'Schulportal-Zugang, Passwort, Abgleich, Benachrichtigungen, Netzwerk')),
-    ),
-    h('section', { class: 'section' },
+    notificationLinks(),
+    serverLinks(),
+    h('section', { class: 'section', id: 'farben' },
       h('div', { class: 'section-head' }, h('h2', null, 'Fächer & Farben'), resetAll, status),
       h('p', { class: 'hint' },
         'Jeder Kurs nutzt die Farbe seines Stundenplan-Fachs, damit Stundenplan, Fächer, ',
         'Hausaufgaben und Noten gleich aussehen. Die Zuordnung zum Stundenplan-Kürzel ',
         'wird automatisch erkannt und kann hier korrigiert werden. Gilt auf allen Geräten.'),
       hasData ? list : empty('Keine Fächer gefunden.'),
-    ),
-    h('section', { class: 'section' },
-      h('h2', null, 'Benachrichtigungen'),
-      h('p', null, h('a', { href: '/benachrichtigungen', class: 'settings-link' },
-        icon('bell'), 'Push-Benachrichtigungen: Status, Testnachricht')),
     ),
   );
 }
@@ -186,7 +178,21 @@ function substitutionFilterSection(saved, plan) {
     save();
   };
 
-  const classChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Meine Klassen' });
+  // One class for now; a list saved earlier stays selectable as it is.
+  const savedKey = filter.classes.join(', ');
+  const classOptions = sortClasses([...new Set([...values.classes, ...(filter.classes.length === 1 ? filter.classes : [])])]);
+  const classSelect = h('select', {
+    id: 'sub-class', class: 'input class-select',
+    onchange: (e) => {
+      const v = e.target.value;
+      filter.classes = v === '' ? [] : v === savedKey ? [...(saved?.classes ?? [])] : [v];
+      save();
+    },
+  },
+  h('option', { value: '' }, 'Alle Klassen (ganzer Plan)'),
+  filter.classes.length > 1 ? h('option', { value: savedKey, selected: true }, savedKey) : null,
+  classOptions.map((c) => h('option', { value: c, selected: filter.classes.length === 1 && filter.classes[0] === c }, c)));
+
   const typeChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Ausgeblendete Arten' });
   const noticeChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Ausgeblendete Hinweise' });
   const unassigned = h('input', {
@@ -196,70 +202,73 @@ function substitutionFilterSection(saved, plan) {
       save();
     },
   });
-  const addInput = h('input', {
-    class: 'input class-input', placeholder: 'z. B. 05eG', 'aria-label': 'Klasse hinzufügen', maxlength: '40',
-  });
-  const add = h('button', {
-    type: 'button', class: 'button small',
-    onclick: () => {
-      const c = addInput.value.trim();
-      if (c && !filter.classes.includes(c)) {
-        filter.classes.push(c);
-        save();
-      }
-      addInput.value = '';
-    },
-  }, 'Hinzufügen');
-  addInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      add.click();
-    }
-  });
+
+  const chips = (container, all, hidden) => container.replaceChildren(...all.map((t) => h('button', {
+    type: 'button', class: 'chip pick', 'aria-pressed': String(hidden.includes(t)),
+    onclick: () => toggle(hidden, t),
+  }, t)));
+  const byName = (a, b) => a.localeCompare(b, 'de');
 
   function renderAll() {
-    const classes = sortClasses([...new Set([...values.classes, ...filter.classes])]);
-    classChips.replaceChildren(...classes.map((c) => h('button', {
-      type: 'button', class: 'chip pick', 'aria-pressed': String(filter.classes.includes(c)),
-      onclick: () => toggle(filter.classes, c),
-    }, c)));
-    const types = [...new Set([...values.types, ...filter.hiddenTypes])].sort((a, b) => a.localeCompare(b, 'de'));
-    typeChips.replaceChildren(...types.map((t) => h('button', {
-      type: 'button', class: 'chip pick', 'aria-pressed': String(filter.hiddenTypes.includes(t)),
-      onclick: () => toggle(filter.hiddenTypes, t),
-    }, t)));
-    const notices = [...new Set([...values.notices, ...filter.hiddenNotices])].sort((a, b) => a.localeCompare(b, 'de'));
-    noticeChips.replaceChildren(...notices.map((t) => h('button', {
-      type: 'button', class: 'chip pick', 'aria-pressed': String(filter.hiddenNotices.includes(t)),
-      onclick: () => toggle(filter.hiddenNotices, t),
-    }, t)));
+    chips(typeChips, [...new Set([...values.types, ...filter.hiddenTypes])].sort(byName), filter.hiddenTypes);
+    chips(noticeChips, [...new Set([...values.notices, ...filter.hiddenNotices])].sort(byName), filter.hiddenNotices);
     unassigned.checked = filter.showUnassigned;
     unassigned.disabled = filter.classes.length === 0;
   }
   renderAll();
 
+  const extraCount = filter.hiddenTypes.length + filter.hiddenNotices.length;
   return h('section', { class: 'section', id: 'vertretungsplan' },
     h('div', { class: 'section-head' }, h('h2', null, 'Vertretungsplan'), status),
-    h('p', { class: 'hint' },
-      'Der Vertretungsplan enthält alle Klassen der Schule. Mit eigenen Klassen zeigen Vertretungen, ',
-      'Heute und die Benachrichtigungen nur deren Einträge, und Heute trägt sie in die Stunden ein. ',
-      'Gilt auf allen Geräten; auf der Seite Vertretungen lassen sich zusätzlich alle Klassen anzeigen.'),
     h('div', { class: 'card settings-form' },
       h('div', { class: 'field' },
-        h('span', { class: 'field-label' }, 'Meine Klassen'),
-        values.classes.length || filter.classes.length
-          ? classChips
-          : h('span', { class: 'muted' }, 'Im aktuellen Plan stehen keine Klassen.'),
-        h('div', { class: 'inline-fields' }, addInput, add)),
+        h('label', { for: 'sub-class' }, 'Meine Klasse'),
+        classSelect,
+        h('span', { class: 'field-hint' },
+          values.classes.length
+            ? 'Vertretungen, Heute und Benachrichtigungen zeigen dann nur diese Klasse. Gilt auf allen Geräten.'
+            : 'Im aktuellen Plan stehen keine Klassen – die Auswahl füllt sich, sobald Vertretungen eingetragen sind.')),
       h('label', { class: 'check', for: 'sub-unassigned' }, unassigned,
         'Einträge ohne Klasse anzeigen (z. B. Pausenaufsicht, Betreuung)'),
-      h('div', { class: 'field' },
-        h('span', { class: 'field-label' }, 'Diese Arten ausblenden'),
-        typeChips),
-      h('div', { class: 'field' },
-        h('span', { class: 'field-label' }, 'Diese Hinweise ausblenden'),
-        values.notices.length || filter.hiddenNotices.length
-          ? noticeChips
-          : h('span', { class: 'muted' }, 'Im aktuellen Plan stehen keine Hinweise.'),
-        h('span', { class: 'field-hint' }, 'Hinweise wie „Allgemein“ stehen über den Vertretungen eines Tages.'))));
+      h('details', { class: 'more-filters', open: extraCount > 0 },
+        h('summary', null, 'Weitere Filter', extraCount ? ` (${extraCount} aktiv)` : ''),
+        h('div', { class: 'field' },
+          h('span', { class: 'field-label' }, 'Diese Arten ausblenden'),
+          values.types.length || filter.hiddenTypes.length
+            ? typeChips
+            : h('span', { class: 'muted' }, 'Im aktuellen Plan stehen keine Arten.')),
+        h('div', { class: 'field' },
+          h('span', { class: 'field-label' }, 'Diese Hinweise ausblenden'),
+          values.notices.length || filter.hiddenNotices.length
+            ? noticeChips
+            : h('span', { class: 'muted' }, 'Im aktuellen Plan stehen keine Hinweise.'),
+          h('span', { class: 'field-hint' }, 'Hinweise wie „Allgemein“ stehen über den Vertretungen eines Tages.')))));
+}
+
+/** Links to the server settings, grouped like that page. */
+function serverLinks() {
+  const link = (anchor, text, hint) => h('li', null,
+    h('a', { href: `/einstellungen/server#${anchor}` }, text),
+    h('span', { class: 'muted' }, ` – ${hint}`));
+  return h('section', { class: 'section', id: 'server' },
+    h('h2', null, 'Konto & Server'),
+    h('div', { class: 'card link-card' },
+      h('ul', { class: 'link-list' },
+        link('schulportal', 'Schulportal-Zugang', 'Schule, Benutzername, Passwort'),
+        link('passwort', 'Passwort dieser Web-Oberfläche', 'ändern, andere Geräte abmelden'),
+        link('abgleich', 'Abgleich', 'wie oft die Daten geladen werden'),
+        link('netzwerk', 'Netzwerk', 'Erreichbarkeit, Port, Anmeldedauer'),
+        link('update', 'Update', 'Version, neue Versionen installieren'))));
+}
+
+/** Notification status and setup. */
+function notificationLinks() {
+  return h('section', { class: 'section', id: 'benachrichtigungen' },
+    h('h2', null, 'Benachrichtigungen'),
+    h('div', { class: 'card link-card' },
+      h('ul', { class: 'link-list' },
+        h('li', null, h('a', { href: '/benachrichtigungen' }, 'Status und Testnachricht'),
+          h('span', { class: 'muted' }, ' – was zuletzt gesendet wurde')),
+        h('li', null, h('a', { href: '/einstellungen/server#benachrichtigungen' }, 'Einrichten'),
+          h('span', { class: 'muted' }, ' – ntfy-Server, Thema, worüber benachrichtigt wird')))));
 }

@@ -6,6 +6,14 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- Einstellungen grouped: Vertretungsplan, Benachrichtigungen, Konto & Server (links to the
+  server settings), Fächer & Farben. „Meine Klasse“ is a dropdown with the classes of the
+  current plan (one class); hiding types and notices moved to „Weitere Filter“.
+- Server-Einstellungen grouped under Konto, Daten, Benachrichtigungen and System; an
+  available update is shown at the top, otherwise under System. Every section can be linked
+  (`#schulportal`, `#passwort`, `#abgleich`, `#benachrichtigungen`, `#netzwerk`, `#update`).
+
 ## [0.8.1] – 2026-11-09
 
 ### Changed

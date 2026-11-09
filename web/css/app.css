@@ -762,3 +762,26 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .update-notice .button.small { margin-left: .25rem; }
 .section[id] { scroll-margin-top: calc(var(--topbar-height) + 1rem); }
 .login-tagline { margin: -.5rem 0 .25rem; }
+
+/* --- settings grouping --- */
+.settings-group { margin-top: 1.5rem; }
+.settings-group > .group-title {
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: .35rem;
+  margin-bottom: .9rem;
+  border-bottom: 1px solid var(--border);
+}
+.settings-group .section > h3 { font-size: 1.05rem; margin: 0 0 .3rem; color: var(--text); }
+.link-card { max-width: 720px; padding: 0; }
+.link-list { list-style: none; margin: 0; padding: .25rem 1rem; display: grid; }
+.link-list li { padding: .55rem 0; border-top: 1px solid var(--border); }
+.link-list li:first-child { border-top: 0; }
+.link-list a { font-weight: 500; }
+.input.class-select { width: auto; min-width: 14rem; max-width: 100%; }
+.more-filters summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+.more-filters[open] summary { margin-bottom: .6rem; }
+.more-filters .field + .field { margin-top: .8rem; }

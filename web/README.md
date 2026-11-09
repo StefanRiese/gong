@@ -22,8 +22,9 @@ js/views/forms.js       form helpers for setup and server settings (fields, scho
 
 Pages: `/` (Heute), `/stundenplan` (week table; compact on phones), `/vertretungen`, `/hausaufgaben`, `/noten`,
 `/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
-`/kalender`, `/einstellungen` (gear icon: subject colors, links),
-`/einstellungen/server` (Schulportal login, web UI password, sync, notifications, network),
+`/kalender`, `/einstellungen` (gear icon: substitution filter with „Meine Klasse“,
+notification and server links, subject colors), `/einstellungen/server` (grouped: Konto,
+Daten, Benachrichtigungen, System; sections linkable by anchor),
 `/benachrichtigungen` (ntfy status, test message, check now), and `/einrichtung` (setup page,
 shown instead of the login while the server is not set up; the token from the setup link is
 kept in `sessionStorage` and removed from the address bar).

@@ -65,18 +65,28 @@ export async function render() {
     pageHeader('Server-Einstellungen'),
     h('p', { class: 'hint' }, 'Gelten für alle Geräte. Gespeichert auf dem Server.'),
     restartNotice,
-    update ? updateSection(update, v, save) : null,
-    portalSection(v, settings.secrets, save),
-    passwordSection(save),
-    syncSection(v, sync, save),
-    notifySection(v, settings.secrets, save),
-    networkSection(v, settings.desktop, save),
+    // An available update is shown first; otherwise it sits under "System".
+    update?.available ? updateSection(update, v, save) : null,
+    group('Konto',
+      portalSection(v, settings.secrets, save),
+      passwordSection(save)),
+    group('Daten', syncSection(v, sync, save)),
+    group('Benachrichtigungen', notifySection(v, settings.secrets, save)),
+    group('System',
+      update && !update.available ? updateSection(update, v, save) : null,
+      networkSection(v, settings.desktop, save)),
   );
 }
 
-function card(titleText, intro, ...content) {
-  return h('section', { class: 'section' },
-    h('h2', null, titleText),
+function group(titleText, ...sections) {
+  return h('div', { class: 'settings-group' },
+    h('h2', { class: 'group-title' }, titleText),
+    sections);
+}
+
+function card(titleText, intro, id, ...content) {
+  return h('section', { class: 'section', id },
+    h('h3', null, titleText),
     intro ? h('p', { class: 'hint' }, intro) : null,
     h('form', { class: 'card settings-form' }, content));
 }
@@ -120,6 +130,7 @@ function portalSection(v, secrets, save) {
 
   const section = card('Schulportal-Zugang',
     'Mit diesen Daten meldet sich der Server beim Schulportal an. Bei einem anderen Konto werden die gespeicherten Daten verworfen.',
+    'schulportal',
     field('Schule', school.el),
     field('Benutzername', username),
     field('Passwort', password, secrets.SPH_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
@@ -144,6 +155,7 @@ function passwordSection(save) {
   const submit = h('button', { type: 'submit', class: 'button primary' }, 'Passwort ändern');
   const section = card('Passwort der Web-Oberfläche',
     'Nach der Änderung werden alle anderen Geräte abgemeldet.',
+    'passwort',
     field('Aktuelles Passwort', current),
     field('Neues Passwort', next, 'Mindestens 8 Zeichen.'),
     field('Neues Passwort wiederholen', repeat),
@@ -185,6 +197,7 @@ function syncSection(v, sync, save) {
 
   const section = card('Abgleich mit dem Schulportal',
     'Der Server lädt die Daten regelmäßig, damit die Seiten sofort angezeigt werden. Kursseiten (Noten, alle Hausaufgaben) brauchen eine Anfrage pro Kurs und werden seltener geladen.',
+    'abgleich',
     enabled.el,
     field('Vertretungen und Hausaufgaben alle … Minuten', fast),
     field('Noten und Kursseiten alle … Minuten', slow),
@@ -230,6 +243,7 @@ function notifySection(v, secrets, save) {
 
   const section = card('Benachrichtigungen (ntfy)',
     'Push-Nachrichten aufs Handy mit der App ntfy: dort das gleiche Thema abonnieren. Auf ntfy.sh kann jeder mitlesen, der das Thema kennt – daher einen langen Zufallsnamen verwenden.',
+    'benachrichtigungen',
     field('Server', url),
     h('div', { class: 'field' },
       h('label', { for: topic.id || (topic.id = 'ntfy-topic') }, 'Thema'),
@@ -273,6 +287,7 @@ function networkSection(v, desktop, save) {
 
   const section = card('Netzwerk',
     'Änderungen gelten erst nach einem Neustart des Servers.',
+    'netzwerk',
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Erreichbar'),
       h('label', { class: 'check' }, onlyHere, 'Nur auf diesem Gerät'),
       h('label', { class: 'check' }, lan, 'Auch von anderen Geräten im Netzwerk (z. B. Handy)')),
@@ -373,7 +388,7 @@ function updateSection(status, v, save) {
   auto.box.addEventListener('change', () => save(msg, check, { settings: { UPDATE_CHECK: String(auto.box.checked) } }));
 
   return h('section', { class: 'section', id: 'update' },
-    h('h2', null, 'Update'),
+    h('h3', null, 'Update'),
     h('div', { class: 'card settings-form' },
       body, auto.el, msg.el,
       h('div', { class: 'button-row' }, install, check)));
