@@ -264,7 +264,7 @@ void _runTray(_TrayArgs args, Arena arena) {
 }
 
 /// Small icon for the current DPI: the exe's icon resource (set by
-/// tool/set_exe_icon.dart, has hand-tuned small sizes), else the embedded
+/// tool/set_exe_icon.dart, has rendered small sizes), else the embedded
 /// PNG, else the generic application icon.
 Pointer _loadIcon(Pointer hInstance, Uint8List png, Arena arena) {
   final cx = GetSystemMetrics(SM_CXSMICON), cy = GetSystemMetrics(SM_CYSMICON);

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generates the desktop app icons (needs Pillow): python3 deploy/desktop/make-icons.py
 
-Motif: mortarboard over an open book on the app blue. Small sizes (<= 32 px)
-show only the mortarboard, which stays readable in the tray / menu bar.
+Motif: mortarboard over an open book on the app blue – the same artwork for every
+size and platform (only the platform layout differs: macOS icon grid margin,
+monochrome template for the menu bar, square for PWA / home screen).
 
 Output (next to this script, committed):
   app-icon-macos.png      1024 px, macOS layout (inset rounded square) -> AppIcon.icns
@@ -63,7 +64,7 @@ def _glyph(d, s, r, color_cap, color_book, color_tassel, book=True, hole=None):
     d.ellipse([s(490), s(364 + dy), s(534), s(408 + dy)], fill=color_tassel)
 
 
-def app_icon(size, *, inset, book):
+def app_icon(size, *, inset):
     big = 1024 * SS
     img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     s = lambda v: int(v * SS)
@@ -75,9 +76,8 @@ def app_icon(size, *, inset, book):
     d = ImageDraw.Draw(img)
     # Glyph scaled into the background area.
     k = (1024 - 2 * m) / 1024
-    z = 1.0 if book else 1.3  # cap only: zoom in so it stays readable when small
-    sg = lambda v: int((m + (512 + (v - 512) * z) * k) * SS)
-    _glyph(d, sg, lambda v: int(v * z * k * SS), WHITE, PAGE, GOLD, book=book, hole=BLUE_BOTTOM + (255,))
+    sg = lambda v: int((m + v * k) * SS)
+    _glyph(d, sg, lambda v: int(v * k * SS), WHITE, PAGE, GOLD, book=True, hole=BLUE_BOTTOM + (255,))
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -86,9 +86,9 @@ def template_icon(size):
     img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     black = (0, 0, 0, 255)
-    # Fill the frame: the glyph spans ~124..900 horizontally.
+    # Fill the frame: the glyph spans ~124..900 horizontally, ~160..852 vertically.
     s = lambda v: int(((v - 112) * 1024 / 800) * SS)
-    _glyph(d, s, lambda v: int(v * 1024 / 800 * SS), black, black, black, book=False, hole=(0, 0, 0, 0))
+    _glyph(d, s, lambda v: int(v * 1024 / 800 * SS), black, black, black, book=True, hole=(0, 0, 0, 0))
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -136,12 +136,12 @@ class _SvgDraw:
 
 
 def web_svg():
-    """Favicon: rounded square with the mortarboard only (readable at 16 px)."""
+    """Favicon and app logo: the same rounded icon as the desktop apps."""
     d = _SvgDraw()
-    m, z = 24, 1.3
+    m = 24
     k = (1024 - 2 * m) / 1024
-    sg = lambda v: round(m + (512 + (v - 512) * z) * k, 1)
-    _glyph(d, sg, lambda v: round(v * z * k, 1), WHITE, PAGE, GOLD, book=False, hole=BLUE_BOTTOM + (255,))
+    sg = lambda v: round(m + v * k, 1)
+    _glyph(d, sg, lambda v: round(v * k, 1), WHITE, PAGE, GOLD, book=True, hole=BLUE_BOTTOM + (255,))
     hexc = lambda c: '#%02x%02x%02x' % c
     return '\n'.join([
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">',
@@ -161,13 +161,13 @@ def main():
     web_png(512).save(web / 'icon-512.png', optimize=True)
     (web / 'icon.svg').write_text(web_svg())
 
-    app_icon(1024, inset=True, book=True).save(OUT / 'app-icon-macos.png')
+    app_icon(1024, inset=True).save(OUT / 'app-icon-macos.png')
 
     sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
-    frames = [app_icon(n, inset=False, book=n > 32) for n in sizes]
+    frames = [app_icon(n, inset=False) for n in sizes]
     frames[-1].save(OUT / 'app-icon.ico', sizes=[(n, n) for n in sizes], append_images=frames[:-1])
 
-    app_icon(32, inset=False, book=False).save(OUT / 'tray-icon.png')
+    app_icon(32, inset=False).save(OUT / 'tray-icon.png')
     template_icon(18).save(OUT / 'MenuBarIcon.png')
     template_icon(36).save(OUT / 'MenuBarIcon@2x.png')
 
