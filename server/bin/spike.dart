@@ -11,9 +11,9 @@
 import 'dart:io';
 
 import 'package:liblanis/easy_client.dart';
-import 'package:schulportal_server/schulportal_server.dart' show loadEnv;
+import 'package:ranzen_server/ranzen_server.dart' show loadEnv;
 
-const userAgent = 'schulportal-client-spike/0.1';
+const userAgent = 'ranzen-spike/0.1';
 
 Future<void> main(List<String> args) async {
   final dbOnly = args.contains('--db-only');

@@ -6,6 +6,15 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- New name: **Ranzen – dein Schulportal-Begleiter für Hessen** (was: schulportal-client). The
+  repository is now `StefanRiese/ranzen`; everything was renamed: release files
+  (`ranzen-linux-x64.tar.gz`, `ranzen-windows-x64.exe`, `ranzen-macos-universal.zip`), the
+  macOS app (`Ranzen.app`), web UI, paths (`/opt/ranzen`, `/etc/ranzen`, `/var/lib/ranzen`),
+  systemd units (`ranzen.service`, `ranzen-update.*`), system user `ranzen`, desktop data
+  folders (`%LOCALAPPDATA%\ranzen`, `~/Library/Application Support/ranzen`) and the database
+  (`ranzen.db`). Installations of earlier versions are not migrated – install anew.
+
 ## [0.7.0] – 2026-11-09
 
 ### Added
@@ -177,12 +186,12 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.7.0...HEAD
-[0.7.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/StefanRiese/schulportal-client/releases/tag/v0.1.0
+[Unreleased]: https://github.com/StefanRiese/ranzen/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/StefanRiese/ranzen/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/StefanRiese/ranzen/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/StefanRiese/ranzen/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/StefanRiese/ranzen/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/StefanRiese/ranzen/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/StefanRiese/ranzen/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/StefanRiese/ranzen/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/StefanRiese/ranzen/releases/tag/v0.1.0

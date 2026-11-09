@@ -1,4 +1,4 @@
-/// Backend library for schulportal-client.
+/// Backend library for ranzen.
 library;
 
 export 'src/api/api.dart';

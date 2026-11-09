@@ -2,11 +2,11 @@
 # the server (unprivileged) writes the wanted version to update-request, this
 # root unit runs install.sh, which downloads, verifies and installs it.
 [Unit]
-Description=Schulportal-Client: watch for update requests from the web UI
+Description=Ranzen: watch for update requests from the web UI
 
 [Path]
-PathExists=/var/lib/schulportal-client/update-request
-Unit=schulportal-client-update.service
+PathExists=/var/lib/ranzen/update-request
+Unit=ranzen-update.service
 
 [Install]
 WantedBy=multi-user.target

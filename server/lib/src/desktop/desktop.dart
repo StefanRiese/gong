@@ -25,15 +25,15 @@ enum DesktopPlatform {
 const exitConfigInvalid = 78;
 
 /// Per-user directory for config, database and log:
-/// `%LOCALAPPDATA%\schulportal-client` or
-/// `~/Library/Application Support/schulportal-client`.
+/// `%LOCALAPPDATA%\ranzen` or
+/// `~/Library/Application Support/ranzen`.
 String desktopDataDir() {
   final env = Platform.environment;
   if (Platform.isWindows) {
     final base = env['LOCALAPPDATA'] ?? env['APPDATA'] ?? '.';
-    return '$base\\schulportal-client';
+    return '$base\\ranzen';
   }
-  return '${env['HOME'] ?? '.'}/Library/Application Support/schulportal-client';
+  return '${env['HOME'] ?? '.'}/Library/Application Support/ranzen';
 }
 
 /// Optional config file of the desktop builds (ENV_FILE overrides it).

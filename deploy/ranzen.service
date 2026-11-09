@@ -1,25 +1,25 @@
 [Unit]
 Description=Schulportal Hessen client (web UI + API)
-Documentation=https://github.com/StefanRiese/schulportal-client
+Documentation=https://github.com/StefanRiese/ranzen
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=schulportal
-Group=schulportal
+User=ranzen
+Group=ranzen
 # Read by systemd as root, so the file can stay root-only (mode 600).
-EnvironmentFile=/etc/schulportal-client/config.env
-WorkingDirectory=/var/lib/schulportal-client
-ExecStart=/opt/schulportal-client/bin/server
-# Updates from the web UI go through schulportal-client-update.path (root).
+EnvironmentFile=/etc/ranzen/config.env
+WorkingDirectory=/var/lib/ranzen
+ExecStart=/opt/ranzen/bin/server
+# Updates from the web UI go through ranzen-update.path (root).
 Environment=UPDATER=systemd
 Restart=on-failure
 RestartSec=5
 # 78 = configuration error: do not restart in a loop, fix config.env instead.
 RestartPreventExitStatus=78
 TimeoutStopSec=15
-StateDirectory=schulportal-client
+StateDirectory=ranzen
 StateDirectoryMode=0750
 UMask=0077
 

@@ -14,7 +14,8 @@ export function render({ onSuccess }) {
 
   const form = h('form', { class: 'login-card card' },
     h('img', { src: '/icon.svg', alt: '', class: 'login-logo' }),
-    h('h1', null, 'Schulportal'),
+    h('h1', null, 'Ranzen'),
+    h('p', { class: 'muted login-tagline' }, 'dein Schulportal-Begleiter für Hessen'),
     h('label', { for: 'password' }, 'Passwort'),
     password,
     message,

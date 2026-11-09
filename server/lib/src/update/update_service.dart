@@ -98,7 +98,7 @@ typedef HttpGet = Future<List<int>> Function(Uri url);
 
 /// Checks GitHub for new releases and installs them (see [UpdateMode]).
 class UpdateService {
-  static const repo = 'StefanRiese/schulportal-client';
+  static const repo = 'StefanRiese/ranzen';
   static final latestUrl = Uri.parse(
     'https://api.github.com/repos/$repo/releases/latest',
   );
@@ -289,7 +289,7 @@ class UpdateService {
     }();
   }
 
-  /// Linux: the root unit schulportal-client-update.path watches this file
+  /// Linux: the root unit ranzen-update.path watches this file
   /// and runs install.sh for the version in it, which restarts the service.
   Future<void> _requestSystemdUpdate(Release release) async {
     _phase = UpdatePhase.installing;
@@ -306,10 +306,7 @@ class UpdateService {
 
   /// Windows: a running exe can be renamed but not overwritten.
   Future<void> _installWindows(Release release) async {
-    final bytes = await _download(
-      release,
-      'schulportal-client-windows-x64.exe',
-    );
+    final bytes = await _download(release, 'ranzen-windows-x64.exe');
     _phase = UpdatePhase.installing;
     final exe = File(executable);
     final next = File('${exe.path}.new');
@@ -331,7 +328,7 @@ class UpdateService {
   /// macOS: unpacks the app next to the data; the menu bar app swaps the
   /// bundle when the server exits with [exitUpdateReady].
   Future<void> _installMacos(Release release) async {
-    const name = 'schulportal-client-macos-universal.zip';
+    const name = 'ranzen-macos-universal.zip';
     final bytes = await _download(release, name);
     _phase = UpdatePhase.installing;
     final dir = Directory('$dataDir/update');
@@ -341,8 +338,7 @@ class UpdateService {
     await zip.writeAsBytes(bytes, flush: true);
     final r = await Process.run('ditto', ['-x', '-k', zip.path, dir.path]);
     zip.deleteSync();
-    if (r.exitCode != 0 ||
-        !Directory('${dir.path}/Schulportal-Client.app').existsSync()) {
+    if (r.exitCode != 0 || !Directory('${dir.path}/Ranzen.app').existsSync()) {
       throw const UpdateException('Update konnte nicht entpackt werden');
     }
     log('Unpacked ${release.tag}, restarting');
@@ -391,7 +387,7 @@ class UpdateService {
   static Future<List<int>> _httpGet(Uri url) async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15)
-      ..userAgent = 'schulportal-client';
+      ..userAgent = 'ranzen';
     try {
       final req = await client.getUrl(url);
       req.headers.set('accept', 'application/vnd.github+json');

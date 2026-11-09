@@ -168,8 +168,7 @@ class Api {
     final router = Router(notFoundHandler: _notFound)
       ..get(
         '/healthz',
-        (Request r) =>
-            _json(200, {'status': 'ok', 'app': 'schulportal-client'}),
+        (Request r) => _json(200, {'status': 'ok', 'app': 'ranzen'}),
       )
       ..post('/api/auth/login', _login)
       ..post('/api/auth/logout', _logout)

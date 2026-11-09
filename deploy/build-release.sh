@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Builds the release for the current OS/architecture:
 #
-#   Linux:   dist/schulportal-client-linux-<arch>.tar.gz (+ .sha256)
+#   Linux:   dist/ranzen-linux-<arch>.tar.gz (+ .sha256)
 #              bin/server, bin/hash_password   native executables
 #              lib/                            bundled native libraries (SQLite)
 #              web/                            web UI
 #              deploy/                         systemd unit, install.sh, README
 #              config.env.example, LICENSE, VERSION
-#   Windows: dist/schulportal-client-windows-<arch>.exe (+ .sha256)
+#   Windows: dist/ranzen-windows-<arch>.exe (+ .sha256)
 #              single file: tray app with embedded web UI and icon, SQLite
 #              from Windows (winsqlite3.dll), no console window
 #   macOS:   dist/macos-<arch>/ (bin/server, lib/, VERSION) with embedded web UI;
@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-APP=schulportal-client
+APP=ranzen
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DIST="$ROOT/dist"
 STAGE="$DIST/$APP"
@@ -120,8 +120,8 @@ cp "build/release/hash_password/bundle/bin/hash_password" "$STAGE/bin/"
 cp -R build/release/server/bundle/lib/. "$STAGE/lib/"
 cp -R "$ROOT/web" "$STAGE/web"
 rm -f "$STAGE/web/README.md"
-cp "$ROOT/deploy/schulportal-client.service" "$ROOT/deploy/schulportal-client-update.path" \
-  "$ROOT/deploy/schulportal-client-update.service" "$ROOT/deploy/install.sh" "$ROOT/deploy/README.md" "$STAGE/deploy/"
+cp "$ROOT/deploy/ranzen.service" "$ROOT/deploy/ranzen-update.path" \
+  "$ROOT/deploy/ranzen-update.service" "$ROOT/deploy/install.sh" "$ROOT/deploy/README.md" "$STAGE/deploy/"
 chmod +x "$STAGE/deploy/install.sh"
 cp "$ROOT/server/.env.example" "$STAGE/config.env.example"
 cp "$ROOT/LICENSE" "$STAGE/"

@@ -18,7 +18,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:schulportal_server/schulportal_server.dart';
+import 'package:ranzen_server/ranzen_server.dart';
 
 const _usage = '''
 Usage: dart run bin/sph.dart <command> [args]

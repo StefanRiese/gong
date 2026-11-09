@@ -1,4 +1,4 @@
-/* Schulportal web UI — no framework, no build step. */
+/* Ranzen web UI — no framework, no build step. */
 
 :root {
   color-scheme: light;
@@ -730,3 +730,4 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .release-notes p { margin: .3rem 0; }
 .update-notice .button.small { margin-left: .25rem; }
 .section[id] { scroll-margin-top: calc(var(--topbar-height) + 1rem); }
+.login-tagline { margin: -.5rem 0 .25rem; }

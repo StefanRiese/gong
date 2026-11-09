@@ -6,7 +6,7 @@
 # the program that Dart appends to its AOT executables:
 #
 #   bash deploy/build-macos-app.sh dist/macos-arm64 dist/macos-x64
-#   → dist/schulportal-client-macos-universal.zip (+ .sha256)
+#   → dist/ranzen-macos-universal.zip (+ .sha256)
 #
 # Each input directory contains bin/server, lib/ (SQLite) and VERSION.
 # The app is signed ad hoc (no Apple Developer ID): on first start, open it
@@ -16,7 +16,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DIST="$ROOT/dist"
-NAME="Schulportal-Client"
+NAME="Ranzen"
 
 [[ $# -ge 1 && $# -le 2 ]] || { echo "usage: $0 <build-dir> [<build-dir>]" >&2; exit 64; }
 inputs=("$@")
@@ -29,7 +29,7 @@ short=${version#v}
 short=${short%%-*}
 [[ $short =~ ^[0-9]+(\.[0-9]+)*$ ]] || short=0.0.0
 if [[ $# -eq 2 ]]; then suffix=universal; else suffix=$(lipo -archs "${inputs[0]}/bin/server" | tr ' ' '-'); fi
-zip="schulportal-client-macos-$suffix.zip"
+zip="ranzen-macos-$suffix.zip"
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -65,7 +65,7 @@ for a in "${targets[@]}"; do
   swiftc -O -target "$a-apple-macos11" -o "$work/launcher-$a" "$ROOT/deploy/macos/main.swift"
   slices+=("$work/launcher-$a")
 done
-lipo -create "${slices[@]}" -output "$contents/MacOS/SchulportalClient"
+lipo -create "${slices[@]}" -output "$contents/MacOS/Ranzen"
 
 echo "Resources"
 sed -e "s/@VERSION@/$version/" -e "s/@SHORT_VERSION@/$short/" \
@@ -98,7 +98,7 @@ for a in "${targets[@]}"; do
   echo "-- $a"
   arch "-$a" "$contents/Resources/bin/server-$a" check --desktop
 done
-for f in "$contents/MacOS/SchulportalClient" "$contents/Resources/bin/"* "$contents/Resources/lib/"*; do
+for f in "$contents/MacOS/Ranzen" "$contents/Resources/bin/"* "$contents/Resources/lib/"*; do
   echo "$(basename "$f"): $(lipo -archs "$f")"
 done
 

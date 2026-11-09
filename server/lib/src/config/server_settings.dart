@@ -147,7 +147,7 @@ class SchoolDirectory {
   static Future<String> _download() async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10)
-      ..userAgent = 'schulportal-client';
+      ..userAgent = 'ranzen';
     try {
       final req = await client.getUrl(listUrl);
       final res = await req.close().timeout(const Duration(seconds: 20));

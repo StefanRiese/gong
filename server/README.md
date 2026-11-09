@@ -1,6 +1,6 @@
 # server
 
-Dart backend for schulportal-client, built on [liblanis](https://pub.dev/packages/liblanis).
+Dart backend for Ranzen, built on [liblanis](https://pub.dev/packages/liblanis).
 
 ## Requirements
 
@@ -30,7 +30,7 @@ dart run bin/spike.dart --details   # also prints homework, grades, messages
 
 ```
 lib/
-  schulportal_server.dart      public exports
+  ranzen_server.dart      public exports
   src/models/models.dart       app models (JSON), independent of liblanis
   src/sph/sph_gateway.dart     interface over liblanis (test seam)
   src/sph/liblanis_gateway.dart  real implementation
@@ -129,7 +129,7 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/healthz` | `{"status": "ok", "app": "schulportal-client"}`, no login |
+| GET | `/healthz` | `{"status": "ok", "app": "ranzen"}`, no login |
 | POST | `/api/auth/login` | body `{"password": "…"}`, `Content-Type: application/json`; sets cookie `sph_session` |
 | POST | `/api/auth/logout` | |
 | GET | `/api/auth/me` | `{"authenticated": bool}` |

@@ -1,6 +1,6 @@
 {
-  "name": "Schulportal",
-  "short_name": "Schulportal",
+  "name": "Ranzen – dein Schulportal-Begleiter für Hessen",
+  "short_name": "Ranzen",
   "description": "Stundenplan, Vertretungen, Hausaufgaben und Noten aus dem Schulportal Hessen",
   "lang": "de",
   "start_url": "/",

@@ -1,5 +1,5 @@
-name: schulportal_server
-description: Self-hosted backend for Schulportal Hessen (uses liblanis).
+name: ranzen_server
+description: Ranzen – self-hosted companion for Schulportal Hessen (uses liblanis).
 publish_to: none
 version: 0.1.0
 

@@ -1,6 +1,6 @@
 # web
 
-Web UI for schulportal-client: plain HTML, CSS and JavaScript modules. No framework, no build
+Web UI for Ranzen: plain HTML, CSS and JavaScript modules. No framework, no build
 step, no npm dependencies. The Dart server serves this directory when `WEB_DIR` points to it.
 
 ## Structure

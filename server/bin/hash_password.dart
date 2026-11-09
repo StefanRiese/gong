@@ -7,7 +7,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:schulportal_server/schulportal_server.dart';
+import 'package:ranzen_server/ranzen_server.dart';
 
 Future<void> main(List<String> args) async {
   final String password;

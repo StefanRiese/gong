@@ -1,4 +1,4 @@
-// HTTP server for schulportal-client.
+// HTTP server for ranzen.
 //
 // Configuration via environment variables or server/.env (see .env.example);
 // settings made in the web UI (setup page, Einstellungen → Server) are stored
@@ -14,8 +14,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:schulportal_server/desktop.dart';
-import 'package:schulportal_server/schulportal_server.dart';
+import 'package:ranzen_server/desktop.dart';
+import 'package:ranzen_server/ranzen_server.dart';
 
 Future<void> main(List<String> args) async {
   switch (args.firstOrNull) {

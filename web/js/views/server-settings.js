@@ -36,7 +36,7 @@ export async function render() {
       h('strong', null, 'Neustart nötig: '),
       'Die Netzwerk-Einstellungen gelten erst nach einem Neustart des Servers (',
       settings.desktop ? 'Symbol im Infobereich bzw. in der Menüleiste → „Neu starten“' :
-        h('code', null, 'systemctl restart schulportal-client'),
+        h('code', null, 'systemctl restart ranzen'),
       ').'));
   };
   showRestart(settings.restartRequired ?? []);
@@ -322,7 +322,7 @@ function updateSection(status, v, save) {
       if (s.mode === 'manual') {
         parts.push(h('p', { class: 'hint' },
           'Diese Installation kann nicht aus der Web-Oberfläche aktualisiert werden. Auf dem Server: ',
-          h('code', null, 'bash /opt/schulportal-client/deploy/install.sh'),
+          h('code', null, 'bash /opt/ranzen/deploy/install.sh'),
           ' – oder die neue Version von GitHub laden.'));
       } else if (s.mode === 'systemd') {
         parts.push(h('p', { class: 'hint' },

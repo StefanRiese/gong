@@ -111,7 +111,7 @@ void _trayMain(_TrayArgs args) {
 
 void _runTray(_TrayArgs args, Arena arena) {
   final hInstance = GetModuleHandle(nullptr);
-  final className = 'SchulportalClientTray'.toNativeUtf16(allocator: arena);
+  final className = 'RanzenTray'.toNativeUtf16(allocator: arena);
   final taskbarCreated = RegisterWindowMessage(
     'TaskbarCreated'.toNativeUtf16(allocator: arena),
   );
@@ -124,7 +124,7 @@ void _runTray(_TrayArgs args, Arena arena) {
     final menu = CreatePopupMenu();
     void item(int id, String text) =>
         AppendMenu(menu, MF_STRING, id, text.toNativeUtf16(allocator: arena));
-    item(_idOpen, 'Schulportal-Client öffnen');
+    item(_idOpen, 'Ranzen öffnen');
     item(_idSettings, 'Einstellungen');
     item(_idLog, 'Protokoll anzeigen');
     AppendMenu(menu, MF_SEPARATOR, 0, nullptr);
@@ -210,7 +210,7 @@ void _runTray(_TrayArgs args, Arena arena) {
     final hwnd = CreateWindowEx(
       0,
       className,
-      'Schulportal-Client'.toNativeUtf16(allocator: arena),
+      'Ranzen'.toNativeUtf16(allocator: arena),
       0,
       0,
       0,
@@ -234,7 +234,7 @@ void _runTray(_TrayArgs args, Arena arena) {
         args.icon.materialize().asUint8List(),
         arena,
       );
-    setFixedString(nid.ref.szTip, 128, 'Schulportal-Client');
+    setFixedString(nid.ref.szTip, 128, 'Ranzen');
     if (Shell_NotifyIcon(NIM_ADD, nid) == 0) {
       throw StateError('Shell_NotifyIcon failed');
     }
@@ -245,7 +245,7 @@ void _runTray(_TrayArgs args, Arena arena) {
       nid.ref
         ..uFlags = NIF_INFO
         ..dwInfoFlags = NIIF_INFO;
-      setFixedString(nid.ref.szInfoTitle, 64, 'Schulportal-Client');
+      setFixedString(nid.ref.szInfoTitle, 64, 'Ranzen');
       setFixedString(nid.ref.szInfo, 256, hint);
       Shell_NotifyIcon(NIM_MODIFY, nid);
       nid.ref.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;

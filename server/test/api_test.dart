@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async/async.dart';
-import 'package:schulportal_server/schulportal_server.dart';
+import 'package:ranzen_server/ranzen_server.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
@@ -78,7 +78,7 @@ void main() {
     test('healthz needs no login', () async {
       final r = await send('GET', '/healthz');
       expect(r.statusCode, 200);
-      expect(await body(r), {'status': 'ok', 'app': 'schulportal-client'});
+      expect(await body(r), {'status': 'ok', 'app': 'ranzen'});
     });
 
     test('data endpoints require login', () async {

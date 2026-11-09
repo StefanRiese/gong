@@ -91,7 +91,7 @@ Notes:
 ## 5. Project structure (target)
 
 ```
-schulportal-client/
+ranzen/
 ├── server/                 # Dart backend (own pubspec.yaml)
 │   ├── bin/server.dart     # entry point
 │   ├── lib/
@@ -118,10 +118,10 @@ LXC container.
   release artifact). The bundle (`bin/` + `lib/libsqlite3.so`) only needs glibc; SQLite is
   included.
 - **Layout in the container:**
-  - `/opt/schulportal-client/` – binary + `web/` static files
-  - `/etc/schulportal-client/config.env` – port, secret key, polling interval (mode 600)
-  - `/var/lib/schulportal-client/` – SQLite database
-  - runs as dedicated user `schulportal` via systemd unit `schulportal-client.service`
+  - `/opt/ranzen/` – binary + `web/` static files
+  - `/etc/ranzen/config.env` – port, secret key, polling interval (mode 600)
+  - `/var/lib/ranzen/` – SQLite database
+  - runs as dedicated user `schulportal` via systemd unit `ranzen.service`
 - **Install/update:** `deploy/install.sh` downloads the latest release (or copies a local
   build), installs the unit, restarts the service. Proxmox snapshots/backups (vzdump) cover
   the database. Step-by-step guide: `deploy/README.md`.
@@ -177,7 +177,7 @@ LXC container.
    updates to the web UI; „Neu laden“ starts an asynchronous sync.
 6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
    for Windows/Linux/macOS, docs.
-   *Result (2026-11-09):* done. `deploy/schulportal-client.service` (own system user, systemd
+   *Result (2026-11-09):* done. `deploy/ranzen.service` (own system user, systemd
    sandbox, automatic fallback for containers without Nesting), `deploy/install.sh` (install /
    update from GitHub release with SHA-256 check or local archive, interactive credentials,
    `--configure`, `--rollback`, `--uninstall [--purge]`), `deploy/build-release.sh`, GitHub

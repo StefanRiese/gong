@@ -4,7 +4,8 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-Self-hosted client for **Schulportal Hessen** (school 6128): a Dart server (portal access via
+**Ranzen** – „dein Schulportal-Begleiter für Hessen“: self-hosted client for **Schulportal
+Hessen** (school 6128): a Dart server (portal access via
 [liblanis](https://pub.dev/packages/liblanis), background sync into a SQLite cache, REST API
 with Server-Sent Events, ntfy notifications, setup and settings in the web UI) plus a plain
 HTML/JS web UI. Deployed as a native binary + systemd service in a Proxmox LXC container, and
@@ -113,5 +114,5 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
   main` and wait for it to pass: GitHub Actions builds Linux x64/arm64, the Windows exe and
   the universal macOS app; the release notes come from that CHANGELOG section
   (`deploy/release-notes.sh`, the release fails if the section is missing).
-- Deployment target: `bash /opt/schulportal-client/deploy/install.sh` in the LXC container
+- Deployment target: `bash /opt/ranzen/deploy/install.sh` in the LXC container
   updates to the latest release.

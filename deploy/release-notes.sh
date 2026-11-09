@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-REPO=${REPO:-StefanRiese/schulportal-client}
+REPO=${REPO:-StefanRiese/ranzen}
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 version=${1:?usage: release-notes.sh vX.Y.Z}
 version=${version#v}
@@ -49,12 +49,12 @@ curl -fsSLO https://raw.githubusercontent.com/$REPO/main/deploy/install.sh
 bash install.sh
 
 # update an existing installation
-bash /opt/schulportal-client/deploy/install.sh
+bash /opt/ranzen/deploy/install.sh
 \`\`\`
 
-**Windows (x64):** download \`schulportal-client-windows-x64.exe\` and start it – it runs in the
+**Windows (x64):** download \`ranzen-windows-x64.exe\` and start it – it runs in the
 notification area (right click on the icon for the menu).
-**macOS (Apple Silicon + Intel):** unzip \`schulportal-client-macos-universal.zip\`, move the app
+**macOS (Apple Silicon + Intel):** unzip \`ranzen-macos-universal.zip\`, move the app
 to Programme and open it with right click → Öffnen the first time; it runs in the menu bar.
 See [deploy/DESKTOP.md](https://github.com/$REPO/blob/v$version/deploy/DESKTOP.md).
 

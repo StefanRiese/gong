@@ -141,7 +141,7 @@ function showLogin() {
   stopLive();
   account = null;
   shell = null;
-  document.title = 'Anmelden – Schulportal';
+  document.title = 'Anmelden – Ranzen';
   root.replaceChildren(login.render({ onSuccess: boot }));
 }
 
@@ -163,7 +163,7 @@ function showShell() {
       h('span', { class: 'label-short', 'aria-hidden': 'true' }, n.short ?? n.label))),
   );
   const header = h('header', { class: 'topbar' },
-    h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Schulportal'),
+    h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Ranzen'),
     status,
     h('div', { class: 'topbar-actions' },
       refreshButton,
@@ -202,7 +202,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
   }
 
   if (!found) {
-    document.title = 'Nicht gefunden – Schulportal';
+    document.title = 'Nicht gefunden – Ranzen';
     main.replaceChildren(h('h1', null, 'Seite nicht gefunden'), h('a', { href: '/' }, 'Zur Startseite'));
     return;
   }
@@ -230,7 +230,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
     status.textContent = '';
     main.setAttribute('aria-busy', 'true');
     main.replaceChildren(h('div', { class: 'loading' }, 'Laden …'));
-    document.title = `${found.view.title} – Schulportal`;
+    document.title = `${found.view.title} – Ranzen`;
   }
 
   let content;

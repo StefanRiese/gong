@@ -1,6 +1,6 @@
 [Unit]
-Description=Schulportal-Client: install the update requested in the web UI
-Documentation=https://github.com/StefanRiese/schulportal-client
+Description=Ranzen: install the update requested in the web UI
+Documentation=https://github.com/StefanRiese/ranzen
 After=network-online.target
 Wants=network-online.target
 
@@ -8,4 +8,4 @@ Wants=network-online.target
 Type=oneshot
 # Only newer releases are installed (checked by install.sh); the request file
 # is removed first, so a failed run does not loop.
-ExecStart=/bin/bash /opt/schulportal-client/deploy/install.sh --auto-update
+ExecStart=/bin/bash /opt/ranzen/deploy/install.sh --auto-update

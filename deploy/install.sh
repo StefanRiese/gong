@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs or updates schulportal-client on Debian/Ubuntu with systemd
+# Installs or updates ranzen on Debian/Ubuntu with systemd
 # (e.g. a Proxmox LXC container). Run as root.
 #
 #   install.sh                       install/update to the latest GitHub release
@@ -9,15 +9,15 @@
 #   install.sh --rollback            switch back to the previously installed version
 #   install.sh --uninstall [--purge] remove the program (--purge: also config + data)
 #   install.sh --auto-update         install the version requested in the web UI
-#                                    (run by schulportal-client-update.service)
+#                                    (run by ranzen-update.service)
 #
 # Options: --non-interactive (never prompt), -h/--help
 
 set -euo pipefail
 
-APP=schulportal-client
-REPO=${REPO:-StefanRiese/schulportal-client}
-SERVICE_USER=${SERVICE_USER:-schulportal}
+APP=ranzen
+REPO=${REPO:-StefanRiese/ranzen}
+SERVICE_USER=${SERVICE_USER:-ranzen}
 PREFIX=${PREFIX:-/opt/$APP}
 CONFIG_DIR=${CONFIG_DIR:-/etc/$APP}
 CONFIG_FILE="$CONFIG_DIR/config.env"
@@ -221,7 +221,7 @@ config_complete() {
 
 # Set up in the web UI: settings are in the database, no setup token left.
 web_configured() {
-  [[ -f $STATE_DIR/schulportal.db && ! -f $STATE_DIR/setup-token ]]
+  [[ -f $STATE_DIR/ranzen.db && ! -f $STATE_DIR/setup-token ]]
 }
 
 configure() { # force
@@ -440,7 +440,7 @@ do_install() {
   summary
 }
 
-# Run by schulportal-client-update.service when the web UI asked for an update
+# Run by ranzen-update.service when the web UI asked for an update
 # (file $STATE_DIR/update-request with the version, written by the server).
 do_auto_update() {
   need_root
