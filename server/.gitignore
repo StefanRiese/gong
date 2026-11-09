@@ -1,0 +1,5 @@
+.dart_tool/
+build/
+# Spike output may contain personal data (grades, messages)
+out/
+*.db

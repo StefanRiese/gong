@@ -76,14 +76,15 @@ upstream with a PR instead of forking.
 
 | Part | Windows | Linux | macOS |
 |---|---|---|---|
-| Backend (native binary via `dart compile exe`) | ✅ | ✅ | ✅ |
+| Backend (native bundle via `dart build cli`) | ✅ | ✅ | ✅ |
 | Web UI | any modern browser, incl. Android/iOS (installable as PWA) | | |
 
 Notes:
-- `dart compile exe` builds for the OS it runs on; build Windows/macOS binaries on those OSes
-  (e.g. via a GitHub Actions matrix). Linux binaries can also be cross-compiled.
-- SQLite: the `sqlite3` package needs a native SQLite library on each OS → verify
-  bundling/availability on Windows and macOS during milestone 1.
+- Use `dart build cli` (not `dart compile exe`, which does not support native assets). It builds
+  for the OS it runs on; build Windows/macOS bundles on those OSes (GitHub Actions matrix).
+- SQLite: the `sqlite3` package's build hook downloads a prebuilt SQLite library for the target
+  OS and bundles it (`bundle/lib/`). Verified on Linux in milestone 1; Windows/macOS use the same
+  mechanism and get checked in CI.
 - Main deployment target: Linux binary in a Proxmox LXC container (see section 6).
 
 ## 5. Project structure (target)
@@ -110,10 +111,10 @@ No Docker: the backend is a single native binary, so it runs directly in an unpr
 LXC container.
 
 - **Container:** Debian 12/13 template, unprivileged, ~1 vCPU, 512 MB RAM, 2–4 GB disk.
-  No Dart SDK needed in the container — only the compiled binary + static web files.
-- **Build:** `dart compile exe server/bin/server.dart` on a Linux x64 machine or in CI
-  (GitHub Actions release artifact); the binary only needs glibc and the system `libsqlite3`
-  (`apt install libsqlite3-0`).
+  No Dart SDK needed in the container — only the build bundle + static web files.
+- **Build:** `dart build cli -t bin/server.dart` on a Linux x64 machine or in CI (GitHub Actions
+  release artifact). The bundle (`bin/` + `lib/libsqlite3.so`) only needs glibc; SQLite is
+  included.
 - **Layout in the container:**
   - `/opt/schulportal-client/` – binary + `web/` static files
   - `/etc/schulportal-client/config.env` – port, secret key, polling interval (mode 600)
@@ -130,6 +131,8 @@ LXC container.
 1. **Spike** – Dart project in `server/`, add liblanis, CLI script that logs into school 6128
    and dumps which applets exist and what timetable/substitutions/lessons return.
    Answers: does school 6128 provide Noten? Does SQLite work on all three OSes?
+   *Status:* `server/bin/spike.dart` done; SQLite + native build verified on Linux;
+   login against school 6128 pending (needs credentials).
 2. **Service layer** – `SphService` wrapping `EasyLanisClient`: login, re-login on session
    expiry, typed results for all needed modules; unit tests with mocked liblanis.
 3. **REST API** – shelf server with the endpoints above, app login, response caching.
