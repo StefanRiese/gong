@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:liblanis/easy_client.dart' as lanis;
 
 import '../models/models.dart';
@@ -293,7 +294,43 @@ class SphService {
     });
   }
 
+  /// liblanis wraps HTTP errors during login as UnknownException with dio's
+  /// message ("… status code of 502 …").
+  static final _statusInMessage = RegExp(r'status code of (\d{3})');
+
+  static int? _serverErrorStatus(Object e) {
+    if (e is DioException) {
+      final code = e.response?.statusCode;
+      return code != null && code >= 500 ? code : null;
+    }
+    if (e is lanis.UnknownException) {
+      final m = _statusInMessage.firstMatch(e.cause);
+      final code = m == null ? null : int.parse(m.group(1)!);
+      return code != null && code >= 500 ? code : null;
+    }
+    return null;
+  }
+
+  static bool _isConnectionProblem(Object e) =>
+      e is DioException &&
+      const {
+        DioExceptionType.connectionTimeout,
+        DioExceptionType.sendTimeout,
+        DioExceptionType.receiveTimeout,
+        DioExceptionType.connectionError,
+      }.contains(e.type);
+
   SphException _mapError(Object e) {
+    final status = _serverErrorStatus(e);
+    if (status != null) {
+      return SphUnavailableException(
+        'Schulportal answered with HTTP $status (disruption on the portal side)',
+        e,
+      );
+    }
+    if (_isConnectionProblem(e)) {
+      return SphUnavailableException('Schulportal is not reachable', e);
+    }
     return switch (e) {
       SphException() => e,
       lanis.WrongCredentialsException() => SphAuthException(

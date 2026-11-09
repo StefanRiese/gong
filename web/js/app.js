@@ -46,15 +46,48 @@ let account = null;
 let renderToken = 0;
 let shell = null;
 
+const ACCOUNT_KEY = 'lastAccount';
+const ALL_FEATURES = ['timetable', 'substitutions', 'calendar', 'lessons'];
+
+/** Last successfully loaded account (per browser), for starting while the portal is down. */
+function rememberedAccount() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACCOUNT_KEY) ?? 'null');
+    return Array.isArray(saved?.features) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberAccount(acc) {
+  try {
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ features: acc.features, username: acc.username }));
+  } catch {
+    // storage unavailable
+  }
+}
+
 async function boot() {
   root.className = '';
   try {
     const me = await api('/api/auth/me');
     if (!me.authenticated) return showLogin();
-    const acc = await api('/api/account');
-    account = { features: new Set(acc.data.features), username: acc.data.username };
+    let portalProblem = null;
+    try {
+      const acc = await api('/api/account');
+      rememberAccount(acc.data);
+      account = { features: new Set(acc.data.features), username: acc.data.username };
+    } catch (err) {
+      if (err instanceof ApiError && err.isUnauthorized) throw err;
+      // Portal down or disturbed: start anyway with what we knew last time;
+      // pages show cached data or their own error.
+      const saved = rememberedAccount();
+      account = { features: new Set(saved?.features ?? ALL_FEATURES), username: saved?.username ?? '' };
+      portalProblem = err;
+    }
     await loadColors();
     showShell();
+    if (portalProblem) showPortalProblem(portalProblem);
   } catch (err) {
     if (err instanceof ApiError && err.isUnauthorized) return showLogin();
     root.replaceChildren(
@@ -176,6 +209,24 @@ async function renderRoute({ focus = true } = {}) {
   main.replaceChildren(content);
   if (focus) main.focus({ preventScroll: true });
   updateStatus(metas);
+}
+
+let portalNotice = null;
+
+/** Persistent notice below the top bar while the portal cannot be used. */
+function showPortalProblem(err) {
+  portalNotice?.remove();
+  portalNotice = h('div', { class: 'portal-notice', role: 'status' },
+    h('span', null, errorMessage(err), ' Angezeigt werden – falls vorhanden – zuletzt geladene Daten.'),
+    h('button', {
+      class: 'button small', type: 'button',
+      onclick: () => {
+        portalNotice?.remove();
+        portalNotice = null;
+        boot(); // full restart; shows the notice again if the portal is still down
+      },
+    }, 'Erneut versuchen'));
+  root.querySelector('.topbar')?.after(portalNotice);
 }
 
 function updateStatus(metas) {

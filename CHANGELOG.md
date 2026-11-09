@@ -6,6 +6,13 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Fixed
+- Portal outages (HTTP 5xx, e.g. `login.schulportal.hessen.de` answering 502) and connection
+  problems are reported as „Das Schulportal ist gerade nicht erreichbar …“ instead of
+  „unerwartete Daten“; cached data is served where available.
+- The web UI starts even if the portal cannot be reached: it uses the sections of the last
+  successful start and shows a notice with „Erneut versuchen“.
+
 ## [0.3.0] – 2026-11-09
 
 ### Changed

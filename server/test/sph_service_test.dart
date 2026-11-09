@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:liblanis/easy_client.dart' as lanis;
 import 'package:schulportal_server/schulportal_server.dart';
 import 'package:test/test.dart';
@@ -126,6 +127,68 @@ void main() {
         service.timetable(),
         throwsA(isA<SphUnavailableException>()),
       );
+    });
+
+    test('portal HTTP 5xx during login → SphUnavailableException', () async {
+      gw.loginErrors.add(
+        lanis.UnknownException(
+          'This exception was thrown because the response has a status code '
+          'of 502 and RequestOptions.validateStatus was configured to throw',
+        ),
+      );
+      await expectLater(
+        service.timetable(),
+        throwsA(
+          isA<SphUnavailableException>().having(
+            (e) => e.message,
+            'message',
+            contains('502'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'raw dio 5xx / timeout during data load → SphUnavailableException',
+      () async {
+        await service.timetable();
+        final opts = RequestOptions(path: '/x');
+        gw.dataErrors.addAll([
+          DioException(
+            requestOptions: opts,
+            type: DioExceptionType.badResponse,
+            response: Response(requestOptions: opts, statusCode: 503),
+          ),
+          DioException(
+            requestOptions: opts,
+            type: DioExceptionType.badResponse,
+            response: Response(requestOptions: opts, statusCode: 503),
+          ),
+        ]);
+        await expectLater(
+          service.timetable(),
+          throwsA(isA<SphUnavailableException>()),
+        );
+        gw.dataErrors.addAll([
+          DioException(
+            requestOptions: opts,
+            type: DioExceptionType.receiveTimeout,
+          ),
+          DioException(
+            requestOptions: opts,
+            type: DioExceptionType.receiveTimeout,
+          ),
+        ]);
+        await expectLater(
+          service.timetable(),
+          throwsA(isA<SphUnavailableException>()),
+        );
+      },
+    );
+
+    test('other unknown errors stay SphDataException', () async {
+      gw.loginErrors.add(lanis.UnknownException('weird'));
+      await expectLater(service.timetable(), throwsA(isA<SphDataException>()));
     });
 
     test('no connection → SphUnavailableException', () async {

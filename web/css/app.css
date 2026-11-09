@@ -573,6 +573,19 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 }
 .course-title .subject-dot { width: .6em; height: .6em; }
 
+.portal-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  padding: .6rem 1rem;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-bottom: 1px solid var(--border);
+  font-size: .92rem;
+}
+
 .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin: -.5rem 0 1rem; }
 .card-actions { display: flex; justify-content: flex-end; margin-top: .5rem; }
 .card.done .text { color: var(--muted); }
