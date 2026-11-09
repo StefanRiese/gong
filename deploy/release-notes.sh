@@ -52,5 +52,11 @@ bash install.sh
 bash /opt/schulportal-client/deploy/install.sh
 \`\`\`
 
+**Windows (x64):** download \`schulportal-client-windows-x64.exe\` and start it – it runs in the
+notification area (right click on the icon for the menu).
+**macOS (Apple Silicon + Intel):** unzip \`schulportal-client-macos-universal.zip\`, move the app
+to Programme and open it with right click → Öffnen the first time; it runs in the menu bar.
+See [deploy/DESKTOP.md](https://github.com/$REPO/blob/v$version/deploy/DESKTOP.md).
+
 **Full Changelog**: $compare
 NOTES

@@ -17,6 +17,9 @@ class AppDatabase {
   /// Opens (and creates) the database file at [path].
   factory AppDatabase.open(String path) => AppDatabase._(sqlite3.open(path));
 
+  /// Version of the loaded SQLite library.
+  static String get sqliteVersion => sqlite3.version.libVersion;
+
   /// In-memory database for tests.
   factory AppDatabase.inMemory() => AppDatabase._(sqlite3.openInMemory());
 

@@ -11,7 +11,8 @@ Hausaufgaben, Noten, Kalender and Nachrichten.
 - Log in to Schulportal Hessen and keep the session alive
 - Show Stundenplan, Vertretungsplan, Hausaufgaben, Noten, Klausuren, Kalender and Nachrichten
 - Push notifications (ntfy) about new substitutions, homework and grades
-- Native binary for Windows, Linux and macOS; deployed as a systemd service in a Proxmox LXC container
+- Native binary for Linux, deployed as a systemd service in a Proxmox LXC container
+- Desktop apps for Windows (single exe, tray icon) and macOS (universal app, menu bar icon)
 
 ## Project structure
 
@@ -32,6 +33,13 @@ bash install.sh
 ```
 
 Full guide: [deploy/README.md](deploy/README.md).
+
+## Windows / macOS
+
+Download `schulportal-client-windows-x64.exe` or `schulportal-client-macos-universal.zip` from the
+[releases](https://github.com/StefanRiese/schulportal-client/releases). The app runs in the
+notification area / menu bar; right click on the icon to open the web UI. See
+[deploy/DESKTOP.md](deploy/DESKTOP.md).
 
 ## Development
 

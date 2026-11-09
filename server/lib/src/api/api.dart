@@ -16,6 +16,7 @@ import '../sph/errors.dart';
 import '../sph/sph_service.dart';
 import '../storage/settings_store.dart';
 import 'cache.dart';
+import 'embedded_web.dart';
 
 /// How long each kind of data is cached before Schulportal is asked again.
 class CacheTtl {
@@ -67,6 +68,9 @@ class Api {
   final bool trustProxy;
   final String? webDir;
 
+  /// Web UI compiled into the executable; used when [webDir] is null.
+  final EmbeddedWeb? embeddedWeb;
+
   /// Background polling + notifications; null = disabled.
   final Poller? poller;
   final SettingsStore settings;
@@ -81,6 +85,7 @@ class Api {
     this.cookieSecure = false,
     this.trustProxy = false,
     this.webDir,
+    this.embeddedWeb,
     this.poller,
     SettingsStore? settings,
     DateTime Function()? now,
@@ -101,7 +106,11 @@ class Api {
 
   Handler get handler {
     final router = Router(notFoundHandler: _notFound)
-      ..get('/healthz', (Request r) => _json(200, {'status': 'ok'}))
+      ..get(
+        '/healthz',
+        (Request r) =>
+            _json(200, {'status': 'ok', 'app': 'schulportal-client'}),
+      )
       ..post('/api/auth/login', _login)
       ..post('/api/auth/logout', _logout)
       ..get('/api/auth/me', _me)
@@ -463,7 +472,7 @@ class Api {
 
   FutureOr<Response> _notFound(Request request) {
     final path = request.url.path;
-    if (webDir == null ||
+    if (webDir == null && (embeddedWeb?.isEmpty ?? true) ||
         path == 'api' ||
         path.startsWith('api/') ||
         request.method != 'GET' && request.method != 'HEAD') {
@@ -479,6 +488,10 @@ class Api {
 
   /// Serves files from [webDir]; unknown paths get index.html (SPA routing).
   Future<Response> _static(Request request) async {
+    if (webDir == null) {
+      return embeddedWeb!.serve(request) ??
+          _error(404, 'not_found', 'No such file');
+    }
     final response = await _staticFiles(request);
     if (response.statusCode != 404) return response;
     final index = File('$webDir/index.html');

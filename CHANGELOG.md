@@ -6,6 +6,26 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- Windows desktop app: a single `schulportal-client-windows-x64.exe` with the web UI built in.
+  It runs without a console window as an icon in the notification area; right click opens a
+  menu with „Schulportal-Client öffnen“, „Einstellungen bearbeiten“, „Protokoll anzeigen“,
+  „Neu starten“ and „Beenden“ (double click opens the web UI). Uses the SQLite that ships
+  with Windows.
+- macOS desktop app: universal `Schulportal-Client.app` (Apple Silicon + Intel) as a menu bar
+  app with the same menu, released as `schulportal-client-macos-universal.zip`.
+- First start of the desktop apps creates `config.env` in the user profile and opens it in
+  Notepad / TextEdit; a second start opens the web UI. See `deploy/DESKTOP.md`.
+- `APP_PASSWORD` (plain text) as alternative to `APP_PASSWORD_HASH`; the server replaces it
+  with the hash in the config file on start.
+- `OPEN_BROWSER=true` opens the web UI in the default browser after start.
+- `server check` verifies a build (SQLite, embedded files) and `server version` prints the
+  version.
+
+### Changed
+- `/healthz` also returns `"app": "schulportal-client"`.
+- The release no longer contains per-architecture macOS archives or a Windows `.tar.gz`.
+
 ## [0.3.1] – 2026-11-09
 
 ### Fixed

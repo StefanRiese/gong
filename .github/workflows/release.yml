@@ -22,10 +22,13 @@ jobs:
       matrix:
         include:
           # Ubuntu 22.04 = glibc 2.35 → binaries also run on Debian 12 (2.36) and 13.
-          - { name: linux-x64, os: ubuntu-22.04 }
-          - { name: linux-arm64, os: ubuntu-22.04-arm }
-          - { name: windows-x64, os: windows-latest }
-          - { name: macos-arm64, os: macos-latest }
+          - { name: linux-x64, os: ubuntu-22.04, publish: true }
+          - { name: linux-arm64, os: ubuntu-22.04-arm, publish: true }
+          # Single tray exe (GUI subsystem, embedded web UI, winsqlite3.dll).
+          - { name: windows-x64, os: windows-latest, publish: true }
+          # Per-architecture server builds, merged into the universal app below.
+          - { name: macos-arm64, os: macos-latest, publish: false }
+          - { name: macos-x64, os: macos-15-intel, publish: false }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -37,15 +40,51 @@ jobs:
       - name: Build
         shell: bash
         run: bash deploy/build-release.sh
+      - name: Upload release files
+        if: matrix.publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            dist/*.tar.gz*
+            dist/*.exe*
+          if-no-files-found: error
+      - name: Upload server build for the macOS app
+        if: ${{ !matrix.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.name }}
+          path: dist/${{ matrix.name }}
+          if-no-files-found: error
+
+  macos-app:
+    name: Build macOS universal app
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-macos-arm64
+          path: dist/macos-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-macos-x64
+          path: dist/macos-x64
+      - name: Build app bundle
+        run: |
+          # Artifacts lose the executable bit.
+          chmod +x dist/macos-*/bin/server
+          bash deploy/build-macos-app.sh dist/macos-arm64 dist/macos-x64
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
-          path: dist/*.tar.gz*
+          name: release-macos-universal
+          path: dist/*.zip*
           if-no-files-found: error
 
   publish:
     name: Publish GitHub release
-    needs: build
+    needs: [build, macos-app]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     permissions:
@@ -57,6 +96,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: release-*
           merge-multiple: true
       - name: Release notes from CHANGELOG.md
         run: bash deploy/release-notes.sh "$GITHUB_REF_NAME" > release-notes.md

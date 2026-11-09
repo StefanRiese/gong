@@ -132,4 +132,5 @@ bash deploy/build-release.sh     # → dist/schulportal-client-linux-x64.tar.gz 
 ```
 
 Pushing a tag `v*` builds releases for Linux, Windows and macOS on GitHub Actions and
-publishes them as a GitHub release.
+publishes them as a GitHub release. The Windows and macOS builds are desktop apps with a tray /
+menu bar icon, see [DESKTOP.md](DESKTOP.md).

@@ -16,10 +16,15 @@ void main() {
   late Handler handler;
   late DateTime now;
 
-  Api build({String? webDir, LoginRateLimiter? limiter}) => Api(
+  Api build({
+    String? webDir,
+    EmbeddedWeb? embeddedWeb,
+    LoginRateLimiter? limiter,
+  }) => Api(
     service: service,
     passwordHash: _hash,
     webDir: webDir,
+    embeddedWeb: embeddedWeb,
     limiter: limiter,
     now: () => now,
   );
@@ -72,7 +77,7 @@ void main() {
     test('healthz needs no login', () async {
       final r = await send('GET', '/healthz');
       expect(r.statusCode, 200);
-      expect(await body(r), {'status': 'ok'});
+      expect(await body(r), {'status': 'ok', 'app': 'schulportal-client'});
     });
 
     test('data endpoints require login', () async {
@@ -481,6 +486,58 @@ void main() {
       handler = build().handler;
       final r = await send('GET', '/');
       expect(r.statusCode, 404);
+    });
+  });
+
+  group('embedded web UI', () {
+    String b64(String s) => base64.encode(utf8.encode(s));
+
+    setUp(() {
+      handler = build(
+        embeddedWeb: EmbeddedWeb.fromBase64({
+          'index.html': b64('<h1>App</h1>'),
+          'js/app.js': b64('console.log(1)'),
+          'manifest.webmanifest': b64('{}'),
+        }),
+      ).handler;
+    });
+
+    test('serves files with content type and ETag', () async {
+      var r = await send('GET', '/js/app.js');
+      expect(r.statusCode, 200);
+      expect(await r.readAsString(), 'console.log(1)');
+      expect(r.headers['content-type'], startsWith('text/javascript'));
+      expect(
+        r.headers['content-security-policy'],
+        contains("script-src 'self'"),
+      );
+      final etag = r.headers['etag']!;
+
+      r = await handler(
+        Request(
+          'GET',
+          Uri.parse('http://localhost/js/app.js'),
+          headers: {'if-none-match': etag},
+        ),
+      );
+      expect(r.statusCode, 304);
+
+      r = await send('GET', '/manifest.webmanifest');
+      expect(r.headers['content-type'], 'application/manifest+json');
+    });
+
+    test('index.html for / and unknown paths, not for the API', () async {
+      expect(await (await send('GET', '/')).readAsString(), '<h1>App</h1>');
+      expect(
+        await (await send('GET', '/noten')).readAsString(),
+        '<h1>App</h1>',
+      );
+      expect((await send('GET', '/api/unknown')).statusCode, 404);
+    });
+
+    test('empty embedded web → 404 for non-API paths', () async {
+      handler = build(embeddedWeb: EmbeddedWeb.fromBase64({})).handler;
+      expect((await send('GET', '/')).statusCode, 404);
     });
   });
 }

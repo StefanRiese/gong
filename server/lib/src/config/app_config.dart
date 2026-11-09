@@ -40,6 +40,9 @@ class AppConfig {
   final Uri? appUrl;
   final PollerConfig poller;
 
+  /// Open the web UI in the default browser after start (desktop builds).
+  final bool openBrowser;
+
   const AppConfig({
     required this.sph,
     required this.appPasswordHash,
@@ -53,6 +56,7 @@ class AppConfig {
     this.ntfy,
     this.appUrl,
     this.poller = const PollerConfig(),
+    this.openBrowser = false,
   });
 
   String get databasePath => '$dataDir/schulportal.db';
@@ -71,11 +75,20 @@ class AppConfig {
     final sph = SphCredentials.fromEnv(env);
     if (sph == null) problems.add('SPH_USERNAME and SPH_PASSWORD are required');
 
-    final hash = get('APP_PASSWORD_HASH') ?? '';
-    if (hash.isEmpty) {
+    // APP_PASSWORD (plain text) wins over APP_PASSWORD_HASH; the desktop
+    // builds replace it with the hash in the config file (see config_file.dart).
+    final plain = get('APP_PASSWORD');
+    var hash = get('APP_PASSWORD_HASH') ?? '';
+    if (plain != null) {
+      if (plain.length < 8) {
+        problems.add('APP_PASSWORD must have at least 8 characters');
+      } else {
+        hash = PasswordHasher.hash(plain);
+      }
+    } else if (hash.isEmpty) {
       problems.add(
-        'APP_PASSWORD_HASH is required (create one with bin/hash_password, '
-        'or run deploy/install.sh --configure)',
+        'APP_PASSWORD or APP_PASSWORD_HASH is required (create a hash with '
+        'bin/hash_password, or run deploy/install.sh --configure)',
       );
     } else if (!PasswordHasher.isValidFormat(hash)) {
       problems.add('APP_PASSWORD_HASH has an invalid format');
@@ -189,6 +202,7 @@ class AppConfig {
         activeToHour: to,
         includeGradeValues: _bool(env['NOTIFY_GRADE_VALUES']),
       ),
+      openBrowser: _bool(env['OPEN_BROWSER']),
     );
   }
 

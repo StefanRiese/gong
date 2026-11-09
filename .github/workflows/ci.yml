@@ -45,4 +45,4 @@ jobs:
       - name: Manifest is valid JSON
         run: node -e 'JSON.parse(require("fs").readFileSync("web/manifest.webmanifest","utf8"))'
       - name: ShellCheck
-        run: shellcheck -s bash deploy/install.sh deploy/build-release.sh deploy/release-notes.sh
+        run: shellcheck -s bash deploy/install.sh deploy/build-release.sh deploy/build-macos-app.sh deploy/release-notes.sh

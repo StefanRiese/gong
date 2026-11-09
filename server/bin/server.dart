@@ -1,111 +1,75 @@
 // HTTP server for schulportal-client.
 //
 // Configuration via environment variables or server/.env (see .env.example).
+//
+//   server            run the server
+//   server check      verify the build (SQLite, embedded files); for CI
+//   server version    print the version
+//
+// The Windows desktop build runs as tray app (see lib/src/desktop/), the
+// macOS desktop build is started by the menu bar app (deploy/macos/).
 
 import 'dart:async';
 import 'dart:io';
 
+import 'package:schulportal_server/desktop.dart';
 import 'package:schulportal_server/schulportal_server.dart';
-import 'package:shelf/shelf.dart';
-import 'package:shelf/shelf_io.dart' as io;
 
 Future<void> main(List<String> args) async {
-  final envFile = Platform.environment['ENV_FILE'] ?? '.env';
+  switch (args.firstOrNull) {
+    case 'check':
+      exit(await runSelfCheck(expectEmbedded: args.contains('--desktop')));
+    case 'version' || '--version':
+      stdout.writeln(buildVersion ?? 'dev');
+      exit(0);
+  }
+
+  final desktop = DesktopPlatform.current;
+  if (desktop == DesktopPlatform.windows) await runWindowsApp(args);
+
+  final envFile = desktop == DesktopPlatform.macos
+      ? desktopConfigPath()
+      : Platform.environment['ENV_FILE'] ?? '.env';
+  if (desktop == DesktopPlatform.macos && !File(envFile).existsSync()) {
+    createDesktopConfig(envFile);
+    stderr.writeln('Created $envFile – fill in and start again.');
+    exit(exitConfigCreated);
+  }
+
+  try {
+    if (hashPlainPasswordInFile(envFile)) {
+      _log('Replaced APP_PASSWORD with APP_PASSWORD_HASH in $envFile', false);
+    }
+  } on FileSystemException catch (e) {
+    _log('Cannot update $envFile (${e.message}); hashing in memory', true);
+  }
+
   final AppConfig config;
   try {
     config = AppConfig.fromEnv(loadEnv(path: envFile));
   } on ConfigException catch (e) {
     stderr.writeln(e);
-    exit(78); // EX_CONFIG
+    exit(exitConfigInvalid);
   }
 
-  if (config.webDir != null && !Directory(config.webDir!).existsSync()) {
-    stderr.writeln('WEB_DIR does not exist: ${config.webDir}');
-    exit(78);
-  }
-
-  final AppDatabase db;
+  final AppServer server;
   try {
-    Directory(config.dataDir).createSync(recursive: true);
-    db = AppDatabase.open(config.databasePath);
-  } on Object catch (e) {
-    stderr.writeln('Cannot open database ${config.databasePath}: $e');
-    exit(73); // EX_CANTCREAT
+    server = await AppServer.start(config, log: _logRaw);
+  } on AppServerException catch (e) {
+    stderr.writeln(e);
+    exit(e.exitCode);
+  } on SocketException catch (e) {
+    stderr.writeln('Cannot listen on ${config.host}:${config.port}: $e');
+    exit(69); // EX_UNAVAILABLE
   }
-
-  final service = SphService(
-    LiblanisGateway(
-      schoolId: config.sph.schoolId,
-      username: config.sph.username,
-      password: config.sph.password,
-    ),
-  );
-  final cache = Api.createCache();
-
-  Poller? poller;
-  final ntfy = config.ntfy;
-  if (ntfy != null && config.poller.kinds.isNotEmpty) {
-    poller = Poller(
-      service: service,
-      cache: cache,
-      db: db,
-      notifier: NtfyNotifier(
-        server: ntfy.server,
-        topic: ntfy.topic,
-        token: ntfy.token,
-        appUrl: config.appUrl,
-      ),
-      config: config.poller,
-      log: (m) => _log(m, false),
-    );
-  }
-
-  final api = Api(
-    service: service,
-    passwordHash: config.appPasswordHash,
-    sessions: SessionStore(ttl: config.sessionTtl, database: db),
-    cache: cache,
-    cookieSecure: config.cookieSecure,
-    trustProxy: config.trustProxy,
-    webDir: config.webDir,
-    poller: poller,
-    settings: SettingsStore(db),
-  );
-
-  final handler = const Pipeline()
-      .addMiddleware(logRequests(logger: _logRaw))
-      .addHandler(api.handler);
-
-  final server = await io.serve(handler, config.host, config.port);
-  server.autoCompress = true;
-  _log(
-    'Listening on http://${config.host}:${server.port} '
-    '(school ${config.sph.schoolId}, user ${config.sph.username}'
-    '${config.webDir != null ? ', web UI from ${config.webDir}' : ''})',
-    false,
-  );
-  if (poller != null) {
-    final c = config.poller;
-    _log(
-      'Notifications via ${poller.notifier.description}: '
-      '${c.kinds.map((k) => k.name).join(', ')} every ${c.interval.inMinutes} min '
-      '(grades ${c.gradesInterval.inMinutes} min), '
-      '${c.activeFromHour}–${c.activeToHour} h',
-      false,
-    );
-    poller.start();
-  } else {
-    _log('Notifications disabled (NTFY_TOPIC not set)', false);
-  }
+  if (desktop != null) _log('Web UI: ${server.localUrl}', false);
+  if (config.openBrowser) await openInBrowser(server.localUrl);
 
   final done = Completer<void>();
   Future<void> shutdown(ProcessSignal signal) async {
     if (done.isCompleted) return;
     _log('Received $signal, shutting down', false);
-    await server.close();
-    await poller?.stop();
-    await service.dispose();
-    db.close();
+    await server.stop();
     done.complete();
   }
 

@@ -142,5 +142,32 @@ void main() {
         ),
       );
     });
+
+    test('APP_PASSWORD (plain) is hashed and wins over the hash', () {
+      final c = AppConfig.fromEnv({
+        'SPH_USERNAME': 'u',
+        'SPH_PASSWORD': 'p',
+        'APP_PASSWORD': 'neues-passwort',
+        'APP_PASSWORD_HASH': hash,
+        'OPEN_BROWSER': 'true',
+      });
+      expect(
+        PasswordHasher.verify('neues-passwort', c.appPasswordHash),
+        isTrue,
+      );
+      expect(c.openBrowser, isTrue);
+      expect(
+        () => AppConfig.fromEnv({
+          'SPH_USERNAME': 'u',
+          'SPH_PASSWORD': 'p',
+          'APP_PASSWORD': 'kurz',
+        }),
+        throwsA(
+          isA<ConfigException>().having((e) => e.problems, 'problems', [
+            contains('at least 8'),
+          ]),
+        ),
+      );
+    });
   });
 }
