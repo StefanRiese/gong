@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.8.0] – 2026-11-09
+
 ### Changed
 - New name: **Ranzen – dein Schulportal-Begleiter für Hessen** (was: schulportal-client). The
   repository is now `StefanRiese/ranzen`; everything was renamed: release files
@@ -186,7 +188,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/ranzen/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/ranzen/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/StefanRiese/ranzen/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/StefanRiese/ranzen/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/StefanRiese/ranzen/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/StefanRiese/ranzen/compare/v0.4.0...v0.5.0
