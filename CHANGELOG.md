@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.7.0] – 2026-11-09
+
 ### Added
 - App updates from the web UI: the server checks GitHub for new releases (every 12 hours,
   `UPDATE_CHECK`), shows a notice with the release notes and installs the update with
@@ -175,7 +177,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.1...v0.4.0
