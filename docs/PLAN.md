@@ -137,6 +137,10 @@ LXC container.
    SQLite + native build verified on Linux.
 2. **Service layer** – `SphService` wrapping `EasyLanisClient`: login, re-login on session
    expiry, typed results for all needed modules; unit tests with mocked liblanis.
+   *Result (2026-11-09):* done. `SphService` (lazy single-flight login, one re-login + retry,
+   idle logout after 5 min instead of liblanis' 10 s keep-alive ping, login block for 10 min
+   after wrong credentials), own JSON models, `SphGateway` seam over liblanis, 28 unit tests,
+   CLI `bin/sph.dart`. Verified against school 6128.
 3. **REST API** – shelf server with the endpoints above, app login, response caching.
 4. **Web UI** – views: Heute (Stundenplan + Vertretungen), Hausaufgaben, Noten, Klausuren,
    Kalender, Nachrichten. Installable PWA.

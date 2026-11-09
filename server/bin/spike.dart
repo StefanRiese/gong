@@ -11,6 +11,7 @@
 import 'dart:io';
 
 import 'package:liblanis/easy_client.dart';
+import 'package:schulportal_server/schulportal_server.dart' show loadEnv;
 
 const userAgent = 'schulportal-client-spike/0.1';
 
@@ -224,28 +225,6 @@ bool checkSqlite() {
   } finally {
     dir.deleteSync(recursive: true);
   }
-}
-
-/// Environment variables take precedence; server/.env only fills gaps.
-Map<String, String> loadEnv() {
-  final env = Map<String, String>.from(Platform.environment);
-  final file = File('.env');
-  if (file.existsSync()) {
-    for (final raw in file.readAsLinesSync()) {
-      final line = raw.trim();
-      if (line.isEmpty || line.startsWith('#') || !line.contains('=')) continue;
-      final i = line.indexOf('=');
-      final key = line.substring(0, i).trim();
-      var value = line.substring(i + 1).trim();
-      if (value.length >= 2 &&
-          (value.startsWith('"') && value.endsWith('"') ||
-              value.startsWith("'") && value.endsWith("'"))) {
-        value = value.substring(1, value.length - 1);
-      }
-      env.putIfAbsent(key, () => value);
-    }
-  }
-  return env;
 }
 
 void section(String title) => print('\n== $title');

@@ -26,6 +26,51 @@ dart run bin/spike.dart --details   # also prints homework, grades, messages
 
 `.env` is git-ignored. Environment variables take precedence over `.env`.
 
+## Service layer (milestone 2)
+
+```
+lib/
+  schulportal_server.dart      public exports
+  src/models/models.dart       app models (JSON), independent of liblanis
+  src/sph/sph_gateway.dart     interface over liblanis (test seam)
+  src/sph/liblanis_gateway.dart  real implementation
+  src/sph/mappers.dart         liblanis → app models
+  src/sph/sph_service.dart     session policy, retries, error mapping
+  src/sph/errors.dart          SphAuth/Unavailable/FeatureDisabled/NotFound/DataException
+  src/config/env.dart          .env loader, credentials
+```
+
+Session policy of `SphService`:
+
+- logs in on the first request; concurrent requests share one login
+- on a failed request: logs in again once and retries (expired sessions)
+- wrong credentials / portal lockout: no retry, further logins blocked for 10 minutes
+- logs out after 5 minutes without requests (no permanent keep-alive pings)
+
+### CLI
+
+Prints JSON from the service:
+
+```sh
+dart run bin/sph.dart account
+dart run bin/sph.dart timetable
+dart run bin/sph.dart substitutions
+dart run bin/sph.dart calendar [YYYY-MM-DD] [YYYY-MM-DD]
+dart run bin/sph.dart courses
+dart run bin/sph.dart homework
+dart run bin/sph.dart course <id>
+dart run bin/sph.dart grades
+```
+
+Exit codes: 3 auth, 4 portal unavailable, 5 feature disabled / not found, 6 unexpected data.
+
+### Tests
+
+```sh
+dart test       # unit tests, no network (fake gateway)
+dart analyze
+```
+
 ## Native build
 
 ```sh
