@@ -71,6 +71,7 @@ upstream with a PR instead of forking.
     `/api/exams`, `/api/calendar?from=&to=`, `/api/messages`
   - `POST /api/homework/{id}/done` – mark homework as done (if supported by SPH)
   - `POST /api/refresh` – force refresh from SPH
+  - implemented API: see `server/README.md`
 
 ## 4. Platforms
 
@@ -142,6 +143,12 @@ LXC container.
    after wrong credentials), own JSON models, `SphGateway` seam over liblanis, 28 unit tests,
    CLI `bin/sph.dart`. Verified against school 6128.
 3. **REST API** – shelf server with the endpoints above, app login, response caching.
+   *Result (2026-11-09):* done. `bin/server.dart` with shelf; app login with PBKDF2 password hash
+   (`bin/hash_password.dart`), HttpOnly/SameSite=Strict session cookie, login rate limit;
+   per-endpoint TTL cache with shared loads and stale fallback when the portal is down;
+   optional static web UI with SPA fallback; security headers; clean SIGTERM shutdown.
+   68 unit tests; verified end-to-end against school 6128 (native build).
+   Sessions are in memory for now (lost on restart).
 4. **Web UI** – views: Heute (Stundenplan + Vertretungen), Hausaufgaben, Noten, Klausuren,
    Kalender, Nachrichten. Installable PWA.
 5. **Background jobs & notifications** – poll every 15–30 min, detect new homework, grades,

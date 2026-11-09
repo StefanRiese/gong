@@ -71,11 +71,61 @@ dart test       # unit tests, no network (fake gateway)
 dart analyze
 ```
 
+## HTTP server (milestone 3)
+
+```sh
+cd server
+cp .env.example .env               # fill in SPH_* values
+dart run bin/hash_password.dart    # paste the printed APP_PASSWORD_HASH=… into .env
+dart run bin/server.dart           # listens on http://127.0.0.1:8080
+```
+
+`ENV_FILE=/path/to/config.env` selects another config file.
+
+### API
+
+All responses are JSON. Data endpoints need the session cookie from the login.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/healthz` | no login |
+| POST | `/api/auth/login` | body `{"password": "…"}`, `Content-Type: application/json`; sets cookie `sph_session` |
+| POST | `/api/auth/logout` | |
+| GET | `/api/auth/me` | `{"authenticated": bool}` |
+| GET | `/api/account` | enabled features |
+| GET | `/api/timetable` | cached 6 h |
+| GET | `/api/substitutions` | cached 10 min |
+| GET | `/api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | default today … +60 days, max 400 days; cached 1 h |
+| GET | `/api/courses` | cached 1 h |
+| GET | `/api/courses/{id}` | history, grades, exams; cached 30 min |
+| GET | `/api/homework` | current homework; cached 15 min |
+| GET | `/api/grades` | all courses (one portal request per course); cached 1 h |
+| POST | `/api/refresh` | clears the cache |
+
+Data responses: `{"data": …, "fetchedAt": "…", "cached": bool, "stale": bool}`.
+`?refresh=1` bypasses the cache. If the portal is down, the last cached data is returned with
+`"stale": true`.
+
+Errors: `{"error": {"code": "…", "message": "…"}}`
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `bad_request` | invalid parameters |
+| 401 | `unauthorized` / `invalid_password` | not logged in / wrong web UI password |
+| 404 | `feature_disabled` / `not_found` | applet not enabled / unknown course or path |
+| 415 | `unsupported_media_type` | login without JSON content type |
+| 429 | `too_many_attempts` | 5 failed logins in 15 min (`Retry-After` header) |
+| 502 | `sph_bad_response` | unexpected portal response |
+| 503 | `sph_auth_failed` / `sph_unavailable` | Schulportal login failed / portal down |
+
+If `WEB_DIR` is set, the server also serves the web UI; unknown non-API paths return
+`index.html`.
+
 ## Native build
 
 ```sh
-dart build cli -t bin/spike.dart -o build/spike
-./build/spike/bundle/bin/spike --db-only
+dart build cli -t bin/server.dart -o build/server
+./build/server/bundle/bin/server
 ```
 
 The bundle contains the executable and `lib/libsqlite3.so` (SQLite is bundled by the
