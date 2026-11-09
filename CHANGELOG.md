@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.3.1] – 2026-11-09
+
 ### Fixed
 - Portal outages (HTTP 5xx, e.g. `login.schulportal.hessen.de` answering 502) and connection
   problems are reported as „Das Schulportal ist gerade nicht erreichbar …“ instead of
@@ -71,7 +73,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/StefanRiese/schulportal-client/releases/tag/v0.1.0
