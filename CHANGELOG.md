@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.8.2] – 2026-11-09
+
 ### Changed
 - Einstellungen grouped: Vertretungsplan, Benachrichtigungen, Konto & Server (links to the
   server settings), Fächer & Farben. „Meine Klasse“ is a dropdown with the classes of the
@@ -204,7 +206,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/StefanRiese/gong/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/StefanRiese/gong/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/StefanRiese/gong/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/StefanRiese/gong/compare/v0.6.0...v0.7.0
