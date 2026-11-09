@@ -73,6 +73,7 @@ Web UI / scripts (repo root):
 node dev/mock-server.mjs                            # UI dev without portal, :8090, password demo
 MOCK_SETUP=1 node dev/mock-server.mjs               # setup page: /einrichtung?token=demo-token
 MOCK_UPDATE=1 node dev/mock-server.mjs              # app update available
+MOCK_ABBREV=1 node dev/mock-server.mjs              # subject abbreviations like the real portal
 for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
 shellcheck -s bash deploy/*.sh
 bash deploy/build-release.sh                        # → dist/ (Linux .tar.gz, Windows .exe, macOS build dir)

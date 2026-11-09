@@ -8,6 +8,7 @@
 //   MOCK_SETUP=1 node dev/mock-server.mjs   → not set up yet: setup page at
 //                                             /einrichtung?token=demo-token
 //   MOCK_UPDATE=1 node dev/mock-server.mjs  → an update (v0.7.0) is available
+//   MOCK_ABBREV=1 node dev/mock-server.mjs  → timetable with subject abbreviations (M, D, Geo …)
 //
 // "Neu laden" (POST /api/refresh) simulates a 2.5 s sync: /api/events pushes
 // sync start/end and an update for every data key the UI has loaded.
@@ -91,9 +92,16 @@ const slots = [
 ].map(([period, label, start, end]) => ({ period, label, start, end }));
 
 const slot = (n) => slots.find((s) => s.period === n);
+// MOCK_ABBREV=1: subject abbreviations in the timetable, like many schools' portals.
+const ABBREV = {
+  Mathematik: 'M', Deutsch: 'D', Englisch: 'E', Biologie: 'Bio', Sport: 'Spo', Physik: 'Ph',
+  Chemie: 'Ch', Religion: 'Rel', Erdkunde: 'Geo', Französisch: 'F', Geschichte: 'G', Kunst: 'Ku',
+  Musik: 'Mu', 'Politik & Wirtschaft': 'PoWi', Informatik: 'Inf',
+};
+const abbrev = process.env.MOCK_ABBREV === '1';
 const lesson = (weekday, period, duration, subject, room, teacher, week = null) => ({
   weekday, period, duration, start: slot(period).start, end: slot(period + duration - 1).end,
-  subject, room, teacher, week,
+  subject: abbrev ? ABBREV[subject] ?? subject : subject, room, teacher, week,
 });
 
 const timetable = {

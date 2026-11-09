@@ -6,6 +6,12 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- Stundenplan on phones: subject abbreviations (M, D, E, Geo, PoWi …) and the weekdays
+  (Mo … Fr) are shown in a clearly larger font; long subject names stay small and hyphenated.
+  Taller rows and larger lesson numbers/times use the screen height (checked at the viewport
+  of iPhone 15 and iPhone 11).
+
 ## [0.8.2] – 2026-11-09
 
 ### Changed

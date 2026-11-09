@@ -105,8 +105,10 @@ function grid(tt, week, today) {
 }
 
 function lessonBox(l) {
+  // Abbreviations (M, D, Geo, PoWi) get a larger font on phones than long names.
+  const short = (l.subject ?? '').length <= 5;
   return h('div', {
-    class: 'tt-lesson', style: subjectStyle(l.subject),
+    class: ['tt-lesson', short && 'short'], style: subjectStyle(l.subject),
     title: [l.subject, l.room, l.teacher, l.week && `Woche ${l.week}`, `${l.start}–${l.end}`].filter(Boolean).join(' · '),
   },
   h('strong', null, l.subject ?? '—', l.week ? badge(l.week, 'info') : null),

@@ -98,6 +98,7 @@ node dev/mock-server.mjs          # http://127.0.0.1:8090, password: demo
 MOCK_STALE=1 node dev/mock-server.mjs   # simulate "portal down, cached data"
 MOCK_SETUP=1 node dev/mock-server.mjs   # not set up: /einrichtung?token=demo-token
 MOCK_UPDATE=1 node dev/mock-server.mjs  # update v0.7.0 available (install simulates a restart)
+MOCK_ABBREV=1 node dev/mock-server.mjs  # timetable with subject abbreviations (M, D, Geo …)
 ```
 
 Edit files and reload the browser — there is nothing to build.

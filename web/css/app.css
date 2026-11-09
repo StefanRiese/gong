@@ -456,23 +456,26 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 /* Phones and narrow windows: the same table, compact. */
 @media (max-width: 800px) {
   .tt-grid {
-    --tt-row: 2.7rem;
-    --tt-break-row: .9rem;
+    --tt-row: 3.4rem;
+    --tt-break-row: 1rem;
     grid-template-columns: 2.1rem repeat(5, minmax(0, 1fr));
     gap: 2px;
     /* Below this the table scrolls sideways instead of squeezing (see 380 px). */
     min-width: 20.5rem;
   }
-  .tt-day { font-size: .8rem; padding: .25rem 0; }
+  .tt-day { font-size: 1rem; padding: .3rem 0; }
   .tt-day .long { display: none; }
   .tt-day .short { display: inline; }
-  .tt-slot { padding: 0 .1rem; font-size: .78rem; text-align: center; justify-items: center; }
-  .tt-slot small { font-size: .6rem; }
+  .tt-slot { padding: 0 .1rem; font-size: .9rem; text-align: center; justify-items: center; }
+  .tt-slot small { font-size: .66rem; }
   .tt-slot .tt-end, .tt-slot.break small { display: none; }
   .tt-slot.break { font-size: .58rem; }
   .tt-lesson { padding: .15rem .15rem .15rem .2rem; border-left-width: 3px; border-radius: 4px; font-size: .72rem; line-height: 1.2; }
   /* Long subject names wrap (with hyphenation) instead of being cut off. */
   .tt-lesson strong { white-space: normal; overflow-wrap: break-word; hyphens: auto; font-size: .66rem; }
+  /* Abbreviations have room: large and easy to read. */
+  .tt-lesson.short strong { font-size: 1.05rem; line-height: 1.15; }
+  .tt-lesson.short > span { font-size: .68rem; }
   .tt-lesson > span { font-size: .62rem; }
   .tt-lesson .tt-teacher { display: none; }
   .tt-lesson .badge { font-size: .55rem; padding: 0 .25rem; margin-left: .15rem; }
@@ -483,6 +486,8 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
   .tt-lesson { padding: .12rem .1rem .12rem .15rem; }
   .tt-lesson strong { font-size: .6rem; }
   .tt-lesson > span { font-size: .56rem; }
+  .tt-lesson.short strong { font-size: .95rem; }
+  .tt-lesson.short > span { font-size: .62rem; }
 }
 
 /* ---------- course ---------- */
