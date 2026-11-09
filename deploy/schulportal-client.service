@@ -12,6 +12,8 @@ Group=schulportal
 EnvironmentFile=/etc/schulportal-client/config.env
 WorkingDirectory=/var/lib/schulportal-client
 ExecStart=/opt/schulportal-client/bin/server
+# Updates from the web UI go through schulportal-client-update.path (root).
+Environment=UPDATER=systemd
 Restart=on-failure
 RestartSec=5
 # 78 = configuration error: do not restart in a loop, fix config.env instead.

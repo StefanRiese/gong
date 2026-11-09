@@ -54,13 +54,18 @@ first) or by the user on the settings page. Colors are automatic (distinct for u
 or user-defined; both settings are stored on the server (`/api/settings`). Navigation items are hidden when the feature is not enabled for the account.
 
 Vertretungen: the portal's plan contains all classes. The permanent filter (own classes, hidden
-types) is set under *Einstellungen → Vertretungsplan* (`#vertretungsplan`), stored on the server
+types, hidden notices such as „Allgemein“) is set under *Einstellungen → Vertretungsplan* (`#vertretungsplan`), stored on the server
 and applied by it to `/api/substitutions` and the notifications. Heute shows substitutions in
 the lessons only for entries that name one of the own classes exactly (and match period and
 subject); without own classes nothing is merged into the lessons. The Vertretungen page adds
 temporary filters: all classes (`?alle=1`), one class (`?klasse=`), search (`?suche=`) and
 type chips (remembered in `localStorage`, key `substitutionFilter`). Shared helpers:
 `js/substitution-filter.js`.
+
+App updates (`js/update.js`): a hint bar below the top bar when a new release is available
+(dismissable per version, `localStorage` key `updateDismissed`); *Einstellungen → Server →
+Update* (`#update`) shows versions and release notes and installs the update, then waits for
+the restarted server and reloads the page. Mock: `MOCK_UPDATE=1 node dev/mock-server.mjs`.
 
 The calendar can be filtered by text (`?suche=…`, searches title, description, place and
 category), by category (chips) and by hiding past events. Hidden categories and "hide past" are
@@ -91,6 +96,7 @@ simulates a 2.5 s sync with live updates:
 node dev/mock-server.mjs          # http://127.0.0.1:8090, password: demo
 MOCK_STALE=1 node dev/mock-server.mjs   # simulate "portal down, cached data"
 MOCK_SETUP=1 node dev/mock-server.mjs   # not set up: /einrichtung?token=demo-token
+MOCK_UPDATE=1 node dev/mock-server.mjs  # update v0.7.0 available (install simulates a restart)
 ```
 
 Edit files and reload the browser — there is nothing to build.

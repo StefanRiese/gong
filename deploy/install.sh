@@ -8,6 +8,8 @@
 #   install.sh --configure           (re)enter credentials in config.env
 #   install.sh --rollback            switch back to the previously installed version
 #   install.sh --uninstall [--purge] remove the program (--purge: also config + data)
+#   install.sh --auto-update         install the version requested in the web UI
+#                                    (run by schulportal-client-update.service)
 #
 # Options: --non-interactive (never prompt), -h/--help
 
@@ -21,6 +23,7 @@ CONFIG_DIR=${CONFIG_DIR:-/etc/$APP}
 CONFIG_FILE="$CONFIG_DIR/config.env"
 UNIT_DIR=${UNIT_DIR:-/etc/systemd/system}
 UNIT_FILE="$UNIT_DIR/$APP.service"
+UPDATE_UNITS=("$APP-update.path" "$APP-update.service")
 DROPIN_DIR="$UNIT_DIR/$APP.service.d"
 STATE_DIR=${STATE_DIR:-/var/lib/$APP}
 # For testing the script without root/systemd (not for normal use).
@@ -38,7 +41,7 @@ say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[33mWarnung:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[31mFehler:\033[0m %s\n' "$*" >&2; exit 1; }
 
-usage() { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +50,7 @@ while [[ $# -gt 0 ]]; do
     --configure) action=configure; shift ;;
     --rollback) action=rollback; shift ;;
     --uninstall) action=uninstall; shift ;;
+    --auto-update) action=auto-update; interactive=0; shift ;;
     --purge) purge=1; shift ;;
     --non-interactive) interactive=0; shift ;;
     -h | --help) usage; exit 0 ;;
@@ -189,6 +193,10 @@ install_files() { # archive workdir
 
   mkdir -p "$UNIT_DIR"
   install -m 644 "$PREFIX/deploy/$APP.service" "$UNIT_FILE"
+  local unit
+  for unit in "${UPDATE_UNITS[@]}"; do
+    [[ -f $PREFIX/deploy/$unit ]] && install -m 644 "$PREFIX/deploy/$unit" "$UNIT_DIR/$unit"
+  done
 }
 
 ensure_config() {
@@ -333,6 +341,12 @@ start_service() {
   [[ $SKIP_SYSTEMD == 1 ]] && { say "(SKIP_SYSTEMD) Dienst nicht gestartet"; return 0; }
   systemctl daemon-reload
   systemctl enable "$APP" >/dev/null 2>&1
+  # Updates from the web UI (Einstellungen → Server → Update).
+  if [[ -f $UNIT_DIR/$APP-update.path ]]; then
+    systemctl enable --now "$APP-update.path" >/dev/null 2>&1 ||
+      warn "Update aus der Web-Oberfläche nicht verfügbar ($APP-update.path)"
+  fi
+
   say "Starte Dienst"
   systemctl restart "$APP" || true
   if wait_healthy; then return 0; fi
@@ -426,6 +440,37 @@ do_install() {
   summary
 }
 
+# Run by schulportal-client-update.service when the web UI asked for an update
+# (file $STATE_DIR/update-request with the version, written by the server).
+do_auto_update() {
+  need_root
+  local request="$STATE_DIR/update-request" result="$STATE_DIR/update-result"
+  local requested installed newest
+  [[ -f $request ]] || exit 0
+  requested=$(head -c 64 "$request" | tr -d '[:space:]')
+  rm -f "$request" # first: a failing run must not trigger again
+  fail() {
+    printf 'failed: %s\n' "$1" > "$result"
+    chmod 644 "$result"
+    die "$1"
+  }
+  [[ $requested =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Ungültige Version: $requested"
+  installed=$(cat "$PREFIX/VERSION" 2>/dev/null || echo v0.0.0)
+  installed=${installed%%-*}
+  newest=$(printf '%s\n%s\n' "${installed#v}" "${requested#v}" | sort -V | tail -1)
+  if [[ ${installed#v} == "${requested#v}" || $newest != "${requested#v}" ]]; then
+    fail "$requested ist nicht neuer als die installierte Version $installed"
+  fi
+  say "Update von $installed auf $requested (angefordert in der Web-Oberfläche)"
+  version=$requested
+  rm -f "$result"
+  # Subshell: die() inside the installation ends only it, so the failure is
+  # reported to the web UI.
+  if ! (do_install); then
+    fail "Installation von $requested fehlgeschlagen – Details: journalctl -u $APP-update"
+  fi
+}
+
 do_configure() {
   need_root
   [[ -x $PREFIX/bin/hash_password ]] || die "$APP ist nicht installiert."
@@ -460,8 +505,8 @@ do_rollback() {
 do_uninstall() {
   need_root
   say "Entferne $APP"
-  systemd disable --now "$APP" >/dev/null 2>&1 || true
-  rm -f "$UNIT_FILE"
+  systemd disable --now "$APP" "${UPDATE_UNITS[0]}" >/dev/null 2>&1 || true
+  rm -f "$UNIT_FILE" "${UPDATE_UNITS[@]/#/$UNIT_DIR/}"
   rm -rf "$DROPIN_DIR" "$PREFIX" "$PREFIX.old" "$PREFIX.new"
   systemd daemon-reload || true
   if [[ $purge == 1 ]]; then
@@ -480,4 +525,5 @@ case $action in
   configure) do_configure ;;
   rollback) do_rollback ;;
   uninstall) do_uninstall ;;
+  auto-update) do_auto_update ;;
 esac

@@ -6,6 +6,7 @@ import { h, icon } from '../dom.js';
 import { age } from '../format.js';
 import { pageHeader } from './common.js';
 import { checkbox, field, input, messageArea, randomTopic, schoolPicker } from './forms.js';
+import { releaseNotes, waitForNewVersion } from '../update.js';
 
 export const title = 'Server-Einstellungen';
 
@@ -22,9 +23,10 @@ const TASKS = {
 };
 
 export async function render() {
-  const [settings, sync] = await Promise.all([
+  const [settings, sync, update] = await Promise.all([
     api('/api/server-settings'),
     api('/api/sync').catch(() => null),
+    api('/api/update').catch(() => null),
   ]);
   const v = settings.values;
   const restartNotice = h('div');
@@ -63,6 +65,7 @@ export async function render() {
     pageHeader('Server-Einstellungen'),
     h('p', { class: 'hint' }, 'Gelten für alle Geräte. Gespeichert auf dem Server.'),
     restartNotice,
+    update ? updateSection(update, v, save) : null,
     portalSection(v, settings.secrets, save),
     passwordSection(save),
     syncSection(v, sync, save),
@@ -291,4 +294,87 @@ function networkSection(v, desktop, save) {
     return save(msg, submit, { settings });
   });
   return section;
+}
+
+// --- update ---------------------------------------------------------------------------
+
+function updateSection(status, v, save) {
+  const body = h('div', { class: 'stack' });
+  const msg = messageArea();
+  const check = h('button', { type: 'button', class: 'button' }, 'Nach Updates suchen');
+  const install = h('button', { type: 'button', class: 'button primary' }, 'Jetzt aktualisieren');
+  const auto = checkbox('Automatisch nach Updates suchen (alle 12 Stunden)', v.UPDATE_CHECK);
+
+  const version = (tag) => (tag ? tag.replace(/^v/, '') : '–');
+
+  const show = (s) => {
+    const facts = h('dl', { class: 'facts' },
+      h('dt', null, 'Installiert'), h('dd', null, s.current ? version(s.current) : 'Entwicklungsversion'),
+      h('dt', null, 'Aktuell'), h('dd', null, s.latest
+        ? [version(s.latest), s.url ? [' · ', h('a', { href: s.url, target: '_blank', rel: 'noopener' }, 'Release auf GitHub')] : '']
+        : 'unbekannt'),
+      h('dt', null, 'Geprüft'), h('dd', null, s.checkedAt ? age(s.checkedAt) : 'noch nicht',
+        s.checkError ? h('span', { class: 'error-text' }, ` – ${s.checkError}`) : ''));
+    const parts = [facts];
+    if (s.available) {
+      parts.push(h('div', { class: 'notice' }, h('strong', null, `Version ${version(s.latest)} ist verfügbar`),
+        releaseNotes(s.notes)));
+      if (s.mode === 'manual') {
+        parts.push(h('p', { class: 'hint' },
+          'Diese Installation kann nicht aus der Web-Oberfläche aktualisiert werden. Auf dem Server: ',
+          h('code', null, 'bash /opt/schulportal-client/deploy/install.sh'),
+          ' – oder die neue Version von GitHub laden.'));
+      } else if (s.mode === 'systemd') {
+        parts.push(h('p', { class: 'hint' },
+          'Der Server lädt die neue Version, prüft sie und startet neu (etwa eine Minute). Die vorige Version bleibt für ',
+          h('code', null, 'install.sh --rollback'), ' erhalten.'));
+      } else {
+        parts.push(h('p', { class: 'hint' },
+          'Die App lädt die neue Version, prüft sie und startet neu.'));
+      }
+    } else if (s.latest && s.current) {
+      parts.push(h('p', { class: 'muted' }, 'Diese Version ist aktuell.'));
+    }
+    if (s.phase === 'failed' && s.error) parts.push(h('div', { class: 'error' }, s.error));
+    body.replaceChildren(...parts);
+    install.hidden = !s.canInstall;
+  };
+  show(status);
+
+  check.addEventListener('click', async () => {
+    check.disabled = true;
+    msg.clear();
+    try {
+      show(await api('/api/update/check', { method: 'POST' }));
+    } catch (err) {
+      msg.error(err);
+    } finally {
+      check.disabled = false;
+    }
+  });
+
+  install.addEventListener('click', async () => {
+    install.disabled = check.disabled = true;
+    msg.ok('Update wird geladen …');
+    try {
+      await api('/api/update/install', { method: 'POST' });
+      await waitForNewVersion(status.current, (text) => msg.ok(text));
+    } catch (err) {
+      msg.error(err instanceof ApiError ? err : new ApiError(0, 'update_failed', err.message));
+      install.disabled = check.disabled = false;
+      try {
+        show(await api('/api/update'));
+      } catch {
+        // server not reachable
+      }
+    }
+  });
+
+  auto.box.addEventListener('change', () => save(msg, check, { settings: { UPDATE_CHECK: String(auto.box.checked) } }));
+
+  return h('section', { class: 'section', id: 'update' },
+    h('h2', null, 'Update'),
+    h('div', { class: 'card settings-form' },
+      body, auto.el, msg.el,
+      h('div', { class: 'button-row' }, install, check)));
 }

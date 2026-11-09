@@ -161,6 +161,7 @@ function substitutionFilterSection(saved, plan) {
     classes: [...(saved?.classes ?? [])],
     showUnassigned: saved?.showUnassigned === true,
     hiddenTypes: [...(saved?.hiddenTypes ?? [])],
+    hiddenNotices: [...(saved?.hiddenNotices ?? [])],
   };
   const values = planValues(plan);
   const status = h('span', { class: 'muted', 'aria-live': 'polite' });
@@ -187,6 +188,7 @@ function substitutionFilterSection(saved, plan) {
 
   const classChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Meine Klassen' });
   const typeChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Ausgeblendete Arten' });
+  const noticeChips = h('div', { class: 'chips', role: 'group', 'aria-label': 'Ausgeblendete Hinweise' });
   const unassigned = h('input', {
     type: 'checkbox', id: 'sub-unassigned',
     onchange: (e) => {
@@ -226,6 +228,11 @@ function substitutionFilterSection(saved, plan) {
       type: 'button', class: 'chip pick', 'aria-pressed': String(filter.hiddenTypes.includes(t)),
       onclick: () => toggle(filter.hiddenTypes, t),
     }, t)));
+    const notices = [...new Set([...values.notices, ...filter.hiddenNotices])].sort((a, b) => a.localeCompare(b, 'de'));
+    noticeChips.replaceChildren(...notices.map((t) => h('button', {
+      type: 'button', class: 'chip pick', 'aria-pressed': String(filter.hiddenNotices.includes(t)),
+      onclick: () => toggle(filter.hiddenNotices, t),
+    }, t)));
     unassigned.checked = filter.showUnassigned;
     unassigned.disabled = filter.classes.length === 0;
   }
@@ -248,5 +255,11 @@ function substitutionFilterSection(saved, plan) {
         'Einträge ohne Klasse anzeigen (z. B. Pausenaufsicht, Betreuung)'),
       h('div', { class: 'field' },
         h('span', { class: 'field-label' }, 'Diese Arten ausblenden'),
-        typeChips)));
+        typeChips),
+      h('div', { class: 'field' },
+        h('span', { class: 'field-label' }, 'Diese Hinweise ausblenden'),
+        values.notices.length || filter.hiddenNotices.length
+          ? noticeChips
+          : h('span', { class: 'muted' }, 'Im aktuellen Plan stehen keine Hinweise.'),
+        h('span', { class: 'field-hint' }, 'Hinweise wie „Allgemein“ stehen über den Vertretungen eines Tages.'))));
 }

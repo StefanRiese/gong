@@ -13,6 +13,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Sync and live updates](#sync-and-live-updates)
 - [Notifications](#notifications)
 - [Setup and server settings](#setup-and-server-settings)
+- [App updates](#app-updates)
 - [Data models](#data-models)
 - [Errors](#errors)
 - [Examples](#examples)
@@ -153,7 +154,8 @@ hidden types) and adds a `filter` field to the envelope:
 
 An entry matches if one of its classes (`className`, several separated by `,` `;` `?` `/`) is one
 of the own classes, compared case-insensitively; entries without class only if
-`showUnassigned` is set. Notices of a day are always kept.
+`showUnassigned` is set. Notices of a day are kept unless their heading is in `hiddenNotices`;
+`filter.hidden` only counts entries.
 
 ### `GET /api/calendar`
 
@@ -196,7 +198,7 @@ Settings of the web UI, shared by all devices.
 {
   "subjectColors": {"M": "#3b6fd8", "BIO": "#2e9e5b"},
   "courseSubjects": {"104": "M"},
-  "substitutionFilter": {"classes": ["05eG"], "showUnassigned": false, "hiddenTypes": ["Pausenaufsicht"]}
+  "substitutionFilter": {"classes": ["05eG"], "showUnassigned": false, "hiddenTypes": ["Pausenaufsicht"], "hiddenNotices": ["Allgemein"]}
 }
 ```
 
@@ -207,6 +209,7 @@ Settings of the web UI, shared by all devices.
 | `substitutionFilter.classes` | own classes as in the plan (e.g. `05eG`); empty = all classes; at most 30 |
 | `substitutionFilter.showUnassigned` | also show entries without class (break supervision, care) while `classes` is set |
 | `substitutionFilter.hiddenTypes` | types to hide (e.g. `Pausenaufsicht`), case-insensitive; at most 30 |
+| `substitutionFilter.hiddenNotices` | notices to hide by their heading (e.g. `Allgemein`), case-insensitive; at most 30 |
 
 The `substitutionFilter` is applied by the server to
 [`/api/substitutions`](#get-apisubstitutions) and to the substitution notifications; the web
@@ -384,7 +387,8 @@ login answer `503 setup_required`.
     "SESSION_TTL_DAYS": 30,
     "COOKIE_SECURE": false,
     "TRUST_PROXY": false,
-    "OPEN_BROWSER": false
+    "OPEN_BROWSER": false,
+    "UPDATE_CHECK": true
   },
   "secrets": {"SPH_PASSWORD": true, "NTFY_TOKEN": false, "APP_PASSWORD": true},
   "sources": {"SPH_USERNAME": "web", "PORT": "config", "SYNC": "default", …},
@@ -426,7 +430,7 @@ Content-Type: application/json
 
 | Field | |
 |---|---|
-| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER` |
+| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK` |
 | `appPassword` | new web UI password (at least 8 characters); stored as hash |
 | `currentPassword` | required with `appPassword`, except during the setup |
 
@@ -467,6 +471,60 @@ match), at most 20 results:
 
 The list is loaded from the portal on first use and kept for a day; `503 sph_unavailable` if it
 cannot be loaded.
+
+## App updates
+
+The server looks for new releases of schulportal-client on GitHub (every 12 hours with
+`UPDATE_CHECK`, and on request) and can install them. All endpoints need the login.
+
+### `GET /api/update`
+
+```json
+{
+  "current": "v0.6.0",
+  "latest": "v0.7.0",
+  "available": true,
+  "notes": "### Added\n- …",
+  "url": "https://github.com/StefanRiese/schulportal-client/releases/tag/v0.7.0",
+  "publishedAt": "2026-11-10T08:00:00Z",
+  "checkedAt": "2026-11-10T09:12:44Z",
+  "checkError": null,
+  "checkEnabled": true,
+  "mode": "systemd",
+  "canInstall": true,
+  "phase": "idle",
+  "error": null
+}
+```
+
+| Field | |
+|---|---|
+| `current` | running version; `null` for development builds |
+| `latest`, `notes`, `url`, `publishedAt` | latest release (release notes in Markdown) |
+| `checkError` | last check failed (German text) |
+| `mode` | how this installation is updated: `systemd` (Linux service installed by install.sh), `windows`, `macos` (desktop apps), `manual` (only a notice) |
+| `canInstall` | an update is available and can be installed from the web UI |
+| `phase` | `idle`, `downloading`, `installing`, `restarting`, `failed` (`error` says why) |
+
+### `POST /api/update/check`
+
+Looks for a new release now and answers with the status as above.
+
+### `POST /api/update/install`
+
+Installs the latest release and answers right away (`202`, status); `409 no_update` if there is
+nothing to install. Downloads come only from the GitHub releases of this project (https) and are
+checked against the published `.sha256` file.
+
+- `systemd`: the server writes the version to `DATA_DIR/update-request`; the root unit
+  `schulportal-client-update.path` runs `install.sh --auto-update`, which installs only newer
+  releases and restarts the service. A failure is reported in `error`.
+- `windows`: the exe downloads the new exe, swaps itself and restarts.
+- `macos`: the server unpacks the new app and exits; the menu bar app swaps the bundle and
+  starts it.
+
+During the restart the server is not reachable for a moment; clients poll `GET /api/update`
+until `current` changes (the web UI then reloads itself).
 
 ## Data models
 
@@ -609,6 +667,7 @@ Errors have a status code and a JSON body:
 | 404 | `not_found` | unknown path or course |
 | 404 | `feature_disabled` | portal area not enabled for the account |
 | 409 | `notifications_disabled` | ntfy is not set up |
+| 409 | `no_update` | no update can be installed |
 | 415 | `unsupported_media_type` | body without `Content-Type: application/json` |
 | 429 | `too_many_attempts` | too many failed logins / test logins; `Retry-After` header |
 | 502 | `sph_bad_response` | unexpected answer from the portal |

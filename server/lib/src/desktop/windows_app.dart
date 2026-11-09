@@ -81,9 +81,17 @@ Future<Never> _run(
     await quit(0);
   }
 
+  // Tray menu commands; an installed update restarts like "Neu starten".
+  final stopped = Completer<TrayCommand>();
   final AppServer server;
   try {
-    server = await AppServer.start(env, log: logLine);
+    server = await AppServer.start(
+      env,
+      log: logLine,
+      onUpdateReady: () async {
+        if (!stopped.isCompleted) stopped.complete(TrayCommand.restart);
+      },
+    );
   } on AppServerException catch (e) {
     info('$e');
     final answer = messageBox(
@@ -129,7 +137,6 @@ Future<Never> _run(
     }
   }
 
-  final stopped = Completer<TrayCommand>();
   WindowsTray? tray;
   try {
     tray = await WindowsTray.start(

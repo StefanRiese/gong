@@ -23,6 +23,10 @@ private let serverBinary = "bin/server-x86_64"
 /// Exit code of the server for an invalid config.env (EX_CONFIG).
 private let exitConfigInvalid: Int32 = 78
 
+/// Exit code of the server: a new version is unpacked in
+/// <support>/update/Schulportal-Client.app (see update_service.dart).
+private let exitUpdateReady: Int32 = 80
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var server: Process?
@@ -146,6 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         switch status {
+        case exitUpdateReady:
+            installUpdate()
         case exitConfigInvalid:
             let choice = alert("Die Konfigurationsdatei ist fehlerhaft:\n\n"
                 + problems() + "\n\nNach dem Speichern über das Menü „Neu starten“ wählen.",
@@ -164,6 +170,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .alertSecondButtonReturn: showLog()
             default: NSApp.terminate(nil)
             }
+        }
+    }
+
+    /// Replaces this app bundle with the downloaded version and starts it.
+    private func installUpdate() {
+        let updateDir = supportDir.appendingPathComponent("update")
+        let source = updateDir.appendingPathComponent("Schulportal-Client.app")
+        let target = Bundle.main.bundleURL
+        do {
+            _ = try FileManager.default.replaceItemAt(target, withItemAt: source)
+            try? FileManager.default.removeItem(at: updateDir)
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            p.arguments = ["-n", target.path]
+            try p.run()
+            NSApp.terminate(nil)
+        } catch {
+            let choice = alert("Das Update konnte nicht installiert werden:\n\n"
+                + error.localizedDescription
+                + "\n\nBitte die neue Version von GitHub laden und die App ersetzen.",
+                               style: .warning, buttons: ["Download öffnen", "Weiter mit alter Version"])
+            if choice == .alertFirstButtonReturn,
+               let url = URL(string: "https://github.com/StefanRiese/schulportal-client/releases/latest") {
+                NSWorkspace.shared.open(url)
+            }
+            try? FileManager.default.removeItem(at: updateDir)
+            startServer()
         }
     }
 

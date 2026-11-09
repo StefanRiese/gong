@@ -103,7 +103,7 @@ export async function render(ctx) {
   const scope = serverFilter.active
     ? h('div', { class: 'notice filter-scope' },
       h('span', null,
-        serverFilter.classes?.length ? `Klasse ${serverFilter.classes.join(', ')}` : 'Gefiltert',
+        serverFilter.classes?.length ? `Klasse ${serverFilter.classes.join(', ')}` : 'Gefiltert nach den Einstellungen',
         serverFilter.hidden ? ` · ${serverFilter.hidden} weitere Einträge ausgeblendet` : ''),
       h('a', { href: '/vertretungen?alle=1', class: 'button small' }, 'Alle Klassen anzeigen'),
       h('a', { href: '/einstellungen#vertretungsplan', class: 'settings-link' }, icon('settings'), 'Filter ändern'))

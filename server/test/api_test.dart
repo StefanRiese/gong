@@ -394,6 +394,7 @@ void main() {
             'classes': <Object?>[],
             'showUnassigned': false,
             'hiddenTypes': <Object?>[],
+            'hiddenNotices': <Object?>[],
           },
         });
 
@@ -428,6 +429,7 @@ void main() {
         'classes': ['05eG'],
         'showUnassigned': false,
         'hiddenTypes': ['Pausenaufsicht'],
+        'hiddenNotices': <Object?>[],
       });
       await put({
         'subjectColors': {'M': '#445566'},
@@ -518,6 +520,27 @@ void main() {
       });
       expect(periods(await subs()), ['3']);
       expect(periods(await subs('?alle=1')), ['3', '5', '2']);
+    });
+
+    test('notices can be hidden by their heading', () async {
+      List<Object?> notices(Map<String, dynamic> b) => [
+        for (final d in b['data'] as List)
+          for (final n in (d as Map)['notices'] as List) (n as Map)['title'],
+      ];
+      Future<Map<String, dynamic>> subs([String q = '']) async =>
+          body(await send('GET', '/api/substitutions$q', cookie: cookie));
+
+      expect(notices(await subs()), ['Allgemein']);
+      await put({
+        'substitutionFilter': {
+          'hiddenNotices': ['allgemein'],
+        },
+      });
+      final b = await subs();
+      expect(notices(b), isEmpty);
+      expect(b['filter']['active'], isTrue);
+      expect(b['filter']['hidden'], 0, reason: 'counts entries only');
+      expect(notices(await subs('?alle=1')), ['Allgemein']);
     });
 
     test('persists in the database', () {

@@ -722,3 +722,11 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .filter-scope { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
 .filter-scope > span { flex: 1 1 auto; }
 .input.class-input { width: 10rem; }
+
+/* --- app update --- */
+.release-notes { margin-top: .4rem; font-size: .92rem; }
+.release-notes h4 { margin: .6rem 0 .2rem; font-size: .92rem; }
+.release-notes ul { margin: 0; padding-left: 1.2rem; }
+.release-notes p { margin: .3rem 0; }
+.update-notice .button.small { margin-left: .25rem; }
+.section[id] { scroll-margin-top: calc(var(--topbar-height) + 1rem); }

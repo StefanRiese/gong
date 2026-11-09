@@ -1,0 +1,11 @@
+[Unit]
+Description=Schulportal-Client: install the update requested in the web UI
+Documentation=https://github.com/StefanRiese/schulportal-client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Only newer releases are installed (checked by install.sh); the request file
+# is removed first, so a failed run does not loop.
+ExecStart=/bin/bash /opt/schulportal-client/deploy/install.sh --auto-update

@@ -19,6 +19,7 @@ import '../sph/sph_service.dart';
 import '../storage/settings_store.dart';
 import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
+import '../update/update_service.dart';
 import 'cache.dart';
 import 'embedded_web.dart';
 import 'server_control.dart';
@@ -68,6 +69,9 @@ const _eventPing = Duration(seconds: 25);
 ///   PUT  /api/server-settings       {settings, appPassword?, currentPassword?}
 ///   POST /api/server-settings/test-login  {schoolId, username, password?}
 ///   GET  /api/schools?q=…   school search (public list of Schulportal Hessen)
+///   GET  /api/update        version, latest release, update state
+///   POST /api/update/check  look for a new release now
+///   POST /api/update/install  install the latest release (202, async)
 /// While the server is not set up, the settings endpoints need the setup
 /// token (header X-Setup-Token) instead of a login.
 ///   GET  /api/settings      user settings (subject colors)
@@ -112,6 +116,9 @@ class Api {
 
   /// Setup page and server settings; null = not available (tests).
   ServerControl? control;
+
+  /// Update check and installation; null = not available (tests).
+  UpdateService? update;
 
   /// PBKDF2 cost for new web UI passwords; null = default (tests: lower).
   final int? passwordIterations;
@@ -227,6 +234,9 @@ class Api {
       ..put('/api/server-settings', _putServerSettings)
       ..post('/api/server-settings/test-login', _testLogin)
       ..get('/api/schools', _schools)
+      ..get('/api/update', _updateStatus)
+      ..post('/api/update/check', _updateCheck)
+      ..post('/api/update/install', _updateInstall)
       ..get('/api/settings', _getSettings)
       ..put('/api/settings', _putSettings)
       ..get('/api/notifications', _notifications)
@@ -710,6 +720,39 @@ class Api {
         'School list of Schulportal not reachable',
       );
     }
+  }
+
+  // --- app updates ---------------------------------------------------------------
+
+  Response _updateStatus(Request request) {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final u = update;
+    if (u == null) return _json(200, {'mode': 'manual', 'available': false});
+    return _json(200, u.status());
+  }
+
+  Future<Response> _updateCheck(Request request) async {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final u = update;
+    if (u == null) return _error(404, 'not_found', 'Not available');
+    await u.check();
+    return _json(200, u.status());
+  }
+
+  Response _updateInstall(Request request) {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final u = update;
+    if (u == null || !u.canInstall) {
+      return _error(409, 'no_update', 'No update can be installed');
+    }
+    u.install();
+    return _json(202, u.status());
   }
 
   // --- live updates (Server-Sent Events) -----------------------------------------

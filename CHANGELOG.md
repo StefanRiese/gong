@@ -6,6 +6,27 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- App updates from the web UI: the server checks GitHub for new releases (every 12 hours,
+  `UPDATE_CHECK`), shows a notice with the release notes and installs the update with
+  „Jetzt aktualisieren“ in *Einstellungen → Server → Update*. Downloads come only from the
+  GitHub releases and are checked against their SHA-256; the page reloads when the new version
+  runs.
+  - LXC/Linux: through the new root units `schulportal-client-update.path`/`.service`
+    (installed by `install.sh`), which run `install.sh --auto-update` – only newer releases,
+    previous version kept for `--rollback`. Existing installations get them with the next
+    `install.sh` run.
+  - Windows: the exe replaces itself and restarts. macOS: the menu bar app swaps the app bundle.
+- `GET /api/update`, `POST /api/update/check`, `POST /api/update/install`.
+
+### Changed
+- One icon everywhere: the mortarboard over the open book is now also used for the favicon,
+  the logo in the web UI, the tray and menu bar icons and the small Windows icon sizes (before,
+  small sizes showed only the mortarboard).
+- *Einstellungen → Vertretungsplan*: notices of the substitution plan (e.g. „Allgemein“) can be
+  hidden by their heading; they then disappear from Vertretungen and Heute
+  (`substitutionFilter.hiddenNotices`; „Alle Klassen anzeigen“ still shows them).
+
 ## [0.6.0] – 2026-11-09
 
 ### Added

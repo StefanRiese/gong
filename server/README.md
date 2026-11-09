@@ -155,6 +155,9 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | PUT | `/api/server-settings` | `{"settings": {KEY: value}, "appPassword"?, "currentPassword"?}`; new Schulportal credentials are tested first; finishing the setup logs in |
 | POST | `/api/server-settings/test-login` | `{"schoolId", "username", "password"?}`; max. 5 per 5 min |
 | GET | `/api/schools?q=…` | school search in the public school list of Schulportal Hessen |
+| GET | `/api/update` | version, latest release, update state |
+| POST | `/api/update/check` | look for a new release now |
+| POST | `/api/update/install` | install the latest release (202, async; see docs/API.md) |
 
 The settings endpoints need the login – or, in setup mode, the setup token.
 

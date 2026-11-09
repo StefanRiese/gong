@@ -81,7 +81,7 @@ Without internet access on the container, copy a release archive over and use
 
 | Task | Command |
 |---|---|
-| Update to the latest release | `bash /opt/schulportal-client/deploy/install.sh` |
+| Update to the latest release | web UI: *Einstellungen → Server → Update*, or `bash /opt/schulportal-client/deploy/install.sh` |
 | Install a specific version | `bash /opt/schulportal-client/deploy/install.sh --version v0.1.0` |
 | Back to the previous version | `bash /opt/schulportal-client/deploy/install.sh --rollback` |
 | Change credentials / web password / ntfy / sync | web UI: *Einstellungen → Server* (or `install.sh --configure`) |
@@ -94,6 +94,15 @@ Without internet access on the container, copy a release archive over and use
 Updates keep `config.env`. The previous version stays in `/opt/schulportal-client.old` for
 `--rollback`.
 
+**Updates from the web UI:** the server checks GitHub for new releases every 12 hours
+(`UPDATE_CHECK`) and shows a notice. „Jetzt aktualisieren“ in *Einstellungen → Server → Update*
+lets the (unprivileged) service write the wanted version to
+`/var/lib/schulportal-client/update-request`; the root units `schulportal-client-update.path`
+/ `.service` (installed and enabled by `install.sh`) then run `install.sh --auto-update`. It
+only installs releases newer than the installed one, verifies the checksum, keeps the previous
+version for `--rollback` and restarts the service. Log: `journalctl -u schulportal-client-update`.
+Installations from before version 0.7 get these units with the next `install.sh` run.
+
 ## Files
 
 | Path | Content |
@@ -102,6 +111,7 @@ Updates keep `config.env`. The previous version stays in `/opt/schulportal-clien
 | `/etc/schulportal-client/config.env` | configuration and credentials (mode 600, root) |
 | `/var/lib/schulportal-client/` | database `schulportal.db`: settings from the web UI (incl. credentials), cached portal data, web logins (hashed), notification state; `setup-token` until set up |
 | `/etc/systemd/system/schulportal-client.service` | systemd unit |
+| `/etc/systemd/system/schulportal-client-update.{path,service}` | updates requested in the web UI (root) |
 
 `config.env` settings are described in `/opt/schulportal-client/config.env.example`.
 Values are written in single quotes so special characters in passwords are read literally.

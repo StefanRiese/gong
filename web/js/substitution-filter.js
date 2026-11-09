@@ -6,19 +6,23 @@ export function classesOf(className) {
   return (className ?? '').split(/[,;?/]+/).map((c) => c.trim()).filter(Boolean);
 }
 
-/** All classes and types that occur in a plan. */
+/** All classes, types and notice headings that occur in a plan. */
 export function planValues(days) {
   const classes = new Set();
   const types = new Set();
+  const notices = new Set();
   for (const d of days) {
     for (const e of d.entries) {
       for (const c of classesOf(e.className)) classes.add(c);
       if (e.type?.trim()) types.add(e.type.trim());
     }
+    for (const n of d.notices) if (n.title?.trim()) notices.add(n.title.trim());
   }
+  const byName = (a, b) => a.localeCompare(b, 'de');
   return {
     classes: sortClasses([...classes]),
-    types: [...types].sort((a, b) => a.localeCompare(b, 'de')),
+    types: [...types].sort(byName),
+    notices: [...notices].sort(byName),
   };
 }
 

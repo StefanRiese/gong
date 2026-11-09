@@ -21,6 +21,7 @@ import '../sph/sph_service.dart';
 import '../storage/app_database.dart';
 import '../storage/settings_store.dart';
 import '../sync/sync_service.dart';
+import '../update/update_service.dart';
 
 /// Log sink: one line, [isError] for stderr-like messages.
 typedef LogLine = void Function(String line, bool isError);
@@ -63,6 +64,7 @@ class AppServer implements ServerControl {
   AppConfig _config;
   SphService _service;
   SyncService _sync;
+  final UpdateService _update;
   SetupToken? _setupToken;
   Future<void> _applying = Future.value();
   Future<void>? _stopping;
@@ -80,6 +82,7 @@ class AppServer implements ServerControl {
     this._config,
     this._service,
     this._sync,
+    this._update,
     this._setupToken,
   ) : startedConfig = _config;
 
@@ -120,6 +123,8 @@ class AppServer implements ServerControl {
     GatewayFactory? gateway,
     SchoolDirectory? schools,
     int? passwordIterations,
+    Future<void> Function()? onUpdateReady,
+    HttpGet? updateGet,
   }) async {
     void info(String m) => log('${DateTime.now().toIso8601String()} $m', false);
     final makeGateway =
@@ -208,6 +213,21 @@ class AppServer implements ServerControl {
     }
     http.autoCompress = true;
 
+    final update = UpdateService(
+      currentVersion: buildVersion,
+      mode: UpdateService.detectMode(
+        version: buildVersion,
+        env: env,
+        desktop: embeddedWebFiles.isNotEmpty,
+      ),
+      dataDir: config.dataDir,
+      checkEnabled: config.updateCheck,
+      onReadyToRestart: onUpdateReady,
+      log: info,
+      get: updateGet,
+    )..cleanUp();
+    api.update = update;
+
     final server = AppServer._(
       http,
       db,
@@ -221,6 +241,7 @@ class AppServer implements ServerControl {
       config,
       service,
       sync,
+      update,
       config.needsSetup ? SetupToken.create(dataDir: config.dataDir) : null,
     );
     api.control = server;
@@ -240,6 +261,7 @@ class AppServer implements ServerControl {
       server._logStatus();
       sync.start();
     }
+    update.start();
     return server;
   }
 
@@ -386,6 +408,7 @@ class AppServer implements ServerControl {
       'COOKIE_SECURE': c.cookieSecure,
       'TRUST_PROXY': c.trustProxy,
       'OPEN_BROWSER': c.openBrowser,
+      'UPDATE_CHECK': c.updateCheck,
     };
     return {
       'setupRequired': c.needsSetup,
@@ -501,6 +524,7 @@ class AppServer implements ServerControl {
       ..sync = _sync
       ..poller = _createPoller(_sync, _db, _api.settings, next, _info)
       ..passwordHash = next.appPasswordHash;
+    _update.checkEnabled = next.updateCheck;
     _config = next;
     if (!next.needsSetup) {
       _logStatus();
@@ -514,6 +538,7 @@ class AppServer implements ServerControl {
   /// Stops listening, the sync and the portal session; closes the database.
   Future<void> stop() => _stopping ??= () async {
     await _applying;
+    _update.stop();
     await _api.close(); // open event streams would keep the server open
     await _http
         .close()

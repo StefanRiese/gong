@@ -42,9 +42,21 @@ Future<void> main(List<String> args) async {
   var env = loadEnv(path: envFile);
   if (desktop != null) env = withDesktopDefaults(env);
 
-  final AppServer server;
+  final done = Completer<void>();
+  late final AppServer server;
   try {
-    server = await AppServer.start(env, log: _logRaw);
+    server = await AppServer.start(
+      env,
+      log: _logRaw,
+      // macOS app: the menu bar app swaps the bundle after this exit code.
+      onUpdateReady: desktop == DesktopPlatform.macos
+          ? () async {
+              _log('Update ready, exiting for the menu bar app', false);
+              await server.stop();
+              exit(exitUpdateReady);
+            }
+          : null,
+    );
   } on AppServerException catch (e) {
     stderr.writeln(e);
     exit(e.exitCode);
@@ -61,7 +73,6 @@ Future<void> main(List<String> args) async {
     await openInBrowser(server.localUrl);
   }
 
-  final done = Completer<void>();
   Future<void> shutdown(ProcessSignal signal) async {
     if (done.isCompleted) return;
     _log('Received $signal, shutting down', false);

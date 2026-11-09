@@ -25,6 +25,8 @@ server/                 Dart package (own pubspec)
                         ServerControl (setup page / server settings)
   lib/src/sync/         SyncService (background sync of all data), cache keys + codecs
   lib/src/notify/       poller (notifications from synced data), change detection, ntfy
+  lib/src/update/       UpdateService: GitHub release check, install per platform (systemd
+                        request file / Windows exe swap / macOS bundle via exit code 80)
   lib/src/config/       AppConfig, config.env, web UI settings (DB), setup token, school list
   lib/src/storage/      SQLite (AppDatabase), SettingsStore
   lib/src/server/       AppServer: start/stop, setup mode, applies settings changes at runtime
@@ -38,7 +40,7 @@ web/                    web UI: index.html, css/app.css, js/ (ES modules, no bui
   js/views/             one module per page (setup.js, server-settings.js, forms.js: settings)
   js/colors.js          subject colors + course ↔ timetable-abbreviation matching
 dev/mock-server.mjs     Node mock API with invented data (password "demo"; MOCK_SETUP=1: setup page)
-deploy/                 systemd unit, install.sh, build-release.sh, deployment guide
+deploy/                 systemd units (incl. -update.path/.service), install.sh, build-release.sh, guide
   build-macos-app.sh    universal macOS app from the arm64 + x64 builds (lipo)
   macos/                menu bar app (main.swift) and Info.plist
   desktop/              app/tray/menu bar icons (make-icons.py); DESKTOP.md: desktop apps
@@ -63,6 +65,7 @@ Web UI / scripts (repo root):
 ```sh
 node dev/mock-server.mjs                            # UI dev without portal, :8090, password demo
 MOCK_SETUP=1 node dev/mock-server.mjs               # setup page: /einrichtung?token=demo-token
+MOCK_UPDATE=1 node dev/mock-server.mjs              # app update available
 for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
 shellcheck -s bash deploy/*.sh
 bash deploy/build-release.sh                        # → dist/ (Linux .tar.gz, Windows .exe, macOS build dir)

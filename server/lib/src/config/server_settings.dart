@@ -28,6 +28,7 @@ abstract final class ServerSettingKeys {
     'COOKIE_SECURE',
     'TRUST_PROXY',
     'OPEN_BROWSER',
+    'UPDATE_CHECK',
   };
 
   /// Never sent to the browser (only whether they are set).

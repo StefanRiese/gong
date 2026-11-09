@@ -14,16 +14,26 @@ class SubstitutionFilter {
   /// Types to hide (e.g. "Pausenaufsicht"), compared case-insensitively.
   final List<String> hiddenTypes;
 
+  /// Notices to hide by their heading (e.g. "Allgemein"), case-insensitive.
+  final List<String> hiddenNotices;
+
   const SubstitutionFilter({
     this.classes = const [],
     this.showUnassigned = false,
     this.hiddenTypes = const [],
+    this.hiddenNotices = const [],
   });
 
   static const maxEntries = 30;
   static const maxLength = 40;
 
-  bool get isActive => classes.isNotEmpty || hiddenTypes.isNotEmpty;
+  bool get isActive =>
+      classes.isNotEmpty || hiddenTypes.isNotEmpty || hiddenNotices.isNotEmpty;
+
+  bool showsNotice(SubstitutionNotice n) {
+    final title = n.title.trim().toLowerCase();
+    return !hiddenNotices.any((t) => t.toLowerCase() == title);
+  }
 
   /// Classes of an entry: "05aG, 05bG" → [05aG, 05bG].
   static List<String> classesOf(String? className) => [
@@ -43,7 +53,8 @@ class SubstitutionFilter {
     return own.any((c) => wanted.contains(c.toLowerCase()));
   }
 
-  /// [days] with only the matching entries, and how many were left out.
+  /// [days] with only the matching entries and notices, and how many
+  /// entries were left out.
   (List<SubstitutionDay>, int) apply(List<SubstitutionDay> days) {
     if (!isActive) return (days, 0);
     var hidden = 0;
@@ -52,7 +63,11 @@ class SubstitutionFilter {
       final entries = d.entries.where(matches).toList();
       hidden += d.entries.length - entries.length;
       result.add(
-        SubstitutionDay(date: d.date, entries: entries, notices: d.notices),
+        SubstitutionDay(
+          date: d.date,
+          entries: entries,
+          notices: d.notices.where(showsNotice).toList(),
+        ),
       );
     }
     return (result, hidden);
@@ -62,6 +77,7 @@ class SubstitutionFilter {
     'classes': classes,
     'showUnassigned': showUnassigned,
     'hiddenTypes': hiddenTypes,
+    'hiddenNotices': hiddenNotices,
   };
 
   factory SubstitutionFilter.fromJson(Object? json) {
@@ -96,6 +112,7 @@ class SubstitutionFilter {
       classes: list('classes'),
       showUnassigned: unassigned,
       hiddenTypes: list('hiddenTypes'),
+      hiddenNotices: list('hiddenNotices'),
     );
   }
 }

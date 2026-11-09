@@ -7,6 +7,7 @@
 //   MOCK_STALE=1 node dev/mock-server.mjs   → responses marked as stale
 //   MOCK_SETUP=1 node dev/mock-server.mjs   → not set up yet: setup page at
 //                                             /einrichtung?token=demo-token
+//   MOCK_UPDATE=1 node dev/mock-server.mjs  → an update (v0.7.0) is available
 //
 // "Neu laden" (POST /api/refresh) simulates a 2.5 s sync: /api/events pushes
 // sync start/end and an update for every data key the UI has loaded.
@@ -26,7 +27,7 @@ const serverValues = {
   SPH_SCHOOL_ID: 9999, SPH_USERNAME: 'max.muster', SYNC: true, POLL_INTERVAL_MINUTES: 15,
   GRADES_INTERVAL_MINUTES: 120, ACTIVE_HOURS: '6-22', NTFY_URL: 'https://ntfy.sh', NTFY_TOPIC: '',
   NOTIFY: 'substitutions,homework,grades', NOTIFY_GRADE_VALUES: false, APP_URL: '', HOST: '0.0.0.0',
-  PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false,
+  PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false, UPDATE_CHECK: true,
 };
 const SCHOOLS = [
   { id: 9999, name: 'Musterschule', city: 'Musterstadt' },
@@ -37,12 +38,24 @@ const SCHOOLS = [
 const sessions = new Set();
 let settings = {
   subjectColors: {}, courseSubjects: {},
-  substitutionFilter: { classes: [], showUnassigned: false, hiddenTypes: [] },
+  substitutionFilter: { classes: [], showUnassigned: false, hiddenTypes: [], hiddenNotices: [] },
 };
 const doneOverrides = new Map(); // "course/entry" → done
 const fetched = new Map(); // cache key → fetchedAt (ISO)
 const eventClients = new Set();
 let syncRunning = false;
+// Simulated app update (Einstellungen → Server → Update).
+const update = {
+  current: 'v0.6.0', latest: null, available: false, notes: null, mode: 'systemd',
+  url: 'https://github.com/StefanRiese/schulportal-client/releases/tag/v0.7.0',
+  checkedAt: null, checkError: null, checkEnabled: true, phase: 'idle', error: null,
+};
+const updateStatus = () => ({ ...update, canInstall: update.available && update.phase !== 'restarting' });
+let restartingUntil = 0;
+if (process.env.MOCK_UPDATE === '1') {
+  Object.assign(update, { latest: 'v0.7.0', available: true, checkedAt: new Date().toISOString(),
+    notes: '### Added\n- Neue Funktion für den Vertretungsplan\n- Updates direkt aus der Web-Oberfläche' });
+}
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -248,6 +261,8 @@ async function readBody(req) {
 async function handleApi(req, res, url) {
   const path = url.pathname;
   if (path === '/api/setup') return json(res, 200, { setupRequired });
+  // During the simulated update the "server" is away for a moment.
+  if (Date.now() < restartingUntil) return error(res, 503, 'restarting', 'Restarting');
   if (path === '/api/server-settings' || path.startsWith('/api/server-settings/') || path === '/api/schools') {
     const allowed = setupRequired ? req.headers['x-setup-token'] === SETUP_TOKEN : sessions.has(token(req));
     if (!allowed) {
@@ -299,7 +314,10 @@ async function handleApi(req, res, url) {
     const list = (v) => [...new Set((Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter(Boolean))];
     settings = {
       subjectColors: colors, courseSubjects,
-      substitutionFilter: { classes: list(f.classes), showUnassigned: f.showUnassigned === true, hiddenTypes: list(f.hiddenTypes) },
+      substitutionFilter: {
+        classes: list(f.classes), showUnassigned: f.showUnassigned === true,
+        hiddenTypes: list(f.hiddenTypes), hiddenNotices: list(f.hiddenNotices),
+      },
     };
     return json(res, 200, settings);
   }
@@ -321,6 +339,24 @@ async function handleApi(req, res, url) {
     return res.end();
   }
   if (req.method === 'POST' && path === '/api/notifications/check') return json(res, 200, { sent: 1 });
+  if (path === '/api/update' && req.method === 'GET') return json(res, 200, updateStatus());
+  if (path === '/api/update/check' && req.method === 'POST') {
+    Object.assign(update, {
+      latest: 'v0.7.0', available: update.current !== 'v0.7.0', checkedAt: new Date().toISOString(),
+      notes: '### Added\n- Neue Funktion für den Vertretungsplan\n- Updates direkt aus der Web-Oberfläche\n\n### Fixed\n- Kleinere Korrekturen\n\n### Installation / Update\n\n```sh\nbash install.sh\n```',
+    });
+    return json(res, 200, updateStatus());
+  }
+  if (path === '/api/update/install' && req.method === 'POST') {
+    if (!updateStatus().canInstall) return error(res, 409, 'no_update', 'No update can be installed');
+    update.phase = 'downloading';
+    setTimeout(() => {
+      update.phase = 'restarting';
+      restartingUntil = Date.now() + 3000;
+      setTimeout(() => Object.assign(update, { current: update.latest, available: false, phase: 'idle' }), 3000);
+    }, 1500);
+    return json(res, 202, updateStatus());
+  }
   if (req.method === 'POST' && path === '/api/refresh') {
     simulateSync();
     return json(res, 202, { refreshing: true });
@@ -352,7 +388,7 @@ async function handleApi(req, res, url) {
     case '/api/substitutions': {
       // Permanent filter from the settings, like the real server.
       const f = settings.substitutionFilter;
-      const active = f.classes.length > 0 || f.hiddenTypes.length > 0;
+      const active = f.classes.length > 0 || f.hiddenTypes.length > 0 || f.hiddenNotices.length > 0;
       if (!active || url.searchParams.get('alle') === '1') {
         return data(res, 'substitutions', substitutions, { filter: { active: false, hidden: 0 } });
       }
@@ -369,7 +405,8 @@ async function handleApi(req, res, url) {
       const days = substitutions.map((d) => {
         const entries = d.entries.filter(keep);
         hidden += d.entries.length - entries.length;
-        return { ...d, entries };
+        const hiddenNotices = new Set(f.hiddenNotices.map((t) => t.toLowerCase()));
+        return { ...d, entries, notices: d.notices.filter((n) => !hiddenNotices.has(n.title.trim().toLowerCase())) };
       });
       return data(res, 'substitutions', days, { filter: { active: true, hidden, classes: f.classes } });
     }

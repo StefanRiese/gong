@@ -47,6 +47,9 @@ class AppConfig {
   /// Open the web UI in the default browser after start (desktop builds).
   final bool openBrowser;
 
+  /// Look for new releases on GitHub (UPDATE_CHECK, default on).
+  final bool updateCheck;
+
   const AppConfig({
     required this.sph,
     required this.appPasswordHash,
@@ -62,6 +65,7 @@ class AppConfig {
     this.poller = const PollerConfig(),
     this.sync = const SyncConfig(),
     this.openBrowser = false,
+    this.updateCheck = true,
     this.missing = const [],
   });
 
@@ -239,6 +243,12 @@ class AppConfig {
         activeToHour: to,
       ),
       openBrowser: _bool(env['OPEN_BROWSER']),
+      updateCheck: !const {
+        '0',
+        'false',
+        'no',
+        'off',
+      }.contains(env['UPDATE_CHECK']?.trim().toLowerCase()),
       missing: missing,
     );
   }
