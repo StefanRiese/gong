@@ -101,7 +101,6 @@ lets the (unprivileged) service write the wanted version to
 / `.service` (installed and enabled by `install.sh`) then run `install.sh --auto-update`. It
 only installs releases newer than the installed one, verifies the checksum, keeps the previous
 version for `--rollback` and restarts the service. Log: `journalctl -u gong-update`.
-Installations from before version 0.7 get these units with the next `install.sh` run.
 
 ## Files
 

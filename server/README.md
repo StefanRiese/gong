@@ -121,6 +121,20 @@ and refreshes expired entries in the background (stale-while-revalidate); entrie
 in the `cache` table, so they are there after a restart. Entries count as fresh for their sync
 interval + 5 min while the sync covers them, otherwise for the TTLs in `CacheTtl`.
 
+### Updates
+
+`UpdateService` (`lib/src/update/`) checks the latest GitHub release every 12 hours
+(`UPDATE_CHECK`) and installs it on request (`POST /api/update/install`). Downloads only come
+from `github.com/StefanRiese/gong` releases and are checked against their `.sha256`. How it
+installs depends on the installation (`mode`):
+
+| Mode | When | How |
+|---|---|---|
+| `systemd` | Linux service installed by install.sh (`UPDATER=systemd` in the unit) | writes the version to `DATA_DIR/update-request`; root units `gong-update.path`/`.service` run `install.sh --auto-update` (newer releases only); failures come back via `DATA_DIR/update-result` |
+| `windows` | Windows desktop build | downloads the exe, renames itself to `.old`, puts the new one in place, restarts |
+| `macos` | macOS desktop build | unpacks the app to `DATA_DIR/update/`, exits with code 80; the menu bar app swaps the bundle |
+| `manual` | development builds, other installations | notice only |
+
 ### API
 
 Full reference with data models and examples: [docs/API.md](../docs/API.md).

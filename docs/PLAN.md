@@ -1,6 +1,6 @@
-# Plan: Schulportal Hessen Client
+# Plan: Gong – Schulportal Hessen client
 
-Goal: a self-hosted client for **Schulportal Hessen** (school ID `6128`, login at
+Goal (app name since 0.8.0: **Gong**, before: schulportal-client): a self-hosted client for **Schulportal Hessen** (school ID `6128`, login at
 `https://login.schulportal.hessen.de/?i=6128`) that shows Stundenplan, Vertretungsplan,
 Hausaufgaben, Noten, Kalender and Nachrichten in a clean, fast web UI.
 
@@ -186,6 +186,16 @@ LXC container.
    test overrides; sandboxed run checked with user systemd. Not yet run in a real LXC container
    or on GitHub Actions.
 7. **Extras** – multiple accounts (siblings), Dateispeicher, dark mode, offline view.
+   *Done since (2026-11-09):* dark mode; desktop apps (Windows tray exe, universal macOS app);
+   background sync with SQLite cache and live updates; setup and server settings in the web UI;
+   substitution filter (own classes, types, notices); updates from the web UI; REST API
+   reference (`docs/API.md`); rename to **Gong** (0.8.0; „Ranzen“ is taken by an App Store app
+   for Schulportal Hessen).
+   *Ideas from comparing with native apps (Lanis Mobile, Ranzen):* messages (read and reply),
+   several children / accounts per server, Dateispeicher, iCal feed for timetable and calendar,
+   holidays and countdowns on Heute, attendance overview across courses, grade calculator.
+   WebUntis as second substitution source was tested and dropped for now (class accounts see
+   no teachers, so no substitutions).
 
 ## 8. Security & privacy
 

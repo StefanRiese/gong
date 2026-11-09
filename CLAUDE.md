@@ -13,6 +13,12 @@ as desktop apps (Windows tray exe, macOS menu bar app). License GPL-3.0 (require
 Plan and decisions: `docs/PLAN.md`; API reference: `docs/API.md` (keep it in sync with
 `lib/src/api/api.dart`); configuration: `server/README.md`.
 
+Name: **Gong** since 0.8.0 (repository `StefanRiese/gong`; before: schulportal-client). Do not
+use „Ranzen“ – an App Store app for Schulportal Hessen has that name. The local checkout folder
+is still called `schulportal-client` (the Claude Code memory is tied to it); do not rename it.
+Technical names are lowercase `gong` (paths, units, release files, user), the Dart package is
+`gong_server`; UI texts use „Gong“, texts about the portal itself keep „Schulportal“.
+
 ## Layout
 
 ```
@@ -114,5 +120,7 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
   main` and wait for it to pass: GitHub Actions builds Linux x64/arm64, the Windows exe and
   the universal macOS app; the release notes come from that CHANGELOG section
   (`deploy/release-notes.sh`, the release fails if the section is missing).
-- Deployment target: `bash /opt/gong/deploy/install.sh` in the LXC container
-  updates to the latest release.
+- Deployment target: LXC container; update with *Einstellungen → Server → Update* in the web
+  UI or `bash /opt/gong/deploy/install.sh`.
+- Before introducing a new product name, check the App Store, Google Play and the DPMA trademark
+  register for existing apps around Schulportal Hessen (not only GitHub).
