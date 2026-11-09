@@ -130,3 +130,6 @@ dart build cli -t bin/server.dart -o build/server
 
 The bundle contains the executable and `lib/libsqlite3.so` (SQLite is bundled by the
 `sqlite3` package's build hook).
+
+A complete release archive (server, password tool, web UI, install files) is built with
+`bash deploy/build-release.sh` from the repository root.

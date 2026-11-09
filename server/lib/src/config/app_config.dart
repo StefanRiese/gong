@@ -41,8 +41,8 @@ class AppConfig {
     final hash = env['APP_PASSWORD_HASH']?.trim() ?? '';
     if (hash.isEmpty) {
       problems.add(
-        'APP_PASSWORD_HASH is required '
-        '(create one with: dart run bin/hash_password.dart)',
+        'APP_PASSWORD_HASH is required (create one with bin/hash_password, '
+        'or run deploy/install.sh --configure)',
       );
     } else if (!PasswordHasher.isValidFormat(hash)) {
       problems.add('APP_PASSWORD_HASH has an invalid format');

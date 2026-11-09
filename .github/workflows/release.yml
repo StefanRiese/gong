@@ -1,0 +1,66 @@
+name: Release
+
+# Push a tag like v0.1.0 to build Linux/Windows/macOS archives and publish a
+# GitHub release. install.sh downloads the Linux archive from there.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 = glibc 2.35 → binaries also run on Debian 12 (2.36) and 13.
+          - { name: linux-x64, os: ubuntu-22.04 }
+          - { name: linux-arm64, os: ubuntu-22.04-arm }
+          - { name: windows-x64, os: windows-latest }
+          - { name: macos-arm64, os: macos-latest }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe for VERSION
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.7
+      - name: Build
+        shell: bash
+        run: bash deploy/build-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*.tar.gz*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

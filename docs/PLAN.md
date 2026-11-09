@@ -124,7 +124,7 @@ LXC container.
   - runs as dedicated user `schulportal` via systemd unit `schulportal-client.service`
 - **Install/update:** `deploy/install.sh` downloads the latest release (or copies a local
   build), installs the unit, restarts the service. Proxmox snapshots/backups (vzdump) cover
-  the database.
+  the database. Step-by-step guide: `deploy/README.md`.
 - **Access:** expose the port only in the LAN; from outside via VPN/Tailscale (can run in the
   same or a separate LXC) or an existing reverse proxy with TLS.
 
@@ -164,6 +164,14 @@ LXC container.
    substitutions; send via ntfy/Pushover/Home Assistant.
 6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
    for Windows/Linux/macOS, docs.
+   *Result (2026-11-09):* done. `deploy/schulportal-client.service` (own system user, systemd
+   sandbox, automatic fallback for containers without Nesting), `deploy/install.sh` (install /
+   update from GitHub release with SHA-256 check or local archive, interactive credentials,
+   `--configure`, `--rollback`, `--uninstall [--purge]`), `deploy/build-release.sh`, GitHub
+   Actions CI (format, analyze, tests, JS/shell lint) and release workflow (tag `v*` → Linux
+   x64/arm64, Windows, macOS archives). Guide: `deploy/README.md`. Tested without root via
+   test overrides; sandboxed run checked with user systemd. Not yet run in a real LXC container
+   or on GitHub Actions.
 7. **Extras** – multiple accounts (siblings), Dateispeicher, dark mode, offline view.
 
 ## 8. Security & privacy
@@ -179,7 +187,7 @@ LXC container.
 
 - [x] Frontend: plain HTML/CSS/JavaScript modules (no framework, no build step)
 - [ ] Notification channel: ntfy / Pushover / Home Assistant / none
-- [ ] Remote access: VPN/Tailscale vs. reverse proxy
+- [ ] Remote access: VPN/Tailscale vs. reverse proxy (both documented in `deploy/README.md`)
 - [ ] Single account or several (siblings) from the start
 
 ## References

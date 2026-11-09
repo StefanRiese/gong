@@ -8,3 +8,6 @@
 .env
 *.local
 credentials*
+
+# Release archives
+dist/

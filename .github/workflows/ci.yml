@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: Server (analyze + test)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.7
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart analyze --fatal-infos
+      - run: dart test
+
+  web:
+    name: Web UI + scripts (lint)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript syntax
+        run: for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
+      - name: No unsafe HTML sinks
+        run: |
+          if grep -rnE 'innerHTML|outerHTML|insertAdjacentHTML|document\.write' web/js --include=*.js | grep -v '^web/js/dom.js:1:'; then
+            echo "::error::Do not insert HTML strings into the DOM (see web/README.md)"
+            exit 1
+          fi
+      - name: Manifest is valid JSON
+        run: node -e 'JSON.parse(require("fs").readFileSync("web/manifest.webmanifest","utf8"))'
+      - name: ShellCheck
+        run: shellcheck -s bash deploy/install.sh deploy/build-release.sh

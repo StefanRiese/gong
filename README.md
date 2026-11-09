@@ -4,7 +4,7 @@ A self-hosted client for **Schulportal Hessen**: a Dart server (using
 [liblanis](https://pub.dev/packages/liblanis)) plus a web UI for Stundenplan, Vertretungsplan,
 Hausaufgaben, Noten, Kalender and Nachrichten.
 
-> **Status:** working server and web UI; deployment (LXC) and notifications next. See [docs/PLAN.md](docs/PLAN.md).
+> **Status:** working server, web UI and LXC deployment; notifications next. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Goals
 
@@ -20,11 +20,20 @@ schulportal-client/
 ├── server/     # Dart backend (uses liblanis)
 ├── web/        # Web UI (plain HTML/CSS/JS, no build step)
 ├── dev/        # Mock API server for UI development
-├── deploy/     # systemd unit and install script for the LXC container
+├── deploy/     # systemd unit, install script, release build (see deploy/README.md)
 └── docs/       # Plan and design notes
 ```
 
-## Getting started
+## Installation (Proxmox LXC / Debian)
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/StefanRiese/schulportal-client/main/deploy/install.sh
+bash install.sh
+```
+
+Full guide: [deploy/README.md](deploy/README.md).
+
+## Development
 
 ```sh
 cd server
