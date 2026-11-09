@@ -1,2 +1,3 @@
-([ ]) untis as additional source for the substitution
-([ ]) category filter for rest api
+- [ ] untis as additional source for the substitution
+- [ ] category filter for rest api (Klausuren, Arbeiten)
+- [ ] maybe integrade caseda Schulmenü (readable only)
