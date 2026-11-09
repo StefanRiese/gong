@@ -1,16 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#1d5bb8"/>
-  <rect x="112" y="136" width="288" height="256" rx="28" fill="#fff"/>
-  <rect x="112" y="136" width="288" height="64" rx="28" fill="#cfe0fa"/>
-  <rect x="112" y="172" width="288" height="28" fill="#cfe0fa"/>
-  <rect x="168" y="104" width="28" height="64" rx="14" fill="#fff"/>
-  <rect x="316" y="104" width="28" height="64" rx="14" fill="#fff"/>
-  <g fill="#1d5bb8">
-    <rect x="156" y="236" width="56" height="40" rx="8"/>
-    <rect x="228" y="236" width="56" height="40" rx="8"/>
-    <rect x="300" y="236" width="56" height="40" rx="8" opacity=".45"/>
-    <rect x="156" y="296" width="56" height="40" rx="8" opacity=".45"/>
-    <rect x="228" y="296" width="56" height="40" rx="8"/>
-    <rect x="300" y="296" width="56" height="40" rx="8"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#256bd0"/><stop offset="1" stop-color="#164aa0"/></linearGradient></defs>
+  <rect x="24" y="24" width="976" height="976" rx="200" fill="url(#bg)"/>
+  <rect x="289" y="460" width="446" height="198.2" rx="74.3" fill="#ffffff"/>
+  <polygon points="249.3,504.6 512,608.6 774.7,504.6 774.7,541.7 512,645.8 249.3,541.7" fill="#164aa0"/>
+  <polygon points="512,249.3 992.8,442.6 512,635.9 31.2,442.6" fill="#ffffff"/>
+  <line x1="512" y1="442.6" x2="844.1" y2="497.1" stroke="#f7be34" stroke-width="27.3"/>
+  <line x1="844.1" y1="497.1" x2="844.1" y2="695.4" stroke="#f7be34" stroke-width="27.3"/>
+  <rect x="814.3" y="683" width="59.5" height="109" rx="22.3" fill="#f7be34"/>
+  <ellipse cx="512" cy="442.65" rx="27.3" ry="27.25" fill="#f7be34"/>
 </svg>

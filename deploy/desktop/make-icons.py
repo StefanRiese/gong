@@ -9,6 +9,7 @@ Output (next to this script, committed):
   app-icon.ico            Windows exe icon, 16-256 px
   tray-icon.png           32 px, Windows notification area
   MenuBarIcon(@2x).png    18/36 px black template image, macOS menu bar
+  ../../web/icon.svg, icon-192.png, icon-512.png   web UI favicon / PWA icons
 """
 
 from pathlib import Path
@@ -91,7 +92,75 @@ def template_icon(size):
     return img.resize((size, size), Image.LANCZOS)
 
 
+def web_png(size):
+    """Web UI / PWA: full-bleed square (also used as maskable icon and iOS
+    touch icon, which round the corners themselves); the glyph stays inside
+    the maskable safe zone."""
+    big = 1024 * SS
+    img = _gradient(big, BLUE_TOP, BLUE_BOTTOM)
+    d = ImageDraw.Draw(img)
+    z = 0.85
+    sg = lambda v: int((512 + (v - 512) * z) * SS)
+    _glyph(d, sg, lambda v: int(v * z * SS), WHITE, PAGE, GOLD, book=True, hole=BLUE_BOTTOM + (255,))
+    return img.convert('RGB').resize((size, size), Image.LANCZOS)
+
+
+class _SvgDraw:
+    """Records the ImageDraw calls of _glyph() as SVG elements."""
+
+    def __init__(self):
+        self.parts = []
+
+    @staticmethod
+    def _c(color):
+        return '#%02x%02x%02x' % color[:3] if color[3] else 'none'
+
+    def polygon(self, pts, fill):
+        p = ' '.join(f'{x:g},{y:g}' for x, y in pts)
+        self.parts.append(f'<polygon points="{p}" fill="{self._c(fill)}"/>')
+
+    def rounded_rectangle(self, box, radius, fill):
+        x0, y0, x1, y1 = box
+        self.parts.append(f'<rect x="{x0:g}" y="{y0:g}" width="{x1 - x0:g}" height="{y1 - y0:g}" '
+                          f'rx="{radius:g}" fill="{self._c(fill)}"/>')
+
+    def line(self, pts, fill, width):
+        (x0, y0), (x1, y1) = pts
+        self.parts.append(f'<line x1="{x0:g}" y1="{y0:g}" x2="{x1:g}" y2="{y1:g}" '
+                          f'stroke="{self._c(fill)}" stroke-width="{width:g}"/>')
+
+    def ellipse(self, box, fill):
+        x0, y0, x1, y1 = box
+        self.parts.append(f'<ellipse cx="{(x0 + x1) / 2:g}" cy="{(y0 + y1) / 2:g}" '
+                          f'rx="{(x1 - x0) / 2:g}" ry="{(y1 - y0) / 2:g}" fill="{self._c(fill)}"/>')
+
+
+def web_svg():
+    """Favicon: rounded square with the mortarboard only (readable at 16 px)."""
+    d = _SvgDraw()
+    m, z = 24, 1.3
+    k = (1024 - 2 * m) / 1024
+    sg = lambda v: round(m + (512 + (v - 512) * z) * k, 1)
+    _glyph(d, sg, lambda v: round(v * z * k, 1), WHITE, PAGE, GOLD, book=False, hole=BLUE_BOTTOM + (255,))
+    hexc = lambda c: '#%02x%02x%02x' % c
+    return '\n'.join([
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">',
+        '  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0" stop-color="{hexc(BLUE_TOP)}"/><stop offset="1" stop-color="{hexc(BLUE_BOTTOM)}"/>'
+        '</linearGradient></defs>',
+        f'  <rect x="{m}" y="{m}" width="{1024 - 2 * m}" height="{1024 - 2 * m}" rx="200" fill="url(#bg)"/>',
+        *('  ' + p for p in d.parts),
+        '</svg>',
+        '',
+    ])
+
+
 def main():
+    web = OUT.parent.parent / 'web'
+    web_png(192).save(web / 'icon-192.png', optimize=True)
+    web_png(512).save(web / 'icon-512.png', optimize=True)
+    (web / 'icon.svg').write_text(web_svg())
+
     app_icon(1024, inset=True, book=True).save(OUT / 'app-icon-macos.png')
 
     sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]

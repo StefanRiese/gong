@@ -27,6 +27,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
   version.
 
 ### Changed
+- The web UI uses the new app icon (mortarboard over an open book) as favicon, PWA and
+  home screen icon, like the desktop apps.
 - `/healthz` also returns `"app": "schulportal-client"`.
 - The release no longer contains per-architecture macOS archives or a Windows `.tar.gz`.
 
