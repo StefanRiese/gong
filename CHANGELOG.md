@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.6.0] – 2026-11-09
+
 ### Added
 - Substitution plan filter in *Einstellungen → Vertretungsplan*: choose the own classes (from the
   classes in the current plan, or entered by hand), whether entries without class (break
@@ -152,7 +154,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/schulportal-client/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/StefanRiese/schulportal-client/compare/v0.3.0...v0.3.1
