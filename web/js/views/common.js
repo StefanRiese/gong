@@ -227,7 +227,9 @@ export function substitutionCard(s) {
   if (s.previousSubject && s.previousSubject !== s.subject) changes.push(['statt', s.previousSubject]);
   if (s.className) changes.push(['Klasse', s.className]);
 
-  return h('article', { class: ['card', 'sub-card', cancelled && 'cancelled'] },
+  return h('article', {
+    class: ['card', 'sub-card', cancelled && 'cancelled'], style: subjectStyle(s.subject ?? s.previousSubject),
+  },
     h('div', { class: 'sub-period' }, s.period.replace(/\s*-\s*/, '–'), h('small', null, 'Std.')),
     h('div', { class: 'sub-body' },
       h('div', { class: 'sub-title' },
