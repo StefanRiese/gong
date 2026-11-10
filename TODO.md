@@ -1,5 +1,4 @@
 ## Open
-- [ ] migrate the Proxmox container from Gong to Lumo (move `/etc/gong`, `/var/lib/gong` incl. `gong.db`, run the new `install.sh`; steps in the chat / CHANGELOG 0.13.0), then check `/healthz` and the phone app
 - [ ] Windows/macOS: install the 0.15.0 apps and rename the old data folders (`gong` → `lumo`)
 - [ ] Lumo name: check Google Play and the DPMA register (App Store has „Lumo for Students“)
 - [ ] decide whether the Lumo indigo scheme becomes the default (blue is still the default; the manifest `theme_color` is still blue)
@@ -9,10 +8,11 @@
 - [ ] phone tab bar: with 8 entries „Aufgaben“ is cut off (shorter label?)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
 - [ ] WebUntis: after the Schulportal adds an entry that WebUntis had supplied, one extra notification is possible
-- [ ] WebUntis: check the timetable warning on the real server (update to 0.12.0 or later first) (Mo „LRS“ is a real difference at the moment)
+- [ ] WebUntis: check the timetable warning on the real server (Mo „LRS“ is a real difference at the moment)
 - [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
+- [x] Proxmox container migrated from Gong to Lumo and updated to 0.15.0
 - [x] light/dark switch in the top bar, data age removed from the top bar (0.15.0; works on the phone)
 - [x] color scheme Lumo (Indigo) as second option, logout moved to the settings, README screenshots (0.14.0)
 - [x] rename to Lumo with the planner-grid icon and the tagline „Dein Schulalltag. Einfach organisiert.“ (0.13.0)
