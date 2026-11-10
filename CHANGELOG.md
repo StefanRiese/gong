@@ -6,6 +6,11 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.16.4] – 2026-11-10
+
+### Fixed
+- mDNS: AAAA questions for `lumo.local` now really get the „no IPv6 address“ answer (NSEC); 0.16.2 contained the answer but never sent it.
+
 ## [0.16.3] – 2026-11-10
 
 ### Fixed
@@ -367,7 +372,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.16.3...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.16.4...HEAD
+[0.16.4]: https://github.com/StefanRiese/lumo/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/StefanRiese/lumo/compare/v0.16.2...v0.16.3
 [0.16.2]: https://github.com/StefanRiese/lumo/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/StefanRiese/lumo/compare/v0.16.0...v0.16.1

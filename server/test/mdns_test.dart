@@ -19,6 +19,7 @@ Uint8List query(String name, int type, {int cls = 1}) {
 
 void main() {
   fibTest();
+  chooseTest();
   nsecTest();
   test('parses the question of a query', () {
     final q = parseDnsQuestions(query('Lumo.local', 1));
@@ -61,6 +62,29 @@ void nsecTest() {
     expect(b.getUint16(10), 1); // additional: the A record
     expect(a.sublist(a.length - 4), [192, 168, 1, 24]);
     expect(String.fromCharCodes(a), contains('lumo'));
+  });
+}
+
+void chooseTest() {
+  test('chooses the reply to a query', () {
+    final a = chooseMdnsReply(
+      parseDnsQuestions(query('lumo.local', 1)),
+      'lumo.local',
+    );
+    expect(a, (unicast: false, noAaaa: false));
+    final aaaa = chooseMdnsReply(
+      parseDnsQuestions(query('lumo.local', 28, cls: 0x8001)),
+      'lumo.local',
+    );
+    expect(aaaa, (unicast: true, noAaaa: true));
+    expect(
+      chooseMdnsReply(parseDnsQuestions(query('other.local', 1)), 'lumo.local'),
+      isNull,
+    );
+    expect(
+      chooseMdnsReply(parseDnsQuestions(query('lumo.local', 16)), 'lumo.local'),
+      isNull,
+    );
   });
 }
 

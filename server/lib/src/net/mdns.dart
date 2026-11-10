@@ -145,6 +145,20 @@ Uint8List buildMdnsNoAaaa(
   return out.toBytes();
 }
 
+/// How to answer [questions] for [hostname]: an A record, or (AAAA only) the
+/// NSEC "no IPv6" record; null when the packet does not ask for the name.
+({bool unicast, bool noAaaa})? chooseMdnsReply(
+  List<DnsQuestion> questions,
+  String hostname,
+) {
+  final mine = questions.where((q) => q.name == hostname).toList();
+  final a = mine.where((q) => q.type == 1 || q.type == 255);
+  if (a.isNotEmpty) return (unicast: a.first.unicast, noAaaa: false);
+  final aaaa = mine.where((q) => q.type == 28);
+  if (aaaa.isNotEmpty) return (unicast: aaaa.first.unicast, noAaaa: true);
+  return null;
+}
+
 /// Minimal mDNS responder: answers A queries for `<label>.local` with the
 /// IPv4 addresses of this machine, so the server is reachable as
 /// `http://lumo.local:8080`. Best effort: failures only mean no mDNS name.
@@ -289,11 +303,9 @@ class MdnsResponder {
     if (e != RawSocketEvent.read) return;
     final d = _socket.receive();
     if (d == null) return;
-    final asked = parseDnsQuestions(
-      d.data,
-    ).where((q) => q.name == hostname && (q.type == 1 || q.type == 255));
-    if (asked.isEmpty) return;
-    unawaited(_reply(d, asked.first.unicast));
+    final choice = chooseMdnsReply(parseDnsQuestions(d.data), hostname);
+    if (choice == null) return;
+    unawaited(_reply(d, choice.unicast, noAaaa: choice.noAaaa));
   }
 
   Future<void> _reply(Datagram d, bool unicast, {bool noAaaa = false}) async {
