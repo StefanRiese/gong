@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.11.0] – 2026-11-10
+
 ### Changed
 - **Settings restructured:** everything is on one page (*Einstellungen*) in eight flat groups –
   Schulportal, Vertretungen (own class, filters and WebUntis), Schulessen, Fächer & Farben,
@@ -288,7 +290,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/StefanRiese/gong/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/StefanRiese/gong/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/StefanRiese/gong/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/StefanRiese/gong/compare/v0.9.2...v0.10.0
