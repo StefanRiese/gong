@@ -6,6 +6,9 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- Phone tab bar: „Hausaufgaben“ is shown as „HA“ so the label is no longer cut off.
+
 ## [0.15.0] – 2026-11-10
 
 ### Added

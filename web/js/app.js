@@ -50,7 +50,7 @@ const NAV = [
   { path: '/', label: 'Heute', icon: 'today' },
   { path: '/stundenplan', label: 'Stundenplan', short: 'Plan', icon: 'timetable', feature: 'timetable' },
   { path: '/vertretungen', label: 'Vertretungen', short: 'Vertr.', icon: 'substitutions', feature: 'substitutions' },
-  { path: '/hausaufgaben', label: 'Hausaufgaben', short: 'Aufgaben', icon: 'homework', feature: 'lessons' },
+  { path: '/hausaufgaben', label: 'Hausaufgaben', short: 'HA', icon: 'homework', feature: 'lessons' },
   { path: '/noten', label: 'Noten', icon: 'grades', feature: 'lessons' },
   { path: '/faecher', label: 'Fächer', icon: 'subjects', feature: 'lessons' },
   { path: '/kalender', label: 'Kalender', short: 'Termine', icon: 'calendar', feature: 'calendar' },

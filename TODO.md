@@ -1,13 +1,13 @@
 ## Open
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
-- [ ] phone tab bar: with 8 entries „Aufgaben“ is cut off (shorter label?)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
 - [ ] WebUntis: after the Schulportal adds an entry that WebUntis had supplied, one extra notification is possible
 - [ ] WebUntis: check the timetable warning on the real server (Mo „LRS“ is a real difference at the moment)
 - [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
+- [x] phone tab bar: „Hausaufgaben“ is shown as „HA“ (was cut off with 8 entries)
 - [x] decisions: the name stays Lumo, blue stays the default color scheme, no migration from Gong (never an update path)
 - [x] new settings page checked on the real server and the phone
 - [x] Proxmox container migrated from Gong to Lumo and updated to 0.15.0
