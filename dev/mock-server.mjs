@@ -439,12 +439,22 @@ async function handleApi(req, res, url) {
     case '/api/meals': {
       // School meals (Caseda): own orders and balance; off in the settings → 404.
       if (!serverValues.CASEDA_ENABLED) return error(res, 404, 'meals_disabled', 'School meals are not set up');
-      const order = (date, line, name) => ({ date: ymd(date), line, name, allergens: [], priceCents: 390, ordered: 1, deadlinePassed: false });
+      const order = (date, line, name, allergens = [], priceCents = 390, ordered = 1) =>
+        ({ date: ymd(date), line, name, allergens, priceCents, ordered, deadlinePassed: date < today });
+      const monday = addDays(today, -((today.getDay() + 6) % 7));
+      const orders = [
+        order(monday, 'Menü 1', 'Spaghetti Bolognese', ['a', 'i']),
+        order(d1, 'Menü 1', 'Gemüsemaultaschen mit Kräuter-Frischkäsesauce', ['a', 'c', 'g']),
+        order(d2, 'Tagesmenue', 'Putensteak mit Bio-Reis und Kräutervelouté', ['g'], 450),
+        order(nextSchoolDay(d2), 'Menü 2', 'Ofenkartoffeln mit Kräuterquark', ['g']),
+        order(addDays(monday, 8), 'Menü 1', 'Hähnchencurry mit Basmatireis'),
+        order(addDays(monday, 10), 'Menü 2', 'Linsen-Dal mit Fladenbrot', ['a'], 390, 2),
+        order(addDays(monday, 15), 'Menü 1', 'Fischstäbchen mit Kartoffelpüree', ['a', 'd', 'g']),
+      ].filter((o, i, all) => all.findIndex((x) => x.date === o.date) === i)
+        .sort((a, b) => a.date.localeCompare(b.date));
       return data(res, 'meals', {
         balanceCents: 845,
-        orders: [order(d1, 'Menü 1', 'Gemüsemaultaschen mit Kräuter-Frischkäsesauce'),
-          order(d2, 'Tagesmenue', 'Putensteak mit Bio-Reis und Kräutervelouté'),
-          order(nextSchoolDay(d2), 'Menü 2', 'Ofenkartoffeln mit Kräuterquark')],
+        orders,
       }, { balanceWarningCents: Math.round(parseFloat(String(serverValues.CASEDA_BALANCE_WARNING).replace(',', '.')) * 100), orderUrl: 'https://www.caseda-schulmenue.de/kunden/essen/' });
     }
     case '/api/calendar': {

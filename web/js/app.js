@@ -12,6 +12,7 @@ import * as homework from './views/homework.js';
 import * as grades from './views/grades.js';
 import * as course from './views/course.js';
 import * as calendar from './views/calendar.js';
+import * as meals from './views/meals.js';
 import * as notifications from './views/notifications.js';
 import * as settings from './views/settings.js';
 import * as subjects from './views/subjects.js';
@@ -27,6 +28,7 @@ route('/hausaufgaben', homework);
 route('/noten', grades);
 route('/kurse/:id', course);
 route('/kalender', calendar);
+route('/schulessen', meals);
 route('/benachrichtigungen', notifications);
 route('/einstellungen', settings);
 route('/einstellungen/server', serverSettings);
@@ -41,6 +43,7 @@ const NAV = [
   { path: '/noten', label: 'Noten', icon: 'grades', feature: 'lessons' },
   { path: '/faecher', label: 'Fächer', icon: 'subjects', feature: 'lessons' },
   { path: '/kalender', label: 'Kalender', short: 'Termine', icon: 'calendar', feature: 'calendar' },
+  { path: '/schulessen', label: 'Schulessen', short: 'Essen', icon: 'meals', feature: 'meals' },
 ];
 
 const root = document.getElementById('app');
@@ -98,7 +101,8 @@ async function boot() {
       account = { features: new Set(saved?.features ?? ALL_FEATURES), username: saved?.username ?? '' };
       portalProblem = err;
     }
-    await loadColors();
+    const [, withMeals] = await Promise.all([loadColors(), mealsEnabled()]);
+    if (withMeals) account.features.add('meals');
     showShell();
     if (portalProblem) showPortalProblem(portalProblem);
     updateHint().then((bar) => {
@@ -112,6 +116,31 @@ async function boot() {
     );
   }
 }
+
+/** Whether school meals (Caseda) are set up and switched on on the server. */
+async function mealsEnabled() {
+  try {
+    await api('/api/meals');
+    return true;
+  } catch (err) {
+    if (err instanceof ApiError && err.isUnauthorized) throw err;
+    // Caseda down: the page still shows cached data or the error.
+    return !(err instanceof ApiError && err.code === 'meals_disabled');
+  }
+}
+
+/** Server settings switched school meals on or off: update the menu. */
+window.addEventListener('gong:meals-changed', async () => {
+  if (!account || !shell) return;
+  const on = await mealsEnabled().catch(() => false);
+  if (on === account.features.has('meals')) return;
+  if (on) account.features.add('meals'); else account.features.delete('meals');
+  // Only the menu: the settings page keeps its message.
+  const nav = buildNav();
+  markActiveNav(nav);
+  shell.nav.replaceWith(nav);
+  shell.nav = nav;
+});
 
 /** Loads what subject colors are derived from (one assignment app-wide). */
 async function loadColors() {
@@ -145,14 +174,9 @@ function showLogin() {
   root.replaceChildren(login.render({ onSuccess: boot }));
 }
 
-function showShell() {
-  const main = h('main', { id: 'main', tabindex: '-1' });
-  const status = h('span', { class: 'status', 'aria-live': 'polite' });
-  const refreshButton = h('button', {
-    class: 'icon-button', title: 'Neu laden', 'aria-label': 'Neu vom Schulportal laden',
-    onclick: refresh,
-  }, icon('refresh'));
-  const nav = h('nav', { class: 'nav', 'aria-label': 'Hauptnavigation' },
+/** Main navigation for the features of the account. */
+function buildNav() {
+  return h('nav', { class: 'nav', 'aria-label': 'Hauptnavigation' },
     NAV.filter((n) => !n.feature || account.features.has(n.feature)).map((n) =>
       h('a', {
         href: n.path, class: 'nav-link', dataset: { path: n.path },
@@ -162,6 +186,28 @@ function showShell() {
       h('span', { class: 'label-long' }, n.label),
       h('span', { class: 'label-short', 'aria-hidden': 'true' }, n.short ?? n.label))),
   );
+}
+
+/** Marks the navigation link of the current page. */
+function markActiveNav(nav) {
+  for (const a of nav.querySelectorAll('.nav-link')) {
+    const path = a.dataset.path;
+    const active = path === '/' ? location.pathname === '/' :
+      location.pathname.startsWith(path) ||
+      (path === '/faecher' && location.pathname.startsWith('/kurse/'));
+    a.classList.toggle('active', active);
+    if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+}
+
+function showShell() {
+  const main = h('main', { id: 'main', tabindex: '-1' });
+  const status = h('span', { class: 'status', 'aria-live': 'polite' });
+  const refreshButton = h('button', {
+    class: 'icon-button', title: 'Neu laden', 'aria-label': 'Neu vom Schulportal laden',
+    onclick: refresh,
+  }, icon('refresh'));
+  const nav = buildNav();
   const header = h('header', { class: 'topbar' },
     h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Gong'),
     status,
@@ -192,14 +238,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
   const found = match(location.pathname);
   const { main, status, nav } = shell;
 
-  for (const a of nav.querySelectorAll('.nav-link')) {
-    const path = a.dataset.path;
-    const active = path === '/' ? location.pathname === '/' :
-      location.pathname.startsWith(path) ||
-      (path === '/faecher' && location.pathname.startsWith('/kurse/'));
-    a.classList.toggle('active', active);
-    if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-  }
+  markActiveNav(nav);
 
   if (!found) {
     document.title = 'Nicht gefunden – Gong';

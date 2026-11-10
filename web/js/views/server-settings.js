@@ -317,7 +317,7 @@ function mealsSection(v, secrets, save) {
   });
 
   const section = card('Schulessen (Caseda)',
-    'Zeigt auf der Seite Heute das bestellte Essen und das Guthaben – nur lesend; bestellt wird weiterhin bei Caseda.',
+    'Zeigt unter Schulessen die eigenen Bestellungen und das Guthaben, auf der Seite Heute das bestellte Essen – nur lesend; bestellt wird weiterhin bei Caseda.',
     'schulessen',
     enabled.el,
     fields,
@@ -334,7 +334,10 @@ function mealsSection(v, secrets, save) {
       if (password.value) settings.CASEDA_PASSWORD = password.value;
       msg.ok('Anmeldung wird geprüft …');
     }
-    if (await save(msg, submit, { settings })) password.value = '';
+    if (await save(msg, submit, { settings })) {
+      password.value = '';
+      window.dispatchEvent(new Event('gong:meals-changed'));
+    }
   });
   return section;
 }

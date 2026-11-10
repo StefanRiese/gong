@@ -189,20 +189,15 @@ function homeworkList(items, now) {
   })), moreLink];
 }
 
-const euro = (cents) => `${(cents / 100).toFixed(2).replace('.', ',')} €`;
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-/** Ordered meal of the shown day, the next orders and the balance (read-only). */
+/** Ordered meal of the shown day and the next orders (read-only). */
 function mealsSection(result, target) {
-  const res = result.ok ? result.value : null;
-  const order = res?.orderUrl
-    ? h('a', { href: res.orderUrl, target: '_blank', rel: 'noopener', class: 'button small' }, 'Bei Caseda bestellen')
-    : null;
-  return section('Schulessen', result.ok ? { ok: true, value: res.data } : result, (data) => {
+  const all = h('a', { href: '/schulessen', class: 'section-link' }, 'Alle Bestellungen');
+  return section('Schulessen', result.ok ? { ok: true, value: result.value.data } : result, (data) => {
     const day = ymd(target);
     const today = data.orders.filter((o) => o.date === day);
     const next = data.orders.filter((o) => o.date > day).slice(0, 4);
-    const low = data.balanceCents != null && data.balanceCents < (res.balanceWarningCents ?? 1000);
     return [
       today.length
         ? h('ul', { class: 'meal-list' }, today.map((o) => h('li', null,
@@ -216,12 +211,8 @@ function mealsSection(result, target) {
             return h('li', null, h('span', { class: 'muted' }, `${WEEKDAYS[d.getDay()]} ${shortDate(d)} `), o.name);
           })))
         : null,
-      h('div', { class: ['meal-balance', low && 'low'] },
-        data.balanceCents == null ? 'Guthaben unbekannt' : `Guthaben: ${euro(data.balanceCents)}`,
-        low ? badge('niedrig', 'warn') : null,
-        order),
     ];
-  });
+  }, all);
 }
 
 function eventList(events, now) {

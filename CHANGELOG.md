@@ -6,6 +6,15 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- New page **Schulessen** (menu item when Caseda is switched on): own orders of this week and
+  the next two weeks day by day, with price, allergens, weekly total, the balance and the
+  link to the ordering page.
+
+### Changed
+- Heute shows only the ordered meal (and further orders) without the balance, with a link to
+  the new page.
+
 ## [0.9.1] – 2026-11-10
 
 ### Fixed

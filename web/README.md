@@ -63,9 +63,11 @@ temporary filters: all classes (`?alle=1`), one class (`?klasse=`), search (`?su
 type chips (remembered in `localStorage`, key `substitutionFilter`). Shared helpers:
 `js/substitution-filter.js`.
 
-School meals: Heute shows the meal ordered for the shown day, further orders (collapsed), the
-balance (highlighted below `balanceWarningCents`) and a link to the ordering page – only when
-Caseda is set up and switched on (`/api/meals`, otherwise 404 `meals_disabled`).
+School meals (`js/views/meals.js`, `/schulessen`): own orders of three weeks day by day, the
+balance (highlighted below `balanceWarningCents`) and a link to the ordering page; Heute shows
+the meal ordered for the shown day. Only when Caseda is set up and switched on (`/api/meals`,
+otherwise 404 `meals_disabled`): the app probes it at start and after saving the Caseda
+settings (event `gong:meals-changed`) and shows the menu item accordingly.
 
 App updates (`js/update.js`): a hint bar below the top bar when a new release is available
 (dismissable per version, `localStorage` key `updateDismissed`); *Einstellungen → Server →
