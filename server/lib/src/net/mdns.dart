@@ -95,6 +95,56 @@ Uint8List buildMdnsAnswer(
   return out.toBytes();
 }
 
+List<int> _encodeName(String name) {
+  final out = <int>[];
+  for (final l in name.split('.')) {
+    out
+      ..add(l.length)
+      ..addAll(l.codeUnits);
+  }
+  return out..add(0);
+}
+
+/// Answer to an AAAA query for a name that only has A records: an NSEC record
+/// saying so (RFC 6762 §6.1), with the A records as additional data.
+/// Without it Windows waits for the missing AAAA answer and fails.
+Uint8List buildMdnsNoAaaa(
+  String name,
+  List<InternetAddress> addresses, {
+  int ttl = 120,
+  int id = 0,
+}) {
+  final v4 = addresses.where((a) => a.type == InternetAddressType.IPv4);
+  final out = BytesBuilder();
+  void u16(int v) => out.add([v >> 8 & 0xFF, v & 0xFF]);
+  final labels = _encodeName(name);
+  u16(id);
+  u16(0x8400);
+  u16(0);
+  u16(1);
+  u16(0);
+  u16(v4.length);
+  out.add(labels);
+  u16(47); // NSEC
+  u16(0x8001);
+  u16(ttl >> 16);
+  u16(ttl & 0xFFFF);
+  u16(labels.length + 3);
+  out
+    ..add(labels)
+    ..add([0, 1, 0x40]); // window 0, one byte, type 1 (A)
+  for (final a in v4) {
+    out.add(labels);
+    u16(1);
+    u16(0x8001);
+    u16(ttl >> 16);
+    u16(ttl & 0xFFFF);
+    u16(4);
+    out.add(a.rawAddress);
+  }
+  return out.toBytes();
+}
+
 /// Minimal mDNS responder: answers A queries for `<label>.local` with the
 /// IPv4 addresses of this machine, so the server is reachable as
 /// `http://lumo.local:8080`. Best effort: failures only mean no mDNS name.
@@ -232,20 +282,17 @@ class MdnsResponder {
     unawaited(_reply(d, asked.first.unicast));
   }
 
-  Future<void> _reply(Datagram d, bool unicast) async {
+  Future<void> _reply(Datagram d, bool unicast, {bool noAaaa = false}) async {
     try {
       final addrs = await _addresses();
       if (addrs.isEmpty) return;
       final legacy = d.port != _port; // plain DNS client, not an mDNS stack
+      final build = noAaaa ? buildMdnsNoAaaa : buildMdnsAnswer;
       if (legacy || unicast) {
         final id = legacy ? (d.data[0] << 8 | d.data[1]) : 0;
-        _socket.send(
-          buildMdnsAnswer(hostname, addrs, id: id),
-          d.address,
-          d.port,
-        );
+        _socket.send(build(hostname, addrs, id: id), d.address, d.port);
       } else {
-        _socket.send(buildMdnsAnswer(hostname, addrs), _group, _port);
+        _socket.send(build(hostname, addrs), _group, _port);
       }
     } on Object catch (e) {
       _log('mDNS: cannot answer ($e)');

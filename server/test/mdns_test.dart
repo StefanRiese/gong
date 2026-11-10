@@ -19,6 +19,7 @@ Uint8List query(String name, int type, {int cls = 1}) {
 
 void main() {
   fibTest();
+  nsecTest();
   test('parses the question of a query', () {
     final q = parseDnsQuestions(query('Lumo.local', 1));
     expect(q, hasLength(1));
@@ -49,6 +50,17 @@ void main() {
     expect(b.getUint16(6), 2);
     expect(a.sublist(a.length - 4), [10, 0, 0, 2]);
     expect(a.sublist(12, 18), [4, ...'lumo'.codeUnits, 5].sublist(0, 6));
+  });
+}
+
+void nsecTest() {
+  test('AAAA query gets an NSEC record saying only A exists', () {
+    final a = buildMdnsNoAaaa('lumo.local', [InternetAddress('192.168.1.24')]);
+    final b = ByteData.sublistView(a);
+    expect(b.getUint16(6), 1); // answers
+    expect(b.getUint16(10), 1); // additional: the A record
+    expect(a.sublist(a.length - 4), [192, 168, 1, 24]);
+    expect(String.fromCharCodes(a), contains('lumo'));
   });
 }
 
