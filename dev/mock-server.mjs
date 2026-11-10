@@ -572,6 +572,11 @@ async function handleStatic(req, res, url) {
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
+    // Dev helper: pretend the server was updated while a page is open (installed-app reload test).
+    if (req.method === 'POST' && url.pathname === '/dev/bump-version') {
+      update.current = 'v9.9.9';
+      return json(res, 200, { current: update.current });
+    }
     if (url.pathname.startsWith('/api/')) await handleApi(req, res, url);
     else await handleStatic(req, res, url);
   } catch (e) {

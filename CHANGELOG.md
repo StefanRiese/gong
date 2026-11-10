@@ -6,6 +6,12 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Fixed
+- The web UI installed as an app (home screen) kept showing an old version after a server
+  update, because the phone keeps the app in memory and does not reload it. The app now checks
+  the server version when it starts, when it becomes visible again, when the network is back and
+  every 10 minutes, and reloads itself after an update (not while typing).
+
 ## [0.10.1] – 2026-11-10
 
 ### Changed

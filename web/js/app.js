@@ -19,7 +19,7 @@ import * as subjects from './views/subjects.js';
 import * as setup from './views/setup.js';
 import * as serverSettings from './views/server-settings.js';
 import { initColors } from './colors.js';
-import { updateHint } from './update.js';
+import { updateHint, watchServerVersion } from './update.js';
 
 route('/', today);
 route('/stundenplan', timetable);
@@ -104,6 +104,7 @@ async function boot() {
     const [, withMeals] = await Promise.all([loadColors(), mealsEnabled()]);
     if (withMeals) account.features.add('meals');
     showShell();
+    watchServerVersion();
     if (portalProblem) showPortalProblem(portalProblem);
     updateHint().then((bar) => {
       if (bar) root.querySelector('.topbar')?.after(bar);

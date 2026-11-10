@@ -69,6 +69,62 @@ export function releaseNotes(markdown) {
   return h('div', { class: 'release-notes' }, out);
 }
 
+let versionWatch = false;
+
+/**
+ * Reloads the app when the server runs a newer version than the one loaded.
+ * An installed app (home screen) stays in memory for days and is not reloaded
+ * when it is opened again, so it would keep running old code. Checks at start,
+ * when the app becomes visible again, when the network is back and every
+ * 10 minutes; not while someone is typing.
+ */
+export function watchServerVersion() {
+  if (versionWatch) return;
+  versionWatch = true;
+  let running = null;
+  let last = 0;
+  const check = async () => {
+    if (Date.now() - last < 10e3) return;
+    last = Date.now();
+    let current;
+    try {
+      current = (await api('/api/update')).current;
+    } catch {
+      return; // offline, logged out or restarting: next time
+    }
+    if (!current) return; // development build
+    if (running == null) {
+      running = current;
+      return;
+    }
+    if (current === running) return;
+    if (document.activeElement?.matches('input, textarea, select')) {
+      last = 0; // typing: try again at the next trigger
+      return;
+    }
+    await reloadFresh();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
+  window.addEventListener('pageshow', check);
+  window.addEventListener('online', check);
+  setInterval(check, 10 * 60e3);
+  check();
+}
+
+/** Loads the app's files again past the HTTP cache, then reloads the page. */
+async function reloadFresh() {
+  const own = (url) => url.startsWith(location.origin);
+  const urls = new Set([
+    `${location.origin}/`,
+    ...performance.getEntriesByType('resource').map((e) => e.name).filter(own),
+  ]);
+  await Promise.all([...urls].filter((u) => !u.includes('/api/'))
+    .map((u) => fetch(u, { cache: 'reload' }).catch(() => {})));
+  location.reload();
+}
+
 /**
  * Waits until the server answers with a version other than [from] (after the
  * restart), then reloads the page. [onProgress] gets German status texts.

@@ -113,3 +113,8 @@ MOCK_ABBREV=1 node dev/mock-server.mjs  # timetable with subject abbreviations (
 ```
 
 Edit files and reload the browser — there is nothing to build.
+
+Installed app: a home screen app stays in memory and is not reloaded when opened again, so
+`watchServerVersion()` (`js/update.js`) compares the server version (`/api/update` → `current`)
+with the one seen at start and reloads the page after an update (files refetched past the HTTP
+cache first). `POST /dev/bump-version` on the mock server simulates an update.
