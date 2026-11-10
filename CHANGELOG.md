@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.13.0] – 2026-11-10
+
 ### Changed
 - New name and icon: **Lumo – Dein Schulalltag. Einfach organisiert.** (was: Gong). The icon is a
   timetable grid with one checked cell. Everything was renamed, as with 0.8.0: repository
