@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.15.0] – 2026-11-10
+
 ### Added
 - Button in the top bar to switch between light and dark by hand (remembered per device; until
   then the device decides).
