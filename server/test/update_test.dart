@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:gong_server/gong_server.dart';
+import 'package:lumo_server/lumo_server.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
 import 'support/fake_gateway.dart';
 
-const _base = 'https://github.com/StefanRiese/gong/releases/download/v0.7.0';
+const _base = 'https://github.com/StefanRiese/lumo/releases/download/v0.7.0';
 
 /// Fake GitHub: release JSON and assets.
 class FakeGitHub {
@@ -18,9 +18,9 @@ class FakeGitHub {
 
   FakeGitHub() {
     final exe = utf8.encode('new exe');
-    files[Uri.parse('$_base/gong-windows-x64.exe')] = exe;
-    files[Uri.parse('$_base/gong-windows-x64.exe.sha256')] = utf8.encode(
-      '${sha256.convert(exe)}  gong-windows-x64.exe\n',
+    files[Uri.parse('$_base/lumo-windows-x64.exe')] = exe;
+    files[Uri.parse('$_base/lumo-windows-x64.exe.sha256')] = utf8.encode(
+      '${sha256.convert(exe)}  lumo-windows-x64.exe\n',
     );
   }
 
@@ -31,7 +31,7 @@ class FakeGitHub {
         jsonEncode({
           'tag_name': tag,
           'body': '### Added\n- Neu',
-          'html_url': 'https://github.com/StefanRiese/gong/releases/tag/$tag',
+          'html_url': 'https://github.com/StefanRiese/lumo/releases/tag/$tag',
           'published_at': '2026-11-10T08:00:00Z',
           'assets': [
             for (final u in files.keys)
@@ -73,7 +73,7 @@ void main() {
     currentVersion: version,
     mode: mode,
     dataDir: dir.path,
-    executable: '${dir.path}/gong.exe',
+    executable: '${dir.path}/lumo.exe',
     onReadyToRestart: onReady,
     get: gh.get,
   );
@@ -146,7 +146,7 @@ void main() {
   );
 
   test('windows: verifies, swaps the exe and restarts', () async {
-    File('${dir.path}/gong.exe').writeAsStringSync('old exe');
+    File('${dir.path}/lumo.exe').writeAsStringSync('old exe');
     var restarted = false;
     final u = service(
       UpdateMode.windows,
@@ -156,16 +156,16 @@ void main() {
     u.install();
     await settle(u);
     expect(restarted, isTrue);
-    expect(File('${dir.path}/gong.exe').readAsStringSync(), 'new exe');
-    expect(File('${dir.path}/gong.exe.old').readAsStringSync(), 'old exe');
+    expect(File('${dir.path}/lumo.exe').readAsStringSync(), 'new exe');
+    expect(File('${dir.path}/lumo.exe.old').readAsStringSync(), 'old exe');
 
     service(UpdateMode.windows).cleanUp();
-    expect(File('${dir.path}/gong.exe.old').existsSync(), isFalse);
+    expect(File('${dir.path}/lumo.exe.old').existsSync(), isFalse);
   });
 
   test('windows: a wrong checksum leaves the exe alone', () async {
-    File('${dir.path}/gong.exe').writeAsStringSync('old exe');
-    gh.files[Uri.parse('$_base/gong-windows-x64.exe.sha256')] = utf8.encode(
+    File('${dir.path}/lumo.exe').writeAsStringSync('old exe');
+    gh.files[Uri.parse('$_base/lumo-windows-x64.exe.sha256')] = utf8.encode(
       '${'0' * 64}  x\n',
     );
     var restarted = false;
@@ -179,12 +179,12 @@ void main() {
     expect(u.status()['phase'], 'failed');
     expect(u.status()['error'], contains('Prüfsumme'));
     expect(restarted, isFalse);
-    expect(File('${dir.path}/gong.exe').readAsStringSync(), 'old exe');
+    expect(File('${dir.path}/lumo.exe').readAsStringSync(), 'old exe');
   });
 
   test('downloads only from github.com over https', () async {
-    gh.files[Uri.parse('https://example.org/gong-windows-x64.exe')] = [1];
-    gh.files.remove(Uri.parse('$_base/gong-windows-x64.exe'));
+    gh.files[Uri.parse('https://example.org/lumo-windows-x64.exe')] = [1];
+    gh.files.remove(Uri.parse('$_base/lumo-windows-x64.exe'));
     final u = service(UpdateMode.windows);
     await u.check();
     u.install();

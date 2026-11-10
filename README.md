@@ -2,18 +2,18 @@
   <img src="deploy/desktop/app-icon-macos.png" alt="" width="128" height="128">
 </p>
 
-<h1 align="center">Gong</h1>
+<h1 align="center">Lumo</h1>
 
-<p align="center"><em>dein Schulportal-Begleiter für Hessen</em></p>
+<p align="center"><em>Dein Schulalltag. Einfach organisiert.</em></p>
 
 <p align="center">
-  <a href="https://github.com/StefanRiese/gong/actions/workflows/ci.yml"><img src="https://github.com/StefanRiese/gong/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="https://github.com/StefanRiese/gong/actions/workflows/release.yml"><img src="https://github.com/StefanRiese/gong/actions/workflows/release.yml/badge.svg?event=push" alt="Release build"></a>
-  <a href="https://github.com/StefanRiese/gong/releases/latest"><img src="https://img.shields.io/github/v/release/StefanRiese/gong" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/StefanRiese/gong" alt="License: GPL-3.0"></a>
+  <a href="https://github.com/StefanRiese/lumo/actions/workflows/ci.yml"><img src="https://github.com/StefanRiese/lumo/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/StefanRiese/lumo/actions/workflows/release.yml"><img src="https://github.com/StefanRiese/lumo/actions/workflows/release.yml/badge.svg?event=push" alt="Release build"></a>
+  <a href="https://github.com/StefanRiese/lumo/releases/latest"><img src="https://img.shields.io/github/v/release/StefanRiese/lumo" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/StefanRiese/lumo" alt="License: GPL-3.0"></a>
 </p>
 
-**Gong** is a self-hosted companion app for **Schulportal Hessen**: a Dart server (using
+**Lumo** is a self-hosted companion app for **Schulportal Hessen**: a Dart server (using
 [liblanis](https://pub.dev/packages/liblanis)) plus a web UI for Stundenplan, Vertretungsplan,
 Hausaufgaben, Noten, Klausuren, Kalender and school meals – and it rings when something changes. It is not an
 official app of the state of Hesse.
@@ -53,7 +53,7 @@ official app of the state of Hesse.
 ## Project structure
 
 ```
-gong/
+lumo/
 ├── server/     # Dart backend (uses liblanis)
 ├── web/        # Web UI (plain HTML/CSS/JS, no build step)
 ├── dev/        # Mock API server for UI development
@@ -64,7 +64,7 @@ gong/
 ## Installation (Proxmox LXC / Debian)
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/StefanRiese/gong/main/deploy/install.sh
+curl -fsSLO https://raw.githubusercontent.com/StefanRiese/lumo/main/deploy/install.sh
 bash install.sh
 ```
 
@@ -75,12 +75,12 @@ web UI password in the browser. Full guide: [deploy/README.md](deploy/README.md)
 
 *Einstellungen → Update* shows new releases with their release notes; „Jetzt
 aktualisieren“ installs them (LXC, Windows and macOS). On the server alternatively:
-`bash /opt/gong/deploy/install.sh`.
+`bash /opt/lumo/deploy/install.sh`.
 
 ## Windows / macOS
 
-Download `gong-windows-x64.exe` or `gong-macos-universal.zip` from the
-[releases](https://github.com/StefanRiese/gong/releases). The app runs in the
+Download `lumo-windows-x64.exe` or `lumo-macos-universal.zip` from the
+[releases](https://github.com/StefanRiese/lumo/releases). The app runs in the
 notification area / menu bar; right click on the icon to open the web UI. See
 [deploy/DESKTOP.md](deploy/DESKTOP.md).
 

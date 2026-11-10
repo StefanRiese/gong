@@ -1,6 +1,6 @@
-# Plan: Gong – Schulportal Hessen client
+# Plan: Lumo – Schulportal Hessen client
 
-Goal (app name since 0.8.0: **Gong**, before: schulportal-client): a self-hosted client for **Schulportal Hessen** (school ID `6128`, login at
+Goal (app name since 0.8.0: **Lumo**, before: schulportal-client): a self-hosted client for **Schulportal Hessen** (school ID `6128`, login at
 `https://login.schulportal.hessen.de/?i=6128`) that shows Stundenplan, Vertretungsplan,
 Hausaufgaben, Noten, Kalender and Nachrichten in a clean, fast web UI.
 
@@ -61,7 +61,7 @@ upstream with a PR instead of forking.
 ```
 
 - **Backend:** Dart with `shelf` + `shelf_router`. One process, compiled to a native binary.
-- **Storage:** SQLite (`gong.db`: cache of the portal data, web sessions (hashed), notification
+- **Storage:** SQLite (`lumo.db`: cache of the portal data, web sessions (hashed), notification
   state, settings made in the web UI). Credentials are stored in the database and in
   `config.env`, not encrypted at rest (see section 8).
 - **Optional second sources** (read-only, behind gateway interfaces like liblanis):
@@ -95,7 +95,7 @@ Notes:
 ## 5. Project structure (target)
 
 ```
-gong/
+lumo/
 ├── server/                 # Dart backend (own pubspec.yaml)
 │   ├── bin/                # server.dart (entry point), CLIs: sph, caseda, untis, hash_password
 │   ├── lib/src/
@@ -126,10 +126,10 @@ LXC container.
   release artifact). The bundle (`bin/` + `lib/libsqlite3.so`) only needs glibc; SQLite is
   included.
 - **Layout in the container:**
-  - `/opt/gong/` – binary + `web/` static files
-  - `/etc/gong/config.env` – port, secret key, polling interval (mode 600)
-  - `/var/lib/gong/` – SQLite database
-  - runs as dedicated user `schulportal` via systemd unit `gong.service`
+  - `/opt/lumo/` – binary + `web/` static files
+  - `/etc/lumo/config.env` – port, secret key, polling interval (mode 600)
+  - `/var/lib/lumo/` – SQLite database
+  - runs as dedicated user `schulportal` via systemd unit `lumo.service`
 - **Install/update:** `deploy/install.sh` downloads the latest release (or copies a local
   build), installs the unit, restarts the service. Proxmox snapshots/backups (vzdump) cover
   the database. Step-by-step guide: `deploy/README.md`.
@@ -185,7 +185,7 @@ LXC container.
    updates to the web UI; „Neu laden“ starts an asynchronous sync.
 6. **Deployment** – systemd unit + install/update script for the LXC container, CI builds
    for Windows/Linux/macOS, docs.
-   *Result (2026-11-09):* done. `deploy/gong.service` (own system user, systemd
+   *Result (2026-11-09):* done. `deploy/lumo.service` (own system user, systemd
    sandbox, automatic fallback for containers without Nesting), `deploy/install.sh` (install /
    update from GitHub release with SHA-256 check or local archive, interactive credentials,
    `--configure`, `--rollback`, `--uninstall [--purge]`), `deploy/build-release.sh`, GitHub
@@ -197,7 +197,7 @@ LXC container.
    *Done since (2026-11-09):* dark mode; desktop apps (Windows tray exe, universal macOS app);
    background sync with SQLite cache and live updates; setup and server settings in the web UI;
    substitution filter (own classes, types, notices); updates from the web UI; REST API
-   reference (`docs/API.md`); rename to **Gong** (0.8.0; „Ranzen“ is taken by an App Store app
+   reference (`docs/API.md`); rename to **Gong** (0.8.0, now Lumo; „Ranzen“ is taken by an App Store app
    for Schulportal Hessen).
    *Ideas from comparing with native apps (Lanis Mobile, Ranzen):* messages (read and reply),
    several children / accounts per server, Dateispeicher, iCal feed for timetable and calendar,

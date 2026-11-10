@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:gong_server/gong_server.dart';
+import 'package:lumo_server/lumo_server.dart';
 import 'package:test/test.dart';
 
 import 'support/fake_gateway.dart';

@@ -22,7 +22,7 @@ class LiblanisGateway implements SphGateway {
     required this.schoolId,
     required this.username,
     required String password,
-    String userAgent = 'gong/0.1',
+    String userAgent = 'lumo/0.1',
     this.keepAlive = false,
   }) : _client = lanis.EasyLanisClient.ephemeral(
          schoolId: schoolId,

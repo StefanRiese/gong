@@ -329,7 +329,7 @@ class UntisClient {
   final String username;
   final String password;
   final HttpClient _http = HttpClient()
-    ..userAgent = 'Gong'
+    ..userAgent = 'Lumo'
     ..connectionTimeout = const Duration(seconds: 15);
   final Map<String, String> _cookies = {};
   String? _token;

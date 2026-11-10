@@ -485,7 +485,7 @@ export function updateGroup({ form, v, status }) {
       if (s.mode === 'manual') {
         parts.push(h('p', { class: 'hint' },
           'Diese Installation kann nicht aus der Web-Oberfläche aktualisiert werden. Auf dem Server: ',
-          h('code', null, 'bash /opt/gong/deploy/install.sh'),
+          h('code', null, 'bash /opt/lumo/deploy/install.sh'),
           ' – oder die neue Version von GitHub laden.'));
       } else if (s.mode === 'systemd') {
         parts.push(h('p', { class: 'hint' },

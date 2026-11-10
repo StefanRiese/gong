@@ -51,7 +51,7 @@ let syncRunning = false;
 // Simulated app update (Einstellungen → Server → Update).
 const update = {
   current: 'v0.6.0', latest: null, available: false, notes: null, mode: 'systemd',
-  url: 'https://github.com/StefanRiese/gong/releases/tag/v0.7.0',
+  url: 'https://github.com/StefanRiese/lumo/releases/tag/v0.7.0',
   checkedAt: null, checkError: null, checkEnabled: true, phase: 'idle', error: null,
 };
 const updateStatus = () => ({ ...update, canInstall: update.available && update.phase !== 'restarting' });

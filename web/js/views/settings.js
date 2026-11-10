@@ -53,7 +53,7 @@ export async function render(ctx) {
       h('strong', null, 'Neustart nötig: '),
       'Die Netzwerk-Einstellungen gelten erst nach einem Neustart des Servers (',
       server.desktop ? 'Symbol im Infobereich bzw. in der Menüleiste → „Neu starten“' :
-        h('code', null, 'systemctl restart gong'),
+        h('code', null, 'systemctl restart lumo'),
       ').'));
   };
   showRestart(server.restartRequired ?? []);
@@ -162,7 +162,7 @@ export async function render(ctx) {
       }
       form.commit();
       if (Object.keys(serverChanges).some((k) => k.startsWith('CASEDA_'))) {
-        window.dispatchEvent(new Event('gong:meals-changed')); // menu item Schulessen
+        window.dispatchEvent(new Event('lumo:meals-changed')); // menu item Schulessen
       }
       say('ok', result?.accountChanged
         ? 'Gespeichert. Die Daten des neuen Kontos werden jetzt geladen.'

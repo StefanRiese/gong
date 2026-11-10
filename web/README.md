@@ -1,6 +1,6 @@
 # web
 
-Web UI for Gong: plain HTML, CSS and JavaScript modules. No framework, no build
+Web UI for Lumo: plain HTML, CSS and JavaScript modules. No framework, no build
 step, no npm dependencies. The Dart server serves this directory when `WEB_DIR` points to it.
 
 ## Structure
@@ -83,7 +83,7 @@ School meals (`js/views/meals.js`, `/schulessen`): own orders of three weeks day
 balance (highlighted below `balanceWarningCents`) and a link to the ordering page; Heute shows
 the meal ordered for the shown day. Only when Caseda is set up and switched on (`/api/meals`,
 otherwise 404 `meals_disabled`): the app probes it at start and after saving the Caseda
-settings (event `gong:meals-changed`) and shows the menu item accordingly.
+settings (event `lumo:meals-changed`) and shows the menu item accordingly.
 
 WebUntis (second source): entries with `source` get a badge on Vertretungen and Heute („laut
 WebUntis“, or „Schulportal + WebUntis“ for completed Schulportal entries); a replaced teacher is

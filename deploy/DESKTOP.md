@@ -6,20 +6,20 @@ it opens in the default browser.
 
 | | Windows | macOS |
 |---|---|---|
-| Download | `gong-windows-x64.exe` (single file) | `gong-macos-universal.zip` (Apple Silicon + Intel) |
+| Download | `lumo-windows-x64.exe` (single file) | `lumo-macos-universal.zip` (Apple Silicon + Intel) |
 | Requires | Windows 10/11 x64 | macOS 11 or newer |
-| Data (database, settings) | `%LOCALAPPDATA%\gong` | `~/Library/Application Support/gong` |
+| Data (database, settings) | `%LOCALAPPDATA%\lumo` | `~/Library/Application Support/lumo` |
 | Optional config file | `config.env` in that folder | `config.env` in that folder |
-| Log | `%LOCALAPPDATA%\gong\gong.log` | `~/Library/Logs/Gong.log` |
+| Log | `%LOCALAPPDATA%\lumo\lumo.log` | `~/Library/Logs/Lumo.log` |
 
 ## First start
 
 1. **Windows:** start the exe. SmartScreen warns about an unknown publisher (the exe is not
    code-signed): *Weitere Informationen → Trotzdem ausführen*. You can put the exe anywhere,
    e.g. `C:\Users\<name>\Programme\`.
-   **macOS:** unzip, move *Gong* to *Programme*, then **right click → Öffnen**
+   **macOS:** unzip, move *Lumo* to *Programme*, then **right click → Öffnen**
    (the app is signed ad hoc, not notarized; a double click is blocked the first time).
-2. The browser opens the **setup page** („Gong einrichten“):
+2. The browser opens the **setup page** („Lumo einrichten“):
    - choose the school (search by name, town or school number),
    - enter the Schulportal username and password („Anmeldung prüfen“ tests them),
    - choose a password for the web UI (min. 8 characters).
@@ -32,7 +32,7 @@ from the tray / menu bar menu). Settings are stored in the database; a text edit
 
 Right click on the icon (macOS: click):
 
-- **Gong öffnen** – web UI in the browser (Windows: also double click on the icon)
+- **Lumo öffnen** – web UI in the browser (Windows: also double click on the icon)
 - **Einstellungen** – server settings in the web UI (Schulportal login, password, sync,
   notifications, WebUntis, school meals, network)
 - **Protokoll anzeigen** – log file

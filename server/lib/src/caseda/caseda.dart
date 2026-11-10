@@ -70,7 +70,7 @@ class MealWeek {
   const MealWeek({required this.offers, required this.balanceCents});
 }
 
-/// Balance and own orders (what Gong shows; the menu itself is not kept).
+/// Balance and own orders (what Lumo shows; the menu itself is not kept).
 class MealsSnapshot {
   final int? balanceCents;
 
@@ -284,7 +284,7 @@ class CasedaClient {
   final String username;
   final String password;
   final HttpClient _http = HttpClient()
-    ..userAgent = 'Gong'
+    ..userAgent = 'Lumo'
     ..connectionTimeout = const Duration(seconds: 15);
   final Map<String, String> _cookies = {};
 

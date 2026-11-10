@@ -139,7 +139,7 @@ async function mealsEnabled() {
 }
 
 /** Server settings switched school meals on or off: update the menu. */
-window.addEventListener('gong:meals-changed', async () => {
+window.addEventListener('lumo:meals-changed', async () => {
   if (!account || !shell) return;
   const on = await mealsEnabled().catch(() => false);
   if (on === account.features.has('meals')) return;
@@ -179,7 +179,7 @@ function showLogin() {
   stopLive();
   account = null;
   shell = null;
-  document.title = 'Anmelden – Gong';
+  document.title = 'Anmelden – Lumo';
   root.replaceChildren(login.render({ onSuccess: boot }));
 }
 
@@ -218,7 +218,7 @@ function showShell() {
   }, icon('refresh'));
   const nav = buildNav();
   const header = h('header', { class: 'topbar' },
-    h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Gong'),
+    h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Lumo'),
     status,
     h('div', { class: 'topbar-actions' },
       refreshButton,
@@ -250,7 +250,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
   markActiveNav(nav);
 
   if (!found) {
-    document.title = 'Nicht gefunden – Gong';
+    document.title = 'Nicht gefunden – Lumo';
     main.replaceChildren(h('h1', null, 'Seite nicht gefunden'), h('a', { href: '/' }, 'Zur Startseite'));
     return;
   }
@@ -278,7 +278,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
     status.textContent = '';
     main.setAttribute('aria-busy', 'true');
     main.replaceChildren(h('div', { class: 'loading' }, 'Laden …'));
-    document.title = `${found.view.title} – Gong`;
+    document.title = `${found.view.title} – Lumo`;
   }
 
   let content;

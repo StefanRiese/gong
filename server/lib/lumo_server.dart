@@ -1,4 +1,4 @@
-/// Backend library for gong.
+/// Backend library for lumo.
 library;
 
 export 'src/api/api.dart';

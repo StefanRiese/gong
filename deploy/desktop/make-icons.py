@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generates the desktop app icons (needs Pillow): python3 deploy/desktop/make-icons.py
 
-Motif: mortarboard over an open book on the app blue – the same artwork for every
+Motif: a four-cell timetable grid with one checked cell (Lumo) on indigo – the same artwork for every
 size and platform (only the platform layout differs: macOS icon grid margin,
 monochrome template for the menu bar, square for PWA / home screen).
 
@@ -20,11 +20,12 @@ from PIL import Image, ImageDraw
 OUT = Path(__file__).resolve().parent
 SS = 4  # supersampling factor
 
-BLUE_TOP = (37, 107, 208)
-BLUE_BOTTOM = (22, 74, 160)
+INDIGO = (43, 58, 140)
+BLUE_TOP = BLUE_BOTTOM = INDIGO
 WHITE = (255, 255, 255, 255)
-PAGE = (214, 228, 250, 255)
-GOLD = (247, 190, 52, 255)
+DIM = (138, 147, 192, 255)  # white at 45 % over the indigo
+GOLD = (245, 184, 61, 255)
+CHECK = INDIGO + (255,)
 
 
 def _gradient(size, top, bottom):
@@ -37,31 +38,18 @@ def _gradient(size, top, bottom):
     return img
 
 
-def _glyph(d, s, r, color_cap, color_book, color_tassel, book=True, hole=None):
-    """Draws on a 1024 grid; s() maps coordinates, r() scales lengths."""
-    P = lambda pts: [(s(x), s(y)) for x, y in pts]
-    if book:
-        # Open book: two pages meeting at the spine, slightly curved via polygons.
-        left = [(500, 600), (420, 572), (300, 566), (196, 584), (196, 836), (300, 818), (420, 824), (500, 852)]
-        right = [(1024 - x, y) for x, y in left]
-        d.polygon(P(left), fill=color_book)
-        d.polygon(P(right), fill=color_book)
-        cap_dy = -70
-    else:
-        cap_dy = 70
-    dy = cap_dy
-    # Cap base (skull cap) below the board.
-    d.rounded_rectangle([s(332), s(400 + dy), s(692), s(560 + dy)], r(60), fill=color_cap)
-    if hole is not None:
-        # Separation line between board and base.
-        d.polygon(P([(300, 436 + dy), (512, 520 + dy), (724, 436 + dy), (724, 466 + dy), (512, 550 + dy), (300, 466 + dy)]), fill=hole)
-    # Board (rhombus).
-    d.polygon(P([(512, 230 + dy), (900, 386 + dy), (512, 542 + dy), (124, 386 + dy)]), fill=color_cap)
-    # Tassel: cord from the button to the right, hanging down.
-    d.line(P([(512, 386 + dy), (780, 430 + dy)]), fill=color_tassel, width=r(22))
-    d.line(P([(780, 430 + dy), (780, 590 + dy)]), fill=color_tassel, width=r(22))
-    d.rounded_rectangle([s(756), s(580 + dy), s(804), s(668 + dy)], r(18), fill=color_tassel)
-    d.ellipse([s(490), s(364 + dy), s(534), s(408 + dy)], fill=color_tassel)
+def _glyph(d, s, r, bright, dim, accent, check):
+    """Draws on a 1024 grid; s() maps coordinates, r() scales lengths.
+    Four cells (timetable); the last one is the accent with a check mark."""
+    cell, radius = 276, 72
+    for x, y, color in [(215, 215, bright), (532, 215, dim), (215, 532, dim), (532, 532, accent)]:
+        d.rounded_rectangle([s(x), s(y), s(x + cell), s(y + cell)], r(radius), fill=color)
+    pts = [(599, 671), (650, 722), (742, 614)]
+    w = 46
+    for a, b in zip(pts, pts[1:]):
+        d.line([(s(a[0]), s(a[1])), (s(b[0]), s(b[1]))], fill=check, width=r(w))
+    for x, y in pts:
+        d.ellipse([s(x - w / 2), s(y - w / 2), s(x + w / 2), s(y + w / 2)], fill=check)
 
 
 def app_icon(size, *, inset):
@@ -77,7 +65,7 @@ def app_icon(size, *, inset):
     # Glyph scaled into the background area.
     k = (1024 - 2 * m) / 1024
     sg = lambda v: int((m + v * k) * SS)
-    _glyph(d, sg, lambda v: int(v * k * SS), WHITE, PAGE, GOLD, book=True, hole=BLUE_BOTTOM + (255,))
+    _glyph(d, sg, lambda v: int(v * k * SS), WHITE, DIM, GOLD, CHECK)
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -86,9 +74,10 @@ def template_icon(size):
     img = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     black = (0, 0, 0, 255)
-    # Fill the frame: the glyph spans ~124..900 horizontally, ~160..852 vertically.
-    s = lambda v: int(((v - 112) * 1024 / 800) * SS)
-    _glyph(d, s, lambda v: int(v * 1024 / 800 * SS), black, black, black, book=True, hole=(0, 0, 0, 0))
+    # Fill the frame: the glyph spans ~215..808.
+    s = lambda v: int(((v - 190) * 1024 / 645) * SS)
+    dim = (0, 0, 0, 120)
+    _glyph(d, s, lambda v: int(v * 1024 / 645 * SS), black, dim, black, (0, 0, 0, 0))
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -101,7 +90,7 @@ def web_png(size):
     d = ImageDraw.Draw(img)
     z = 0.85
     sg = lambda v: int((512 + (v - 512) * z) * SS)
-    _glyph(d, sg, lambda v: int(v * z * SS), WHITE, PAGE, GOLD, book=True, hole=BLUE_BOTTOM + (255,))
+    _glyph(d, sg, lambda v: int(v * z * SS), WHITE, DIM, GOLD, CHECK)
     return img.convert('RGB').resize((size, size), Image.LANCZOS)
 
 
@@ -141,14 +130,11 @@ def web_svg():
     m = 24
     k = (1024 - 2 * m) / 1024
     sg = lambda v: round(m + v * k, 1)
-    _glyph(d, sg, lambda v: round(v * k, 1), WHITE, PAGE, GOLD, book=True, hole=BLUE_BOTTOM + (255,))
+    _glyph(d, sg, lambda v: round(v * k, 1), WHITE, DIM, GOLD, CHECK)
     hexc = lambda c: '#%02x%02x%02x' % c
     return '\n'.join([
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">',
-        '  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
-        f'<stop offset="0" stop-color="{hexc(BLUE_TOP)}"/><stop offset="1" stop-color="{hexc(BLUE_BOTTOM)}"/>'
-        '</linearGradient></defs>',
-        f'  <rect x="{m}" y="{m}" width="{1024 - 2 * m}" height="{1024 - 2 * m}" rx="200" fill="url(#bg)"/>',
+        f'  <rect x="{m}" y="{m}" width="{1024 - 2 * m}" height="{1024 - 2 * m}" rx="200" fill="{hexc(INDIGO)}"/>',
         *('  ' + p for p in d.parts),
         '</svg>',
         '',

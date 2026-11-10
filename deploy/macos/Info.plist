@@ -5,17 +5,17 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>de</string>
 	<key>CFBundleDisplayName</key>
-	<string>Gong</string>
+	<string>Lumo</string>
 	<key>CFBundleExecutable</key>
-	<string>Gong</string>
+	<string>Lumo</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.stefanriese.gong</string>
+	<string>io.github.stefanriese.lumo</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Gong</string>
+	<string>Lumo</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -29,6 +29,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>GPL-3.0 – https://github.com/StefanRiese/gong</string>
+	<string>GPL-3.0 – https://github.com/StefanRiese/lumo</string>
 </dict>
 </plist>

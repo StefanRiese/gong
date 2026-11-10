@@ -6,6 +6,16 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- New name and icon: **Lumo – Dein Schulalltag. Einfach organisiert.** (was: Gong). The icon is a
+  timetable grid with one checked cell. Everything was renamed, as with 0.8.0: repository
+  `StefanRiese/lumo`, release files (`lumo-linux-x64.tar.gz`, `lumo-windows-x64.exe`,
+  `lumo-macos-universal.zip`), macOS app (`Lumo.app`), paths (`/opt/lumo`, `/etc/lumo`,
+  `/var/lib/lumo`), systemd units (`lumo.service`, `lumo-update.*`), system user `lumo`,
+  desktop data folders and the database (`lumo.db`). **Installations of 0.12.0 and earlier
+  cannot update themselves to this version** (the update looks for the old release files):
+  install anew and copy `config.env` / the database if needed.
+
 ## [0.12.0] – 2026-11-10
 
 ### Added
@@ -306,24 +316,24 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.11.1...HEAD
-[0.11.1]: https://github.com/StefanRiese/gong/compare/v0.11.0...v0.11.1
-[0.11.0]: https://github.com/StefanRiese/gong/compare/v0.10.2...v0.11.0
-[0.10.2]: https://github.com/StefanRiese/gong/compare/v0.10.1...v0.10.2
-[0.10.1]: https://github.com/StefanRiese/gong/compare/v0.10.0...v0.10.1
-[0.10.0]: https://github.com/StefanRiese/gong/compare/v0.9.2...v0.10.0
-[0.9.2]: https://github.com/StefanRiese/gong/compare/v0.9.1...v0.9.2
-[0.9.1]: https://github.com/StefanRiese/gong/compare/v0.9.0...v0.9.1
-[0.9.0]: https://github.com/StefanRiese/gong/compare/v0.8.3...v0.9.0
-[0.8.3]: https://github.com/StefanRiese/gong/compare/v0.8.2...v0.8.3
-[0.8.2]: https://github.com/StefanRiese/gong/compare/v0.8.1...v0.8.2
-[0.8.1]: https://github.com/StefanRiese/gong/compare/v0.8.0...v0.8.1
-[0.8.0]: https://github.com/StefanRiese/gong/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/StefanRiese/gong/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/StefanRiese/gong/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/StefanRiese/gong/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/StefanRiese/gong/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/StefanRiese/gong/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/StefanRiese/gong/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/StefanRiese/gong/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/StefanRiese/gong/releases/tag/v0.1.0
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/StefanRiese/lumo/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/StefanRiese/lumo/compare/v0.10.2...v0.11.0
+[0.10.2]: https://github.com/StefanRiese/lumo/compare/v0.10.1...v0.10.2
+[0.10.1]: https://github.com/StefanRiese/lumo/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/StefanRiese/lumo/compare/v0.9.2...v0.10.0
+[0.9.2]: https://github.com/StefanRiese/lumo/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/StefanRiese/lumo/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/StefanRiese/lumo/compare/v0.8.3...v0.9.0
+[0.8.3]: https://github.com/StefanRiese/lumo/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/StefanRiese/lumo/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/StefanRiese/lumo/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/StefanRiese/lumo/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/StefanRiese/lumo/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/StefanRiese/lumo/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/StefanRiese/lumo/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/StefanRiese/lumo/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/StefanRiese/lumo/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/StefanRiese/lumo/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/StefanRiese/lumo/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/StefanRiese/lumo/releases/tag/v0.1.0

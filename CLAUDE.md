@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-**Gong** – „dein Schulportal-Begleiter für Hessen“: self-hosted client for **Schulportal
+**Lumo** – „Dein Schulalltag. Einfach organisiert.“: self-hosted client for **Schulportal
 Hessen** (school 6128): a Dart server (portal access via
 [liblanis](https://pub.dev/packages/liblanis), background sync into a SQLite cache, REST API
 with Server-Sent Events, ntfy notifications, setup and settings in the web UI; optional extras:
@@ -14,11 +14,12 @@ as desktop apps (Windows tray exe, macOS menu bar app). License GPL-3.0 (require
 Plan and decisions: `docs/PLAN.md`; API reference: `docs/API.md` (keep it in sync with
 `lib/src/api/api.dart`); configuration: `server/README.md`.
 
-Name: **Gong** since 0.8.0 (repository `StefanRiese/gong`; before: schulportal-client). Do not
-use „Ranzen“ – an App Store app for Schulportal Hessen has that name. The local checkout folder
+Name: **Lumo** since 0.13.0 (repository `StefanRiese/lumo`; before: Gong since 0.8.0, before that
+schulportal-client). Do not use „Ranzen“ – an App Store app for Schulportal Hessen has that name.
+A student planner „Lumo for Students“ exists in the App Store (not checked: Google Play, DPMA). The local checkout folder
 is still called `schulportal-client` (the Claude Code memory is tied to it); do not rename it.
-Technical names are lowercase `gong` (paths, units, release files, user), the Dart package is
-`gong_server`; UI texts use „Gong“, texts about the portal itself keep „Schulportal“.
+Technical names are lowercase `lumo` (paths, units, release files, user), the Dart package is
+`lumo_server`; UI texts use „Lumo“, texts about the portal itself keep „Schulportal“.
 
 ## Layout
 
@@ -145,6 +146,6 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
   the universal macOS app; the release notes come from that CHANGELOG section
   (`deploy/release-notes.sh`, the release fails if the section is missing).
 - Deployment target: LXC container; update with *Einstellungen → Update* in the web
-  UI or `bash /opt/gong/deploy/install.sh`.
+  UI or `bash /opt/lumo/deploy/install.sh`.
 - Before introducing a new product name, check the App Store, Google Play and the DPMA trademark
   register for existing apps around Schulportal Hessen (not only GitHub).

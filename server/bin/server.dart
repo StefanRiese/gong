@@ -1,4 +1,4 @@
-// HTTP server for gong.
+// HTTP server for lumo.
 //
 // Configuration via environment variables or server/.env (see .env.example);
 // settings made in the web UI (setup page, Einstellungen) are stored
@@ -14,8 +14,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:gong_server/desktop.dart';
-import 'package:gong_server/gong_server.dart';
+import 'package:lumo_server/desktop.dart';
+import 'package:lumo_server/lumo_server.dart';
 
 Future<void> main(List<String> args) async {
   switch (args.firstOrNull) {

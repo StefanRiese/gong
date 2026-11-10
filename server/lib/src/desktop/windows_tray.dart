@@ -111,7 +111,7 @@ void _trayMain(_TrayArgs args) {
 
 void _runTray(_TrayArgs args, Arena arena) {
   final hInstance = GetModuleHandle(nullptr);
-  final className = 'GongTray'.toNativeUtf16(allocator: arena);
+  final className = 'LumoTray'.toNativeUtf16(allocator: arena);
   final taskbarCreated = RegisterWindowMessage(
     'TaskbarCreated'.toNativeUtf16(allocator: arena),
   );
@@ -124,7 +124,7 @@ void _runTray(_TrayArgs args, Arena arena) {
     final menu = CreatePopupMenu();
     void item(int id, String text) =>
         AppendMenu(menu, MF_STRING, id, text.toNativeUtf16(allocator: arena));
-    item(_idOpen, 'Gong öffnen');
+    item(_idOpen, 'Lumo öffnen');
     item(_idSettings, 'Einstellungen');
     item(_idLog, 'Protokoll anzeigen');
     AppendMenu(menu, MF_SEPARATOR, 0, nullptr);
@@ -210,7 +210,7 @@ void _runTray(_TrayArgs args, Arena arena) {
     final hwnd = CreateWindowEx(
       0,
       className,
-      'Gong'.toNativeUtf16(allocator: arena),
+      'Lumo'.toNativeUtf16(allocator: arena),
       0,
       0,
       0,
@@ -234,7 +234,7 @@ void _runTray(_TrayArgs args, Arena arena) {
         args.icon.materialize().asUint8List(),
         arena,
       );
-    setFixedString(nid.ref.szTip, 128, 'Gong');
+    setFixedString(nid.ref.szTip, 128, 'Lumo');
     if (Shell_NotifyIcon(NIM_ADD, nid) == 0) {
       throw StateError('Shell_NotifyIcon failed');
     }
@@ -245,7 +245,7 @@ void _runTray(_TrayArgs args, Arena arena) {
       nid.ref
         ..uFlags = NIF_INFO
         ..dwInfoFlags = NIIF_INFO;
-      setFixedString(nid.ref.szInfoTitle, 64, 'Gong');
+      setFixedString(nid.ref.szInfoTitle, 64, 'Lumo');
       setFixedString(nid.ref.szInfo, 256, hint);
       Shell_NotifyIcon(NIM_MODIFY, nid);
       nid.ref.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;

@@ -1,10 +1,10 @@
-// Menu bar app for the macOS build of gong.
+// Menu bar app for the macOS build of lumo.
 //
 // Starts the Dart server (Contents/Resources/bin/server-<arch>) as child process and
 // shows a menu bar icon with: open web UI, settings (web UI), show log, restart,
 // quit. Data (and an optional config.env) live in
-// ~/Library/Application Support/gong, the log in
-// ~/Library/Logs/Gong.log. On first start the server opens its
+// ~/Library/Application Support/lumo, the log in
+// ~/Library/Logs/Lumo.log. On first start the server opens its
 // setup page in the browser.
 //
 // Built by deploy/build-macos-app.sh (swiftc, no Xcode project).
@@ -24,7 +24,7 @@ private let serverBinary = "bin/server-x86_64"
 private let exitConfigInvalid: Int32 = 78
 
 /// Exit code of the server: a new version is unpacked in
-/// <support>/update/Gong.app (see update_service.dart).
+/// <support>/update/Lumo.app (see update_service.dart).
 private let exitUpdateReady: Int32 = 80
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -37,10 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let home = FileManager.default.homeDirectoryForCurrentUser
     private var supportDir: URL {
-        home.appendingPathComponent("Library/Application Support/gong")
+        home.appendingPathComponent("Library/Application Support/lumo")
     }
     private var configURL: URL { supportDir.appendingPathComponent("config.env") }
-    private var logURL: URL { home.appendingPathComponent("Library/Logs/Gong.log") }
+    private var logURL: URL { home.appendingPathComponent("Library/Logs/Lumo.log") }
     private var logHandle: FileHandle?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -52,11 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 button.title = "SPH"
             }
-            button.toolTip = "Gong"
+            button.toolTip = "Lumo"
         }
 
         let menu = NSMenu()
-        menu.addItem(menuItem("Gong öffnen", #selector(openWebUI), "o"))
+        menu.addItem(menuItem("Lumo öffnen", #selector(openWebUI), "o"))
         menu.addItem(.separator())
         menu.addItem(menuItem("Einstellungen …", #selector(openSettings), ","))
         menu.addItem(menuItem("Protokoll anzeigen", #selector(showLog), "l"))
@@ -176,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Replaces this app bundle with the downloaded version and starts it.
     private func installUpdate() {
         let updateDir = supportDir.appendingPathComponent("update")
-        let source = updateDir.appendingPathComponent("Gong.app")
+        let source = updateDir.appendingPathComponent("Lumo.app")
         let target = Bundle.main.bundleURL
         do {
             _ = try FileManager.default.replaceItemAt(target, withItemAt: source)
@@ -192,7 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 + "\n\nBitte die neue Version von GitHub laden und die App ersetzen.",
                                style: .warning, buttons: ["Download öffnen", "Weiter mit alter Version"])
             if choice == .alertFirstButtonReturn,
-               let url = URL(string: "https://github.com/StefanRiese/gong/releases/latest") {
+               let url = URL(string: "https://github.com/StefanRiese/lumo/releases/latest") {
                 NSWorkspace.shared.open(url)
             }
             try? FileManager.default.removeItem(at: updateDir)
@@ -260,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func alert(_ text: String, style: NSAlert.Style, buttons: [String]) -> NSApplication.ModalResponse {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Gong"
+        alert.messageText = "Lumo"
         alert.informativeText = text
         alert.alertStyle = style
         for b in buttons { alert.addButton(withTitle: b) }

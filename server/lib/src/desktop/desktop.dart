@@ -25,15 +25,15 @@ enum DesktopPlatform {
 const exitConfigInvalid = 78;
 
 /// Per-user directory for config, database and log:
-/// `%LOCALAPPDATA%\gong` or
-/// `~/Library/Application Support/gong`.
+/// `%LOCALAPPDATA%\lumo` or
+/// `~/Library/Application Support/lumo`.
 String desktopDataDir() {
   final env = Platform.environment;
   if (Platform.isWindows) {
     final base = env['LOCALAPPDATA'] ?? env['APPDATA'] ?? '.';
-    return '$base\\gong';
+    return '$base\\lumo';
   }
-  return '${env['HOME'] ?? '.'}/Library/Application Support/gong';
+  return '${env['HOME'] ?? '.'}/Library/Application Support/lumo';
 }
 
 /// Optional config file of the desktop builds (ENV_FILE overrides it).

@@ -1,4 +1,4 @@
-import 'package:gong_server/gong_server.dart';
+import 'package:lumo_server/lumo_server.dart';
 import 'package:test/test.dart';
 
 Map<String, Object?> _entry(

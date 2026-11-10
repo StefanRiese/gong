@@ -21,16 +21,16 @@ Start the container and open its console (or `pct enter <id>` on the Proxmox hos
 
 ```sh
 apt update && apt install -y curl ca-certificates
-curl -fsSLO https://raw.githubusercontent.com/StefanRiese/gong/main/deploy/install.sh
+curl -fsSLO https://raw.githubusercontent.com/StefanRiese/lumo/main/deploy/install.sh
 bash install.sh
 ```
 
 The script
 
 1. downloads the latest release from GitHub and checks its SHA-256 checksum,
-2. creates the system user `gong`,
-3. installs the program to `/opt/gong`,
-4. installs and starts the systemd service `gong` and checks that it answers,
+2. creates the system user `lumo`,
+3. installs the program to `/opt/lumo`,
+4. installs and starts the systemd service `lumo` and checks that it answers,
 5. prints the **setup link** `http://<container-ip>:8080/einrichtung?token=…`.
 
 Open the setup link in a browser: choose the school, enter the Schulportal login (it is
@@ -38,15 +38,15 @@ tested right away) and a password for the web UI. The web UI then opens, logged 
 changes: *Einstellungen* in the web UI.
 
 The setup link only works until the setup is done; it is also in the log
-(`journalctl -u gong`) and in `/var/lib/gong/setup-token`.
+(`journalctl -u lumo`) and in `/var/lib/lumo/setup-token`.
 Without the token nobody else in the network can take over the unconfigured server.
 
 Alternatively, `install.sh` asks in the terminal whether to enter the credentials there; they
-are written to `/etc/gong/config.env` (readable by root only).
-`bash /opt/gong/deploy/install.sh --configure` does that again later.
+are written to `/etc/lumo/config.env` (readable by root only).
+`bash /opt/lumo/deploy/install.sh --configure` does that again later.
 
 **Where settings live:** settings made in the web UI are stored in the database
-(`/var/lib/gong/gong.db`) and take precedence over `config.env`.
+(`/var/lib/lumo/lumo.db`) and take precedence over `config.env`.
 `install.sh --configure` hands the keys it writes back to `config.env`.
 
 ## Push notifications (ntfy)
@@ -75,7 +75,7 @@ Server*), with `install.sh --configure`, or by editing `config.env` and restarti
 (values set in the web UI take precedence over `config.env`).
 
 Without internet access on the container, copy a release archive over and use
-`bash install.sh --from gong-linux-x64.tar.gz`.
+`bash install.sh --from lumo-linux-x64.tar.gz`.
 
 ## School meals and WebUntis (optional)
 
@@ -94,38 +94,38 @@ The logins are tested before they are saved and can be switched off without losi
 
 | Task | Command |
 |---|---|
-| Update to the latest release | web UI: *Einstellungen → Update*, or `bash /opt/gong/deploy/install.sh` |
-| Install a specific version | `bash /opt/gong/deploy/install.sh --version v0.1.0` |
-| Back to the previous version | `bash /opt/gong/deploy/install.sh --rollback` |
+| Update to the latest release | web UI: *Einstellungen → Update*, or `bash /opt/lumo/deploy/install.sh` |
+| Install a specific version | `bash /opt/lumo/deploy/install.sh --version v0.1.0` |
+| Back to the previous version | `bash /opt/lumo/deploy/install.sh --rollback` |
 | Change credentials / web password / ntfy / sync | web UI: *Einstellungen* (or `install.sh --configure`) |
-| Status | `systemctl status gong` |
-| Logs | `journalctl -u gong -f` |
-| Restart (after editing config.env) | `systemctl restart gong` |
-| Remove (keep config + data) | `bash /opt/gong/deploy/install.sh --uninstall` |
-| Remove everything | `bash /opt/gong/deploy/install.sh --uninstall --purge` |
+| Status | `systemctl status lumo` |
+| Logs | `journalctl -u lumo -f` |
+| Restart (after editing config.env) | `systemctl restart lumo` |
+| Remove (keep config + data) | `bash /opt/lumo/deploy/install.sh --uninstall` |
+| Remove everything | `bash /opt/lumo/deploy/install.sh --uninstall --purge` |
 
-Updates keep `config.env`. The previous version stays in `/opt/gong.old` for
+Updates keep `config.env`. The previous version stays in `/opt/lumo.old` for
 `--rollback`.
 
 **Updates from the web UI:** the server checks GitHub for new releases every 12 hours
 (`UPDATE_CHECK`) and shows a notice. „Jetzt aktualisieren“ in *Einstellungen → Update*
 lets the (unprivileged) service write the wanted version to
-`/var/lib/gong/update-request`; the root units `gong-update.path`
+`/var/lib/lumo/update-request`; the root units `lumo-update.path`
 / `.service` (installed and enabled by `install.sh`) then run `install.sh --auto-update`. It
 only installs releases newer than the installed one, verifies the checksum, keeps the previous
-version for `--rollback` and restarts the service. Log: `journalctl -u gong-update`.
+version for `--rollback` and restarts the service. Log: `journalctl -u lumo-update`.
 
 ## Files
 
 | Path | Content |
 |---|---|
-| `/opt/gong/` | program (`bin/`, `lib/`), web UI (`web/`), `deploy/`, `VERSION` |
-| `/etc/gong/config.env` | configuration and credentials (mode 600, root) |
-| `/var/lib/gong/` | database `gong.db`: settings from the web UI (incl. credentials), cached portal data, web logins (hashed), notification state; `setup-token` until set up |
-| `/etc/systemd/system/gong.service` | systemd unit |
-| `/etc/systemd/system/gong-update.{path,service}` | updates requested in the web UI (root) |
+| `/opt/lumo/` | program (`bin/`, `lib/`), web UI (`web/`), `deploy/`, `VERSION` |
+| `/etc/lumo/config.env` | configuration and credentials (mode 600, root) |
+| `/var/lib/lumo/` | database `lumo.db`: settings from the web UI (incl. credentials), cached portal data, web logins (hashed), notification state; `setup-token` until set up |
+| `/etc/systemd/system/lumo.service` | systemd unit |
+| `/etc/systemd/system/lumo-update.{path,service}` | updates requested in the web UI (root) |
 
-`config.env` settings are described in `/opt/gong/config.env.example`.
+`config.env` settings are described in `/opt/lumo/config.env.example`.
 Values are written in single quotes so special characters in passwords are read literally.
 
 ## Access from outside the LAN
@@ -153,9 +153,9 @@ can always be reinstalled with `install.sh`.
 The unit uses systemd sandboxing (read-only system, private `/tmp`, no capabilities, …). In an
 unprivileged container without *Nesting*, systemd cannot set this up and the service fails
 with `226/NAMESPACE`. `install.sh` detects this and adds
-`/etc/systemd/system/gong.service.d/no-namespaces.conf`, which relaxes the
+`/etc/systemd/system/lumo.service.d/no-namespaces.conf`, which relaxes the
 sandbox. To restore full sandboxing: enable Nesting, restart the container, delete that file,
-then run `systemctl daemon-reload && systemctl restart gong`.
+then run `systemctl daemon-reload && systemctl restart lumo`.
 
 ## Building a release yourself
 
@@ -163,7 +163,7 @@ On a Linux x64 machine with the Dart SDK (Debian 12 / Ubuntu 22.04 or older, so 
 runs on Debian 12 and 13):
 
 ```sh
-bash deploy/build-release.sh     # → dist/gong-linux-x64.tar.gz (+ .sha256)
+bash deploy/build-release.sh     # → dist/lumo-linux-x64.tar.gz (+ .sha256)
 ```
 
 The Windows exe and the macOS app can only be built on Windows / macOS (see

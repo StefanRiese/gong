@@ -11,9 +11,9 @@
 import 'dart:io';
 
 import 'package:liblanis/easy_client.dart';
-import 'package:gong_server/gong_server.dart' show loadEnv;
+import 'package:lumo_server/lumo_server.dart' show loadEnv;
 
-const userAgent = 'gong-spike/0.1';
+const userAgent = 'lumo-spike/0.1';
 
 Future<void> main(List<String> args) async {
   final dbOnly = args.contains('--db-only');

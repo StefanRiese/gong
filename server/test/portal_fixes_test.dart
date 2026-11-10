@@ -1,4 +1,4 @@
-import 'package:gong_server/gong_server.dart';
+import 'package:lumo_server/lumo_server.dart';
 import 'package:html/parser.dart' as html;
 import 'package:test/test.dart';
 

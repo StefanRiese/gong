@@ -1,25 +1,25 @@
 [Unit]
 Description=Schulportal Hessen client (web UI + API)
-Documentation=https://github.com/StefanRiese/gong
+Documentation=https://github.com/StefanRiese/lumo
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=gong
-Group=gong
+User=lumo
+Group=lumo
 # Read by systemd as root, so the file can stay root-only (mode 600).
-EnvironmentFile=/etc/gong/config.env
-WorkingDirectory=/var/lib/gong
-ExecStart=/opt/gong/bin/server
-# Updates from the web UI go through gong-update.path (root).
+EnvironmentFile=/etc/lumo/config.env
+WorkingDirectory=/var/lib/lumo
+ExecStart=/opt/lumo/bin/server
+# Updates from the web UI go through lumo-update.path (root).
 Environment=UPDATER=systemd
 Restart=on-failure
 RestartSec=5
 # 78 = configuration error: do not restart in a loop, fix config.env instead.
 RestartPreventExitStatus=78
 TimeoutStopSec=15
-StateDirectory=gong
+StateDirectory=lumo
 StateDirectoryMode=0750
 UMask=0077
 

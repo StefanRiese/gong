@@ -132,7 +132,7 @@ class AppConfig {
 
   bool get needsSetup => missing.isNotEmpty;
 
-  String get databasePath => '$dataDir/gong.db';
+  String get databasePath => '$dataDir/lumo.db';
 
   static final _topicPattern = RegExp(r'^[-_A-Za-z0-9]{1,64}$');
   static final _hoursPattern = RegExp(r'^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$');

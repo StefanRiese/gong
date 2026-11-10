@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#256bd0"/><stop offset="1" stop-color="#164aa0"/></linearGradient></defs>
-  <rect x="24" y="24" width="976" height="976" rx="200" fill="url(#bg)"/>
-  <polygon points="500.6,595.9 424.3,569.2 309.9,563.5 210.8,580.6 210.8,820.8 309.9,803.7 424.3,809.4 500.6,836.1" fill="#d6e4fa"/>
-  <polygon points="523.4,595.9 599.7,569.2 714.1,563.5 813.2,580.6 813.2,820.8 714.1,803.7 599.7,809.4 523.4,836.1" fill="#d6e4fa"/>
-  <rect x="340.4" y="338.5" width="343.2" height="152.5" rx="57.2" fill="#ffffff"/>
-  <polygon points="309.9,372.8 512,452.9 714.1,372.8 714.1,401.4 512,481.5 309.9,401.4" fill="#164aa0"/>
-  <polygon points="512,176.5 881.8,325.2 512,473.9 142.2,325.2" fill="#ffffff"/>
-  <line x1="512" y1="325.2" x2="767.4" y2="367.1" stroke="#f7be34" stroke-width="21"/>
-  <line x1="767.4" y1="367.1" x2="767.4" y2="519.6" stroke="#f7be34" stroke-width="21"/>
-  <rect x="744.6" y="510.1" width="45.7" height="83.9" rx="17.2" fill="#f7be34"/>
-  <ellipse cx="512" cy="325.2" rx="21" ry="21" fill="#f7be34"/>
+  <rect x="24" y="24" width="976" height="976" rx="200" fill="#2b3a8c"/>
+  <rect x="228.9" y="228.9" width="263.1" height="263.1" rx="68.6" fill="#ffffff"/>
+  <rect x="531.1" y="228.9" width="263" height="263.1" rx="68.6" fill="#8a93c0"/>
+  <rect x="228.9" y="531.1" width="263.1" height="263" rx="68.6" fill="#8a93c0"/>
+  <rect x="531.1" y="531.1" width="263" height="263" rx="68.6" fill="#f5b83d"/>
+  <line x1="594.9" y1="663.5" x2="643.5" y2="712.2" stroke="#2b3a8c" stroke-width="43.8"/>
+  <line x1="643.5" y1="712.2" x2="731.2" y2="609.2" stroke="#2b3a8c" stroke-width="43.8"/>
+  <ellipse cx="594.9" cy="663.55" rx="21.9" ry="21.95" fill="#2b3a8c"/>
+  <ellipse cx="643.55" cy="712.15" rx="21.95" ry="21.95" fill="#2b3a8c"/>
+  <ellipse cx="731.2" cy="609.2" rx="21.9" ry="21.9" fill="#2b3a8c"/>
 </svg>

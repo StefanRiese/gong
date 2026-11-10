@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async/async.dart';
-import 'package:gong_server/gong_server.dart';
+import 'package:lumo_server/lumo_server.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
@@ -78,7 +78,7 @@ void main() {
     test('healthz needs no login', () async {
       final r = await send('GET', '/healthz');
       expect(r.statusCode, 200);
-      expect(await body(r), {'status': 'ok', 'app': 'gong'});
+      expect(await body(r), {'status': 'ok', 'app': 'lumo'});
     });
 
     test('data endpoints require login', () async {
