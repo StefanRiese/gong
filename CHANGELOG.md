@@ -6,6 +6,15 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- REST API: the filters of the web UI pages also work as URL parameters on the API, e.g.
+  `/kalender?suche=05eg` → `/api/calendar?suche=05eg`. `/api/substitutions` accepts `suche`,
+  `klasse`, `art`, `ohne_art`, `von` and `bis` (on top of the permanent filter, or of the
+  full plan with `alle=1`); `/api/calendar` accepts `suche` and `kategorie` (e.g.
+  `kategorie=Klausuren,Arbeiten`), `/api/homework` accepts `suche`.
+- Kalender: `?kategorie=Klausuren` shows only these categories (temporary, the saved category
+  chips stay as they are), so page and API URLs match.
+
 ## [0.8.3] – 2026-11-09
 
 ### Changed

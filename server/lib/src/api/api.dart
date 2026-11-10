@@ -22,6 +22,7 @@ import '../sync/sync_service.dart';
 import '../update/update_service.dart';
 import 'cache.dart';
 import 'embedded_web.dart';
+import 'query_filters.dart';
 import 'server_control.dart';
 
 /// How long each kind of data counts as fresh when the background sync does
@@ -56,6 +57,8 @@ const _eventPing = Duration(seconds: 25);
 ///   GET  /api/auth/me
 ///   GET  /api/account | timetable | substitutions | courses | homework | grades
 ///   GET  /api/substitutions?alle=1  without the permanent class filter
+///   URL filters like on the web UI pages: /api/substitutions?klasse=&art=&
+///   ohne_art=&suche=&von=&bis=, /api/calendar?suche=, /api/homework?suche=
 ///   GET  /api/homework?alle=1   all homework incl. done and older entries
 ///   GET  /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
 ///   GET  /api/courses/{id}
@@ -214,11 +217,13 @@ class Api {
                 CacheKeys.allHomework,
                 CacheTtl.allHomework,
                 (_) => service.allHomework(),
+                present: _searchHomework,
               )(r)
             : _data(
                 CacheKeys.homework,
                 CacheTtl.homework,
                 (_) => service.homework(),
+                present: _searchHomework,
               )(r);
       })
       ..get(
@@ -405,16 +410,34 @@ class Api {
       '1',
       'true',
     }.contains(request.url.queryParameters['alle']);
-    if (all || !filter.isActive || value is! List<SubstitutionDay>) {
+    if (value is! List<SubstitutionDay>) return const {};
+    // URL filters (klasse, art, ohne_art, suche, von, bis) on top.
+    List<SubstitutionDay> query(List<SubstitutionDay> days) =>
+        filterSubstitutionsByQuery(days, request.url.queryParameters) ?? days;
+    if (all || !filter.isActive) {
       return {
+        'data': query(value),
         'filter': {'active': false, 'hidden': 0},
       };
     }
     final (days, hidden) = filter.apply(value);
     return {
-      'data': days,
+      'data': query(days),
       'filter': {'active': true, 'hidden': hidden, 'classes': filter.classes},
     };
+  }
+
+  /// `?suche=` for calendar and homework, like on the web UI pages.
+  Map<String, Object?> _searchCalendar(Object? value, Request request) {
+    if (value is! List<CalendarEntry>) return const {};
+    final found = filterCalendarByQuery(value, request.url.queryParameters);
+    return found == null ? const {} : {'data': found};
+  }
+
+  Map<String, Object?> _searchHomework(Object? value, Request request) {
+    if (value is! List<Homework>) return const {};
+    final found = filterHomeworkByQuery(value, request.url.queryParameters);
+    return found == null ? const {} : {'data': found};
   }
 
   Future<Response> _calendar(Request request) async {
@@ -440,6 +463,7 @@ class Api {
       CacheKeys.calendar(start, end),
       CacheTtl.calendar,
       (_) => service.calendar(from: start, to: end),
+      present: _searchCalendar,
     )(request);
   }
 

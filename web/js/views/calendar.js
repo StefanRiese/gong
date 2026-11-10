@@ -31,7 +31,7 @@ export async function render(ctx) {
       ? `${events.length} Termin${events.length === 1 ? '' : 'e'}`
       : `${visible.length} von ${events.length} Terminen`;
     list.replaceChildren(...renderDays(visible, first, last, today, events.length));
-    reset.hidden = isDefault(filter);
+    reset.hidden = isDefault(filter) && !temporary;
   };
 
   const search = h('input', {
@@ -49,10 +49,28 @@ export async function render(ctx) {
 
   const categories = [...new Set(events.map(categoryOf))]
     .sort((a, b) => (a === NO_CATEGORY) - (b === NO_CATEGORY) || a.localeCompare(b, 'de'));
+
+  // ?kategorie=Klausuren,Arbeiten (like /api/calendar): show only matching
+  // categories for now, without changing the chips saved for this browser.
+  const only = (ctx.query.get('kategorie') ?? '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean);
+  let temporary = only.length > 0;
+  if (temporary) {
+    filter.hidden = new Set(categories.filter((c) => !only.some((o) => c.toLowerCase().includes(o))));
+  }
+  const endTemporary = () => {
+    if (!temporary) return;
+    temporary = false;
+    filter.hidden = loadFilter().hidden;
+    const url = new URL(location.href);
+    url.searchParams.delete('kategorie');
+    history.replaceState(null, '', url.pathname + url.search);
+    for (const chip of chips) chip.setAttribute('aria-pressed', String(!filter.hidden.has(chip.dataset.category)));
+  };
   const chips = categories.map((c) => {
     const chip = h('button', {
-      type: 'button', class: 'chip', 'aria-pressed': String(!filter.hidden.has(c)),
+      type: 'button', class: 'chip', 'aria-pressed': String(!filter.hidden.has(c)), dataset: { category: c },
       onclick: () => {
+        endTemporary(); // a click goes back to the saved chips, then toggles
         if (filter.hidden.has(c)) filter.hidden.delete(c); else filter.hidden.add(c);
         chip.setAttribute('aria-pressed', String(!filter.hidden.has(c)));
         saveFilter(filter);
@@ -74,6 +92,7 @@ export async function render(ctx) {
   const reset = h('button', {
     type: 'button', class: 'button small', hidden: true,
     onclick: () => {
+      temporary = false;
       filter.query = '';
       filter.hidden.clear();
       filter.hidePast = false;

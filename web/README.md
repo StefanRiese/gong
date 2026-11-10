@@ -69,7 +69,8 @@ Update* (`#update`) shows versions and release notes and installs the update, th
 the restarted server and reloads the page. Mock: `MOCK_UPDATE=1 node dev/mock-server.mjs`.
 
 The calendar can be filtered by text (`?suche=…`, searches title, description, place and
-category), by category (chips) and by hiding past events. Hidden categories and "hide past" are
+category), by `?kategorie=Klausuren,Arbeiten` (temporary, does not change the saved chips; a chip
+click returns to them), by category (chips) and by hiding past events. Hidden categories and "hide past" are
 remembered per browser in `localStorage` (key `calendarFilter`).
 
 ## Security rules

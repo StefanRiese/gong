@@ -522,6 +522,73 @@ void main() {
       expect(periods(await subs('?alle=1')), ['3', '5', '2']);
     });
 
+    test('URL filters like on the web UI pages', () async {
+      Future<Map<String, dynamic>> get(String path) async =>
+          body(await send('GET', path, cookie: cookie));
+      List<String?> periods(Map<String, dynamic> b) => [
+        for (final d in b['data'] as List)
+          for (final e in (d as Map)['entries'] as List) (e as Map)['period'],
+      ];
+
+      expect(periods(await get('/api/substitutions?suche=buch')), ['3']);
+      expect(periods(await get('/api/substitutions?klasse=07bg')), ['5']);
+      expect(periods(await get('/api/substitutions?art=F%C3%A4llt%20aus')), [
+        '5',
+      ]);
+      expect(periods(await get('/api/substitutions?ohne_art=pausenaufsicht')), [
+        '3',
+        '5',
+      ]);
+      final day = await get('/api/substitutions?von=2026-11-11&bis=2026-11-11');
+      expect((day['data'] as List).map((d) => (d as Map)['date']), [
+        '2026-11-11',
+      ]);
+      final bad = await send(
+        'GET',
+        '/api/substitutions?von=11.11.2026',
+        cookie: cookie,
+      );
+      expect(bad.statusCode, 400);
+
+      // On top of the permanent filter.
+      await put({
+        'substitutionFilter': {
+          'classes': ['05eG'],
+        },
+      });
+      expect(
+        periods(await get('/api/substitutions?suche=f%C3%A4llt')),
+        isEmpty,
+      );
+      expect(periods(await get('/api/substitutions?alle=1&suche=f%C3%A4llt')), [
+        '5',
+      ]);
+      expect(periods(await get('/api/substitutions?suche=buch')), ['3']);
+
+      var cal = await get('/api/calendar?suche=ELTERN');
+      expect((cal['data'] as List).single['title'], 'Elternabend');
+      cal = await get('/api/calendar?suche=gibtsnicht');
+      expect(cal['data'], isEmpty);
+      cal = await get('/api/calendar?kategorie=termin');
+      expect((cal['data'] as List).single['category'], 'Termine');
+      cal = await get('/api/calendar?kategorie=Klausuren,Arbeiten');
+      expect(cal['data'], isEmpty);
+      cal = await get('/api/calendar?kategorie=Termine&suche=gibtsnicht');
+      expect(cal['data'], isEmpty);
+
+      final all = (await get('/api/homework?alle=1'))['data'] as List;
+      expect(all, isNotEmpty);
+      final course = (all.first as Map)['courseName'] as String;
+      final found =
+          (await get(
+                '/api/homework?alle=1&suche=${Uri.encodeQueryComponent(course)}',
+              ))['data']
+              as List;
+      expect(found, isNotEmpty);
+      expect(found.every((h) => (h as Map)['courseName'] == course), isTrue);
+      expect((await get('/api/homework?suche=gibtsnicht'))['data'], isEmpty);
+    });
+
     test('notices can be hidden by their heading', () async {
       List<Object?> notices(Map<String, dynamic> b) => [
         for (final d in b['data'] as List)

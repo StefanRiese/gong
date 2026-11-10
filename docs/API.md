@@ -157,12 +157,46 @@ of the own classes, compared case-insensitively; entries without class only if
 `showUnassigned` is set. Notices of a day are kept unless their heading is in `hiddenNotices`;
 `filter.hidden` only counts entries.
 
+### Filters in the URL
+
+The list endpoints accept the same filters as the web UI pages, so a page URL can be turned
+into an API call by replacing the path:
+
+| Web UI | API |
+|---|---|
+| `/kalender?suche=05eg` | `/api/calendar?suche=05eg` |
+| `/kalender?kategorie=Klausuren` | `/api/calendar?kategorie=Klausuren` |
+| `/vertretungen?suche=Becker` | `/api/substitutions?suche=Becker` |
+| `/vertretungen?klasse=05eG` | `/api/substitutions?klasse=05eG` |
+| `/vertretungen?alle=1` | `/api/substitutions?alle=1` |
+
+| Endpoint | Parameter | Effect |
+|---|---|---|
+| `/api/substitutions` | `suche` | text in period, type, subject, teachers, rooms, class, note |
+| | `klasse` | only entries of these classes (comma-separated, exact class, case-insensitive) |
+| | `art` / `ohne_art` | only / without these types (comma-separated, e.g. `art=Fällt aus,Entfall`) |
+| | `von` / `bis` | only these days (`YYYY-MM-DD`; invalid → `400 bad_request`) |
+| | `alle=1` | without the permanent filter of the settings (the URL filters still apply) |
+| `/api/calendar` | `suche` | text in title, description, place, category |
+| | `kategorie` | only these categories (comma-separated; part of the name is enough, e.g. `kategorie=Klausuren,Arbeiten` or `kategorie=arbeit`) |
+| `/api/homework` | `suche` | text in course, topic, description (also with `alle=1`) |
+
+The search ignores case and looks for the whole text in any of the fields, like the pages.
+URL filters are applied after the permanent filter of the settings and do not change it; the
+cached data stays complete, so different filters cost no extra portal requests.
+
+```sh
+# cancellations of class 07bG from the whole plan, tomorrow only
+curl -s -b jar "$BASE/api/substitutions?alle=1&klasse=07bG&art=F%C3%A4llt%20aus&von=2026-11-10&bis=2026-11-10"
+```
+
 ### `GET /api/calendar`
 
 | Parameter | Default | |
 |---|---|---|
 | `from` | today | `YYYY-MM-DD` |
 | `to` | `from` + 60 days | `YYYY-MM-DD`, not before `from`, range at most 400 days |
+| `suche`, `kategorie` | – | see [Filters in the URL](#filters-in-the-url) |
 
 Only the default range (no parameters) is kept fresh by the sync; other ranges are loaded on
 demand and cached as well.

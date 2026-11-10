@@ -149,12 +149,12 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | GET | `/api/auth/me` | `{"authenticated": bool}` |
 | GET | `/api/account` | enabled features |
 | GET | `/api/timetable` | |
-| GET | `/api/substitutions` | filtered by the permanent class filter (`substitutionFilter` in `/api/settings`); `?alle=1` = full plan |
-| GET | `/api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | default today … +60 days, max 400 days |
+| GET | `/api/substitutions` | filtered by the permanent class filter (`substitutionFilter` in `/api/settings`); `?alle=1` = full plan; URL filters `klasse`, `art`, `ohne_art`, `suche`, `von`, `bis` |
+| GET | `/api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` | default today … +60 days, max 400 days; `suche`, `kategorie` |
 | GET | `/api/courses` | |
 | GET | `/api/courses/{id}` | history, grades, exams, attendance |
 | GET | `/api/homework` | current homework (portal overview) |
-| GET | `/api/homework?alle=1` | all homework incl. done and older entries (course histories) |
+| GET | `/api/homework?alle=1` | all homework incl. done and older entries (course histories); `suche` on both |
 | PUT | `/api/courses/{id}/entries/{entry}/homework` | body `{"done": true\|false}`; marks homework as done/undone **in Schulportal**; cached lists are patched, not reloaded |
 | GET | `/api/grades` | grades and exams of all courses |
 | GET / PUT | `/api/settings` | `subjectColors`, `courseSubjects`, `substitutionFilter`; PUT keeps fields not sent |
