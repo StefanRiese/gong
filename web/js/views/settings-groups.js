@@ -456,7 +456,7 @@ export function accessGroup({ form, v, desktop }) {
           type: 'radio', name: 'scheme', value: s.id, checked: getScheme() === s.id,
           onchange: () => setScheme(s.id),
         }), s.label)),
-      h('small', { class: 'field-hint' }, 'Hell und dunkel folgen dem Gerät. Gilt nur für dieses Gerät, sofort ohne Speichern.')),
+      h('small', { class: 'field-hint' }, 'Hell oder dunkel schaltet der Knopf oben in der Leiste um (sonst folgt es dem Gerät). Gilt nur für dieses Gerät, sofort ohne Speichern.')),
     partLabel('Abmelden'),
     h('p', { class: 'hint' }, 'Meldet nur dieses Gerät ab.'),
     h('div', null, h('button', {

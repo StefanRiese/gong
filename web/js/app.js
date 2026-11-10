@@ -18,7 +18,7 @@ import * as settings from './views/settings.js';
 import * as subjects from './views/subjects.js';
 import * as setup from './views/setup.js';
 import { initColors } from './colors.js';
-import { initScheme } from './scheme.js';
+import { initScheme, isDark, toggleMode } from './scheme.js';
 import { updateHint, watchServerVersion } from './update.js';
 
 initScheme();
@@ -219,12 +219,23 @@ function showShell() {
     class: 'icon-button', title: 'Neu laden', 'aria-label': 'Neu vom Schulportal laden',
     onclick: refresh,
   }, icon('refresh'));
+  // Light / dark by hand: shows the mode it switches to.
+  const modeButton = h('button', { class: 'icon-button', onclick: toggleMode });
+  const showMode = () => {
+    const dark = isDark();
+    modeButton.title = dark ? 'Helles Design' : 'Dunkles Design';
+    modeButton.setAttribute('aria-label', modeButton.title);
+    modeButton.replaceChildren(icon(dark ? 'sun' : 'moon'));
+  };
+  showMode();
+  window.addEventListener('lumo:theme', showMode);
   const nav = buildNav();
   const header = h('header', { class: 'topbar' },
     h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Lumo'),
     status,
     h('div', { class: 'topbar-actions' },
       refreshButton,
+      modeButton,
       h('a', {
         href: '/einstellungen', class: 'icon-button', title: 'Einstellungen',
         'aria-label': 'Einstellungen',
@@ -393,7 +404,7 @@ function updateStatus(metas) {
     status.textContent = `Offline – Stand ${age(oldest)}${refreshing}`;
     status.title = 'Das Schulportal ist nicht erreichbar; es werden gespeicherte Daten angezeigt.';
   } else {
-    status.textContent = `Stand ${age(oldest)}${refreshing}`;
+    status.textContent = refreshing ? 'Wird aktualisiert …' : '';
     status.title = refreshing ? 'Die Daten werden im Hintergrund vom Schulportal geladen.' : '';
   }
 }

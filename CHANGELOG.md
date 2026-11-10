@@ -6,6 +6,16 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- Button in the top bar to switch between light and dark by hand (remembered per device; until
+  then the device decides).
+
+### Changed
+- The top bar no longer shows „Stand vor … Min.“; it only says „Wird aktualisiert …“ while data
+  loads and „Offline – Stand …“ when the portal is not reachable.
+- Color scheme *Lumo (Indigo)* is easier to tell from the blue one: indigo top bar, gold marker
+  for the active page, stronger lavender background and borders (light and dark).
+
 ## [0.14.0] – 2026-11-10
 
 ### Added
