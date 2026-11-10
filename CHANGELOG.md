@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.10.2] – 2026-11-10
+
 ### Fixed
 - The web UI installed as an app (home screen) kept showing an old version after a server
   update, because the phone keeps the app in memory and does not reload it. The app now checks
@@ -277,7 +279,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/StefanRiese/gong/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/StefanRiese/gong/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/StefanRiese/gong/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/StefanRiese/gong/compare/v0.9.1...v0.9.2
