@@ -123,6 +123,23 @@ void main() {
     return cookieOf(r.headers);
   }
 
+  test(
+    'HOST 0.0.0.0 also listens on IPv6 (mDNS names resolve to IPv6)',
+    () async {
+      final s = await start({'HOST': '0.0.0.0'});
+      final port = s.localUrl.port;
+      for (final host in ['127.0.0.1', '[::1]']) {
+        final req = await client.getUrl(
+          Uri.parse('http://$host:$port/healthz'),
+        );
+        final res = await req.close();
+        await res.drain<void>();
+        expect(res.statusCode, 200, reason: host);
+      }
+    },
+    skip: _noIpv6() ? 'no IPv6 loopback here' : false,
+  );
+
   group('setup mode', () {
     test('starts without credentials; only the setup page works', () async {
       final s = await start();
@@ -724,5 +741,13 @@ class FakeUntis implements UntisGateway {
   Future<UntisSnapshot> load(DateTime today) async {
     if (error != null) throw error!;
     return UntisSnapshot(className: '05eG', changes: const []);
+  }
+}
+
+bool _noIpv6() {
+  try {
+    return !File('/proc/net/if_inet6').readAsStringSync().contains(' lo');
+  } on Object {
+    return false;
   }
 }

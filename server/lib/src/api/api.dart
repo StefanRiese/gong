@@ -372,7 +372,11 @@ class Api {
       }
     }
     final info = request.context['shelf.io.connection_info'];
-    if (info is HttpConnectionInfo) return info.remoteAddress.address;
+    if (info is HttpConnectionInfo) {
+      // IPv4 clients of the dual-stack socket appear as ::ffff:a.b.c.d.
+      final a = info.remoteAddress.address;
+      return a.startsWith('::ffff:') && a.contains('.') ? a.substring(7) : a;
+    }
     return 'unknown';
   }
 

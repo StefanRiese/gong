@@ -6,6 +6,19 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.17.0] – 2026-11-10
+
+### Changed
+- The name `lumo.local` now comes from `avahi-daemon`, which `install.sh` installs on Linux (the
+  standard mDNS responder; works with Windows and iPhone). Lumo's own mDNS responder and
+  `MDNS_NAME` are removed: its answers were not accepted by Windows. A line `MDNS_NAME=…` in
+  `config.env` is ignored and can be deleted. Windows and macOS announce their computer name
+  (`<computername>.local`) themselves.
+- With „Auch von anderen Geräten“ (`HOST=0.0.0.0`) the server also listens on IPv6. Windows
+  resolves `lumo.local` to the IPv6 address, so the browser could not connect before (ping worked).
+  Without IPv6 on the machine it listens on IPv4 as before.
+- Release notes contain only the changes and the compare link (no installation section).
+
 ## [0.16.4] – 2026-11-10
 
 ### Fixed
@@ -372,7 +385,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.16.4...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/StefanRiese/lumo/compare/v0.16.4...v0.17.0
 [0.16.4]: https://github.com/StefanRiese/lumo/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/StefanRiese/lumo/compare/v0.16.2...v0.16.3
 [0.16.2]: https://github.com/StefanRiese/lumo/compare/v0.16.1...v0.16.2

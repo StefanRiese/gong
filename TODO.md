@@ -1,5 +1,4 @@
 ## Open
-- [ ] test mDNS: open `http://lumo.local:8080` on the phone, Windows and macOS (container: multicast must reach the bridge)
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
@@ -8,6 +7,7 @@
 - [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
+- [x] `lumo.local` via avahi-daemon in the container (works from Windows and the iPhone); own mDNS responder removed
 - [x] phone tab bar: „Hausaufgaben“ is shown as „HA“ (was cut off with 8 entries)
 - [x] decisions: the name stays Lumo, blue stays the default color scheme, no migration from Gong (never an update path)
 - [x] new settings page checked on the real server and the phone

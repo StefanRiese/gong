@@ -30,8 +30,10 @@ The script
 1. downloads the latest release from GitHub and checks its SHA-256 checksum,
 2. creates the system user `lumo`,
 3. installs the program to `/opt/lumo`,
-4. installs and starts the systemd service `lumo` and checks that it answers,
-5. prints the **setup link** `http://<container-ip>:8080/einrichtung?token=…`.
+4. installs `avahi-daemon`, so the container is reachable by name: `http://<hostname>.local:8080`,
+   e.g. `http://lumo.local:8080` for a container named `lumo` (`SKIP_AVAHI=1` skips it),
+5. installs and starts the systemd service `lumo` and checks that it answers,
+6. prints the **setup link** `http://<container-ip>:8080/einrichtung?token=…`.
 
 Open the setup link in a browser: choose the school, enter the Schulportal login (it is
 tested right away) and a password for the web UI. The web UI then opens, logged in. Later

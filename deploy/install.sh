@@ -315,6 +315,23 @@ configure_ntfy() {
   echo 'Testnachricht danach in der Web-Oberfläche unter „Benachrichtigungen“ senden.'
 }
 
+# avahi-daemon announces the machine as <hostname>.local (mDNS), so the web UI
+# is reachable as http://lumo.local:8080 in a container named lumo.
+# Best effort: without it only the IP address works. SKIP_AVAHI=1 skips it.
+ensure_avahi() {
+  [[ $SKIP_SYSTEMD == 1 || ${SKIP_AVAHI:-0} == 1 ]] && return 0
+  command -v apt-get >/dev/null 2>&1 || return 0
+  if ! dpkg -s avahi-daemon >/dev/null 2>&1; then
+    say "Installiere avahi-daemon (Name $(hostname).local im Netzwerk)"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -q avahi-daemon >/dev/null 2>&1 ||
+      { apt-get update -q >/dev/null 2>&1 &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q avahi-daemon >/dev/null 2>&1; } ||
+      { warn "avahi-daemon konnte nicht installiert werden – erreichbar nur über die IP-Adresse"; return 0; }
+  fi
+  systemctl enable --now avahi-daemon >/dev/null 2>&1 ||
+    warn "avahi-daemon läuft nicht – erreichbar nur über die IP-Adresse"
+}
+
 # Unprivileged LXC without "nesting" cannot set up the sandbox namespaces.
 relax_sandbox() {
   mkdir -p "$DROPIN_DIR"
@@ -397,6 +414,9 @@ summary() {
     echo "  Erreichbar nur lokal: http://127.0.0.1:${port:-8080}  (HOST in $CONFIG_FILE)"
   else
     echo "  Web-Oberfläche: http://${ip:-<container-ip>}:${port:-8080}"
+    if systemctl is-active --quiet avahi-daemon 2>/dev/null; then
+      echo "                  http://$(hostname).local:${port:-8080}"
+    fi
   fi
   local token
   token=$(cat "$STATE_DIR/setup-token" 2>/dev/null || true)
@@ -436,6 +456,7 @@ do_install() {
   install_files "$archive" "$tmp"
   ensure_config
   configure 0
+  ensure_avahi
   start_service
   summary
 }

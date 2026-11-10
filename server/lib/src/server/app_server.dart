@@ -16,7 +16,6 @@ import '../config/env.dart';
 import '../config/server_settings.dart';
 import '../desktop/build_info.g.dart';
 import '../notify/notifier.dart';
-import '../net/mdns.dart';
 import '../net/ports.dart';
 import '../notify/poller.dart';
 import '../sph/liblanis_gateway.dart';
@@ -60,7 +59,6 @@ class AppServerException implements Exception {
 /// one-time token ([setupUrl]).
 class AppServer implements ServerControl {
   final HttpServer _http;
-  MdnsResponder? _mdns;
   final AppDatabase _db;
   final ResponseCache _cache;
   final Api _api;
@@ -240,13 +238,10 @@ class AppServer implements ServerControl {
 
     final HttpServer http;
     try {
-      http = await io.serve(
-        const Pipeline()
-            .addMiddleware(logRequests(logger: log))
-            .addHandler(api.handler),
-        config.host,
-        config.port,
-      );
+      final handler = const Pipeline()
+          .addMiddleware(logRequests(logger: log))
+          .addHandler(api.handler);
+      http = await _listen(handler, config.host, config.port);
     } on Object {
       await api.close();
       await sync.stop();
@@ -294,16 +289,6 @@ class AppServer implements ServerControl {
       config.needsSetup ? SetupToken.create(dataDir: config.dataDir) : null,
     );
     api.control = server;
-
-    final loopback =
-        config.host == 'localhost' ||
-        (InternetAddress.tryParse(config.host)?.isLoopback ?? false);
-    if (config.mdnsName != null && !loopback) {
-      server._mdns = await MdnsResponder.start(config.mdnsName!, log: info);
-      if (server._mdns != null) {
-        info('mDNS: reachable as http://${config.mdnsName}.local:${http.port}');
-      }
-    }
 
     final webSource = webDir != null
         ? ', web UI from $webDir'
@@ -702,11 +687,28 @@ class AppServer implements ServerControl {
   @override
   Future<List<School>> searchSchools(String query) => _schools.search(query);
 
+  /// Listens on [host]:[port]. `0.0.0.0` (all IPv4 addresses) also listens on
+  /// IPv6 where available: clients that resolve the name via mDNS
+  /// (`lumo.local`) often get the IPv6 address only.
+  static Future<HttpServer> _listen(
+    Handler handler,
+    String host,
+    int port,
+  ) async {
+    if (host == '0.0.0.0') {
+      try {
+        return await io.serve(handler, InternetAddress.anyIPv6, port);
+      } on SocketException {
+        // no IPv6 on this machine
+      }
+    }
+    return io.serve(handler, host, port);
+  }
+
   /// Stops listening, the sync and the portal session; closes the database.
   Future<void> stop() => _stopping ??= () async {
     await _applying;
     _update.stop();
-    await _mdns?.stop();
     await _api.close(); // open event streams would keep the server open
     await _http
         .close()

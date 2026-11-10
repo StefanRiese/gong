@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prints the GitHub release notes for a version from CHANGELOG.md:
-# the version's section, install/update instructions and a compare link.
+# the version's section and a compare link.
 #
 #   bash deploy/release-notes.sh v0.3.0 > notes.md
 #
@@ -40,23 +40,6 @@ fi
 
 cat <<NOTES
 $section
-
-### Installation / Update
-
-\`\`\`sh
-# first installation (Debian/Ubuntu, e.g. Proxmox LXC)
-curl -fsSLO https://raw.githubusercontent.com/$REPO/main/deploy/install.sh
-bash install.sh
-
-# update an existing installation
-bash /opt/lumo/deploy/install.sh
-\`\`\`
-
-**Windows (x64):** download \`lumo-windows-x64.exe\` and start it – it runs in the
-notification area (right click on the icon for the menu).
-**macOS (Apple Silicon + Intel):** unzip \`lumo-macos-universal.zip\`, move the app
-to Programme and open it with right click → Öffnen the first time; it runs in the menu bar.
-See [deploy/DESKTOP.md](https://github.com/$REPO/blob/v$version/deploy/DESKTOP.md).
 
 **Full Changelog**: $compare
 NOTES
