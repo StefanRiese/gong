@@ -22,6 +22,16 @@ official app of the state of Hesse.
 > updates in the browser, LXC deployment and desktop apps for Windows and macOS. See
 > [CHANGELOG.md](CHANGELOG.md) and [docs/PLAN.md](docs/PLAN.md).
 
+## Screenshots
+
+Invented sample data from the mock server (`dev/mock-server.mjs`); the web UI follows the
+light or dark mode of the device.
+
+| Light | Dark |
+|---|---|
+| ![Heute (light)](docs/screenshots/heute-light.png) | ![Heute (dark)](docs/screenshots/heute-dark.png) |
+| ![Stundenplan (light)](docs/screenshots/stundenplan-light.png) | ![Stundenplan (dark)](docs/screenshots/stundenplan-dark.png) |
+
 ## Features
 
 - Logs in to Schulportal Hessen and keeps all data in sync in the background (substitutions and

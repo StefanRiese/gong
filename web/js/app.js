@@ -18,7 +18,10 @@ import * as settings from './views/settings.js';
 import * as subjects from './views/subjects.js';
 import * as setup from './views/setup.js';
 import { initColors } from './colors.js';
+import { initScheme } from './scheme.js';
 import { updateHint, watchServerVersion } from './update.js';
+
+initScheme();
 
 /** The server settings are part of the settings page now (old links and apps). */
 const serverSettingsMoved = {
@@ -226,9 +229,6 @@ function showShell() {
         href: '/einstellungen', class: 'icon-button', title: 'Einstellungen',
         'aria-label': 'Einstellungen',
       }, icon('settings')),
-      h('button', {
-        class: 'icon-button', title: 'Abmelden', 'aria-label': 'Abmelden', onclick: logout,
-      }, icon('logout')),
     ),
   );
   shell = { main, status, nav, refreshButton };
@@ -433,6 +433,9 @@ async function waitForSync() {
     if (!s.running) return;
   }
 }
+
+/** The logout button is on the settings page (it fires this event). */
+window.addEventListener('lumo:logout', () => logout());
 
 async function logout() {
   try {

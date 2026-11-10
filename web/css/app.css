@@ -47,6 +47,33 @@
   }
 }
 
+/* Color scheme "Lumo": indigo like the app icon (the default is the blue above). */
+:root[data-scheme="lumo"] {
+  --bg: #f5f6fb;
+  --surface: #ffffff;
+  --surface-2: #e9ebf6;
+  --text: #1b2260;
+  --muted: #4a5280;
+  --border: #d9dcee;
+  --accent: #2b3a8c;
+  --accent-text: #ffffff;
+  --accent-soft: #e3e6f7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-scheme="lumo"] {
+    --bg: #0e0f13;
+    --surface: #1a1c24;
+    --surface-2: #242736;
+    --text: #f2f3f7;
+    --muted: #a8abb8;
+    --border: #353949;
+    --accent: #9fb4ff;
+    --accent-text: #0e0f13;
+    --accent-soft: #23294a;
+  }
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 [hidden] { display: none !important; }

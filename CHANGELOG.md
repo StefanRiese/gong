@@ -6,6 +6,14 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- Second color scheme **Lumo (Indigo)** from the app icon, light and dark (follows the device).
+  Choose it in *Einstellungen → Web-Oberfläche → Farbschema*; it applies immediately and is
+  remembered per device (the default stays blue).
+
+### Changed
+- The logout button moved from the top bar to *Einstellungen* (group *Web-Oberfläche*, „Abmelden“).
+
 ## [0.13.0] – 2026-11-10
 
 ### Changed

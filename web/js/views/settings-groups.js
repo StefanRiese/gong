@@ -9,6 +9,7 @@ import {
   autoColor, autoSubjectOf, getCourseOverrides, getCourses, getSubjectColors, getSubjects,
 } from '../colors.js';
 import { planValues, sortClasses } from '../substitution-filter.js';
+import { SCHEMES, getScheme, setScheme } from '../scheme.js';
 import { releaseNotes, waitForNewVersion } from '../update.js';
 import { checkbox, field, input, messageArea, randomTopic, schoolPicker } from './forms.js';
 import { bindCheck, bindText, stable } from './settings-form.js';
@@ -447,7 +448,21 @@ export function accessGroup({ form, v, desktop }) {
     field('Port', port),
     secure.el,
     proxy.el,
-    open?.el);
+    open?.el,
+    partLabel('Farbschema'),
+    h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Farben dieses Geräts'),
+      SCHEMES.map((s) => h('label', { class: 'check' },
+        h('input', {
+          type: 'radio', name: 'scheme', value: s.id, checked: getScheme() === s.id,
+          onchange: () => setScheme(s.id),
+        }), s.label)),
+      h('small', { class: 'field-hint' }, 'Hell und dunkel folgen dem Gerät. Gilt nur für dieses Gerät, sofort ohne Speichern.')),
+    partLabel('Abmelden'),
+    h('p', { class: 'hint' }, 'Meldet nur dieses Gerät ab.'),
+    h('div', null, h('button', {
+      type: 'button', class: 'button',
+      onclick: () => window.dispatchEvent(new Event('lumo:logout')),
+    }, 'Abmelden')));
 }
 
 // --- Update ---------------------------------------------------------------------------------

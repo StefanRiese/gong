@@ -11,7 +11,8 @@ manifest.webmanifest    install as app (Android/iOS/desktop)
 icon.svg, icon-*.png    app icons
 css/app.css             all styles (light/dark, desktop sidebar / mobile tab bar)
 js/app.js               shell: setup/login gate, navigation, view rendering, live updates,
-                        refresh, logout
+                        refresh, logout (triggered from the settings page)
+js/scheme.js            color scheme (blue / Lumo indigo) per device
 js/router.js            history-based router
 js/api.js               fetch wrapper, German error messages
 js/dom.js               h() element builder, htmlToText(), icons
