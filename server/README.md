@@ -111,6 +111,12 @@ school or user clears cached data and notification state. `DATA_DIR/reset-web-se
 key per line, written by `install.sh --configure`) drops web UI values on the next start so the
 config file applies again.
 
+**mDNS:** unless `HOST` is a loopback address, the server answers mDNS queries (UDP 5353,
+multicast) for `<MDNS_NAME>.local` with the IPv4 addresses of the machine, so it is reachable as
+`http://lumo.local:8080` without knowing the IP. `MDNS_NAME` (default `lumo`; empty or `off`
+disables it; needs a restart). Windows may ask the firewall once. Works only inside the same
+network segment (IP-based access keeps working).
+
 A plain `APP_PASSWORD` in the config file is replaced by `APP_PASSWORD_HASH` on start (if the
 file is writable).
 

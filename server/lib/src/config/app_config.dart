@@ -59,12 +59,24 @@ class NtfyConfig {
 
 /// Server configuration from environment variables / `.env`.
 class AppConfig {
+  /// `MDNS_NAME`: unset = `lumo`, empty / `off` = no mDNS; otherwise a host label.
+  static String? _mdnsName(String? v) {
+    final n = (v ?? 'lumo').trim().toLowerCase();
+    if (n.isEmpty || n == 'off') return null;
+    return RegExp(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$').hasMatch(n)
+        ? n
+        : null;
+  }
+
   final SphCredentials sph;
 
   /// PBKDF2 hash of the web UI password (see bin/hash_password.dart).
   final String appPasswordHash;
   final String host;
   final int port;
+
+  /// Name announced via mDNS (`<name>.local`); null = off.
+  final String? mdnsName;
 
   /// Directory with the built web UI; null = API only.
   final String? webDir;
@@ -109,6 +121,7 @@ class AppConfig {
     required this.appPasswordHash,
     this.host = '127.0.0.1',
     this.port = 8080,
+    this.mdnsName,
     this.webDir,
     this.dataDir = '.',
     this.cookieSecure = false,
@@ -353,6 +366,7 @@ class AppConfig {
       appPasswordHash: hash,
       host: get('HOST') ?? '127.0.0.1',
       port: port!,
+      mdnsName: _mdnsName(get('MDNS_NAME')),
       webDir: get('WEB_DIR'),
       dataDir: get('DATA_DIR') ?? '.',
       cookieSecure: _bool(env['COOKIE_SECURE']),

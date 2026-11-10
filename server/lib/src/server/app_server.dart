@@ -16,6 +16,8 @@ import '../config/env.dart';
 import '../config/server_settings.dart';
 import '../desktop/build_info.g.dart';
 import '../notify/notifier.dart';
+import '../net/mdns.dart';
+import '../net/ports.dart';
 import '../notify/poller.dart';
 import '../sph/liblanis_gateway.dart';
 import '../sph/sph_gateway.dart';
@@ -58,6 +60,7 @@ class AppServerException implements Exception {
 /// one-time token ([setupUrl]).
 class AppServer implements ServerControl {
   final HttpServer _http;
+  MdnsResponder? _mdns;
   final AppDatabase _db;
   final ResponseCache _cache;
   final Api _api;
@@ -291,6 +294,16 @@ class AppServer implements ServerControl {
       config.needsSetup ? SetupToken.create(dataDir: config.dataDir) : null,
     );
     api.control = server;
+
+    final loopback =
+        config.host == 'localhost' ||
+        (InternetAddress.tryParse(config.host)?.isLoopback ?? false);
+    if (config.mdnsName != null && !loopback) {
+      server._mdns = await MdnsResponder.start(config.mdnsName!, log: info);
+      if (server._mdns != null) {
+        info('mDNS: reachable as http://${config.mdnsName}.local:${http.port}');
+      }
+    }
 
     final webSource = webDir != null
         ? ', web UI from $webDir'
@@ -582,6 +595,10 @@ class AppServer implements ServerControl {
     final previous = _config;
     final web = {..._web.load(), ...changes};
     final next = AppConfig.fromEnv(_merge(_base, web));
+    if (next.port != previous.port) {
+      final problem = await portProblem(next.port);
+      if (problem != null) throw ConfigException([problem]);
+    }
 
     final p = previous.sph, n = next.sph;
     final accountChanged =
@@ -689,6 +706,7 @@ class AppServer implements ServerControl {
   Future<void> stop() => _stopping ??= () async {
     await _applying;
     _update.stop();
+    await _mdns?.stop();
     await _api.close(); // open event streams would keep the server open
     await _http
         .close()

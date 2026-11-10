@@ -429,7 +429,7 @@ export function accessGroup({ form, v, desktop }) {
   const onlyHere = h('input', { type: 'radio', name, value: 'local', checked: local });
   const lan = h('input', { type: 'radio', name, value: 'lan', checked: !local });
   form.add('server', 'HOST', () => (onlyHere.checked ? '127.0.0.1' : '0.0.0.0'));
-  const port = bindText(form, 'PORT', input({ type: 'number', min: '1', max: '65535', value: v.PORT, class: 'input narrow' }));
+  const port = bindText(form, 'PORT', input({ type: 'number', min: '1024', max: '65535', value: v.PORT, class: 'input narrow' }));
   const secure = bindCheck(form, 'COOKIE_SECURE', checkbox('Nur über HTTPS (hinter einem Reverse-Proxy mit HTTPS)', v.COOKIE_SECURE));
   const proxy = bindCheck(form, 'TRUST_PROXY', checkbox('Hinter einem Reverse-Proxy (X-Forwarded-For auswerten)', v.TRUST_PROXY));
   const open = desktop ? bindCheck(form, 'OPEN_BROWSER', checkbox('Beim Start im Browser öffnen', v.OPEN_BROWSER)) : null;
@@ -445,7 +445,7 @@ export function accessGroup({ form, v, desktop }) {
     h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Erreichbar'),
       h('label', { class: 'check' }, onlyHere, 'Nur auf diesem Gerät'),
       h('label', { class: 'check' }, lan, 'Auch von anderen Geräten im Netzwerk (z. B. Handy)')),
-    field('Port', port),
+    field('Port', port, 'Ab 1024. Ports darunter (z. B. 80) darf der Server unter Linux nicht öffnen und startet dann nicht mehr.'),
     secure.el,
     proxy.el,
     open?.el,
