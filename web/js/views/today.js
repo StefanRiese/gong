@@ -6,7 +6,7 @@ import {
 import {
   badge, homeworkDoneToast, homeworkToggle, isCancellation, lazySection, lessonsOn, load, pageHeader,
   periodRange, removeAnimated, section, settle,
-  substitutionCard, weekFor,
+  sourceBadge, substitutionCard, teacherChange, weekFor,
 } from './common.js';
 import { courseStyle, initColors, subjectStyle } from '../colors.js';
 import { classesOf } from '../substitution-filter.js';
@@ -114,13 +114,22 @@ function lessonList(lessons, subDay, ownClasses) {
         h('div', { class: 'muted' }, [l.room, l.teacher].filter(Boolean).join(' · ')),
         matching.map((s) => h('div', { class: 'lesson-change' },
           badge(s.type ?? 'Änderung', isCancellation(s) ? 'danger' : 'warn'),
-          s.source ? badge(`laut ${s.source}`, 'info') : null,
-          [s.substitute && `Vertretung: ${s.substitute}`,
-            s.room && s.room !== l.room && `Raum ${s.room}`,
-            s.note].filter(Boolean).join(' · '))),
+          sourceBadge(s),
+          changeParts(s, l))),
       ),
     );
   }));
+}
+
+/** Teacher change, room and note of a substitution as one line (text and nodes). */
+function changeParts(s, lesson) {
+  const teacher = teacherChange(s);
+  const parts = [
+    teacher && [`${teacher[0]}: `, teacher[1]],
+    s.room && s.room !== lesson.room && `Raum ${s.room}`,
+    s.note,
+  ].filter(Boolean);
+  return parts.flatMap((p, i) => (i ? [' · ', p] : [p]));
 }
 
 function substitutionsSection(subs, subDay, target, ownClasses) {

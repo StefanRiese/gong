@@ -335,10 +335,15 @@ class SyncService {
           CacheKeys.substitutions,
           service.substitutions,
         );
-        // Listeners (notifications) see the plan with the WebUntis entries.
+        // Listeners (notifications) see the plan with the WebUntis entries
+        // (not completed: that would change fingerprints).
         return untis == null
             ? days
-            : mergeUntis(days, cache.peek<UntisSnapshot>(CacheKeys.untis));
+            : mergeUntis(
+                days,
+                cache.peek<UntisSnapshot>(CacheKeys.untis),
+                enrich: false,
+              );
       case SyncTask.homework:
         final current = await _fresh(CacheKeys.homework, service.homework);
         _mergeIntoAllHomework(current);
@@ -368,7 +373,7 @@ class SyncService {
         // The plan as it shows now, for the notifications; null until the
         // Schulportal plan was loaded once.
         final plan = cache.peek<List<SubstitutionDay>>(CacheKeys.substitutions);
-        return plan == null ? null : mergeUntis(plan, snap);
+        return plan == null ? null : mergeUntis(plan, snap, enrich: false);
     }
   }
 

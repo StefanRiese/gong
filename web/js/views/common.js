@@ -192,12 +192,36 @@ export function isCancellation(sub) {
   return /entfall|fällt aus|ausfall|frei/i.test(`${sub.type ?? ''} ${sub.note ?? ''}`);
 }
 
+/** Where an entry comes from if not only the Schulportal: „laut WebUntis“ or „Schulportal + WebUntis“. */
+export function sourceBadge(s) {
+  if (!s.source) return null;
+  return badge(s.source.includes('+') ? s.source : `laut ${s.source}`, 'info');
+}
+
+/** A replaced teacher, struck through like in WebUntis. */
+const struck = (name) => h('s', { class: 'struck' }, name);
+
+/**
+ * Teacher change of a substitution as [label, content], or null: the replaced
+ * teacher struck through and the substitute („Becker → Wolf“), a substitute
+ * without a named teacher, or a missing teacher without a substitute
+ * („Becker entfällt“). [content] is a list of text and DOM nodes.
+ */
+export function teacherChange(s) {
+  const was = s.teacher?.trim();
+  const now = s.substitute?.trim();
+  if (now && was && was.toLowerCase() !== now.toLowerCase()) return ['Lehrkraft', [struck(was), ' → ', now]];
+  if (now) return ['Vertretung', [now]];
+  if (was) return ['Lehrkraft', isCancellation(s) ? [was] : [struck(was), ' entfällt']];
+  return null;
+}
+
 /** One substitution as a card. */
 export function substitutionCard(s) {
   const cancelled = isCancellation(s);
   const changes = [];
-  if (s.substitute) changes.push(['Vertretung', s.substitute]);
-  if (s.teacher) changes.push(['Lehrkraft', s.teacher]);
+  const teacher = teacherChange(s);
+  if (teacher) changes.push(teacher);
   if (s.room) changes.push(['Raum', s.previousRoom && s.previousRoom !== s.room ? `${s.room} (statt ${s.previousRoom})` : s.room]);
   else if (s.previousRoom) changes.push(['Raum', s.previousRoom]);
   if (s.previousSubject && s.previousSubject !== s.subject) changes.push(['statt', s.previousSubject]);
@@ -212,7 +236,7 @@ export function substitutionCard(s) {
           : null,
         h('strong', null, s.subject ?? s.previousSubject ?? 'Unterricht'),
         s.type ? badge(s.type, cancelled ? 'danger' : 'warn') : null,
-        s.source ? badge(`laut ${s.source}`, 'info') : null),
+        sourceBadge(s)),
       changes.length
         ? h('dl', { class: 'facts' }, changes.map(([k, v]) => [h('dt', null, k), h('dd', null, v)]))
         : null,

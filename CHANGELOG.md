@@ -6,6 +6,16 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- WebUntis and the Schulportal are now really combined: a Schulportal entry that WebUntis also
+  has is completed with what only WebUntis knows (original teacher, substitute, room change,
+  subject, text; the Schulportal's values win) and marked „Schulportal + WebUntis“. Changes only
+  WebUntis has are still added („laut WebUntis“). Notifications are not affected.
+- The replaced teacher is struck through, like in WebUntis.
+- Vertretungen and Heute show a teacher change as „Becker → Wolf“ (Lehrkraft), a substitute
+  without a named teacher as „Vertretung: Wolf“, and a missing teacher without a substitute as
+  „Becker entfällt“ (before: two separate rows).
+
 ## [0.10.0] – 2026-11-10
 
 ### Added

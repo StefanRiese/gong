@@ -404,6 +404,7 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .lesson-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .6rem; }
 .lesson-change { margin-top: .35rem; font-size: .9rem; }
 .lesson-change .badge { margin: 0 .4rem 0 0; }
+.struck { color: var(--muted); text-decoration: line-through; }
 
 .event-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .event-list li { display: flex; gap: .75rem; }

@@ -69,8 +69,9 @@ the meal ordered for the shown day. Only when Caseda is set up and switched on (
 otherwise 404 `meals_disabled`): the app probes it at start and after saving the Caseda
 settings (event `gong:meals-changed`) and shows the menu item accordingly.
 
-WebUntis (second source): entries with `source: "WebUntis"` get the badge „laut WebUntis“ on
-Vertretungen and Heute; set up in *Einstellungen → Server → Vertretungen* (`untisSection`).
+WebUntis (second source): entries with `source` get a badge on Vertretungen and Heute („laut
+WebUntis“, or „Schulportal + WebUntis“ for completed Schulportal entries); a replaced teacher is
+struck through (`teacherChange` in `views/common.js`); set up in *Einstellungen → Server → Vertretungen* (`untisSection`).
 
 App updates (`js/update.js`): a hint bar below the top bar when a new release is available
 (dismissable per version, `localStorage` key `updateDismissed`); *Einstellungen → Server →

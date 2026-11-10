@@ -105,8 +105,12 @@ void main() {
   test('times', () => expect(untisTime(745), '07:45'));
 
   group('mergeUntis', () {
-    Substitution sub(String period, {String? cls = '05eG'}) =>
-        Substitution(period: period, type: 'Vertretung', className: cls);
+    Substitution sub(String period, {String? cls = '05eG'}) => Substitution(
+      period: period,
+      type: 'Vertretung',
+      className: cls,
+      subject: 'M',
+    );
     UntisChange change(DateTime d, String? period, {String type = 'Entfall'}) =>
         UntisChange(
           date: d,
@@ -153,6 +157,76 @@ void main() {
       );
       expect(added.toJson()['source'], 'WebUntis');
       expect(plan.first.entries.first.toJson().containsKey('source'), isFalse);
+    });
+
+    test('entries in both sources are completed from WebUntis', () {
+      final base = SubstitutionDay(
+        date: DateTime(2026, 11, 11),
+        entries: [
+          const Substitution(
+            period: '3',
+            type: 'Vertretung',
+            className: '05eG',
+            substitute: 'SCH', // the Schulportal's value wins
+          ),
+          const Substitution(
+            period: '6',
+            type: 'Vertretung',
+            className: '05eG',
+            subject: 'D',
+            teacher: 'ABC',
+            substitute: 'DEF',
+            note: 'Buch',
+          ),
+        ],
+        notices: const [],
+      );
+      UntisChange c(String period, {String? teacher, String? substitute}) =>
+          UntisChange(
+            date: DateTime(2026, 11, 11),
+            period: period,
+            start: '09:45',
+            end: '10:30',
+            type: 'Vertretung',
+            subject: 'M',
+            teacher: teacher,
+            substitute: substitute,
+            room: 'B12',
+            previousRoom: 'A101',
+            note: 'Text',
+          );
+      final snap = UntisSnapshot(
+        className: '05eG',
+        changes: [
+          c('3', teacher: 'MUS', substitute: 'ANDERS'),
+          c('6', teacher: 'XYZ', substitute: 'UVW'),
+        ],
+      );
+      final merged = mergeUntis([base], snap).single.entries;
+      final first = merged[0];
+      expect(
+        (first.subject, first.teacher, first.substitute),
+        ('M', 'MUS', 'SCH'),
+      );
+      expect(
+        (first.room, first.previousRoom, first.note),
+        ('B12', 'A101', 'Text'),
+      );
+      expect(first.source, combinedSource);
+      expect(first.toJson()['source'], 'Schulportal + WebUntis');
+      // The second entry has everything except a room change.
+      final second = merged[1];
+      expect(
+        (second.teacher, second.substitute, second.note),
+        ('ABC', 'DEF', 'Buch'),
+      );
+      expect((second.room, second.previousRoom), ('B12', 'A101'));
+      expect(merged, hasLength(2), reason: 'nothing added as extra');
+
+      // Notifications use the plan as the Schulportal delivers it.
+      final plain = mergeUntis([base], snap, enrich: false);
+      expect(plain.single.entries.first.source, isNull);
+      expect(plain.single.entries, hasLength(2));
     });
 
     test('nothing to add returns the plan itself', () {

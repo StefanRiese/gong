@@ -1,6 +1,9 @@
 import '../models/models.dart';
 import 'untis.dart';
 
+/// Source marker of an entry that exists in both sources.
+const combinedSource = 'Schulportal + WebUntis';
+
 /// "05eG" and "5eg" are the same class.
 String _normClass(String s) =>
     s.trim().toLowerCase().replaceFirst(RegExp(r'^0+'), '');
@@ -28,31 +31,92 @@ bool _overlap(String a, String b) {
   return ra != null && rb != null && ra.$1 <= rb.$2 && rb.$1 <= ra.$2;
 }
 
-/// Adds the WebUntis changes that the Schulportal plan does not have: an
-/// entry counts as covered if the plan lists the same class on the same day
-/// with overlapping periods. Added entries are marked `source: WebUntis`;
-/// days only WebUntis knows (after the end of the plan) are added.
-/// Returns [portal] itself if nothing is added.
+bool _blank(String? s) => s == null || s.trim().isEmpty;
+
+/// [entry] of the Schulportal completed with what WebUntis knows about the
+/// same lesson (the original teacher, the substitute, a room change, the
+/// subject, a text) – only where the Schulportal has nothing. Null if
+/// WebUntis adds nothing.
+Substitution? _enrich(Substitution entry, UntisChange c) {
+  final teacher = _blank(entry.teacher) ? c.teacher : null;
+  final substitute = _blank(entry.substitute) ? c.substitute : null;
+  final subject = _blank(entry.subject) ? c.subject : null;
+  final note = _blank(entry.note) ? c.note : null;
+  // Only a real room change: otherwise WebUntis' room is just the regular one.
+  final roomChange =
+      c.previousRoom != null &&
+      _blank(entry.room) &&
+      _blank(entry.previousRoom);
+  if (teacher == null &&
+      substitute == null &&
+      subject == null &&
+      note == null &&
+      !roomChange) {
+    return null;
+  }
+  return Substitution(
+    period: entry.period,
+    type: entry.type,
+    subject: subject ?? entry.subject,
+    previousSubject: entry.previousSubject,
+    teacher: teacher ?? entry.teacher,
+    substitute: substitute ?? entry.substitute,
+    room: roomChange ? c.room : entry.room,
+    previousRoom: roomChange ? c.previousRoom : entry.previousRoom,
+    className: entry.className,
+    note: note ?? entry.note,
+    source: combinedSource,
+  );
+}
+
+/// Combines the Schulportal plan with the WebUntis changes of the class.
+///
+/// An entry counts as the same lesson if the plan lists the same class on
+/// the same day with overlapping periods. Then, with [enrich], the plan's
+/// entry is completed with what only WebUntis knows (marked as
+/// [combinedSource]). Changes the plan does not have are added, marked
+/// `source: WebUntis`; days only WebUntis knows (after the end of the plan)
+/// are added as new days.
+///
+/// Notifications use `enrich: false`: completing an entry would change its
+/// fingerprint and notify the same lesson twice.
+///
+/// Returns [portal] itself if nothing changes.
 List<SubstitutionDay> mergeUntis(
   List<SubstitutionDay> portal,
-  UntisSnapshot? untis,
-) {
+  UntisSnapshot? untis, {
+  bool enrich = true,
+}) {
   if (untis == null || untis.changes.isEmpty) return portal;
   bool sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  final entries = [
+    for (final d in portal) [...d.entries],
+  ];
+  var changed = false;
   final extra = <DateTime, List<Substitution>>{};
   for (final c in untis.changes) {
     final period = c.period ?? '';
-    final covered = portal.any(
-      (d) =>
-          sameDay(d.date, c.date) &&
-          d.entries.any(
-            (e) =>
-                _sameClass(e.className, untis.className) &&
-                _overlap(e.period, period),
-          ),
-    );
+    var covered = false;
+    for (final (i, d) in portal.indexed) {
+      if (!sameDay(d.date, c.date)) continue;
+      final at = entries[i].indexWhere(
+        (e) =>
+            _sameClass(e.className, untis.className) &&
+            _overlap(e.period, period),
+      );
+      if (at < 0) continue;
+      covered = true;
+      if (enrich) {
+        final better = _enrich(entries[i][at], c);
+        if (better != null) {
+          entries[i][at] = better;
+          changed = true;
+        }
+      }
+      break;
+    }
     if (covered) continue;
     (extra[c.date] ??= []).add(
       Substitution(
@@ -69,14 +133,14 @@ List<SubstitutionDay> mergeUntis(
       ),
     );
   }
-  if (extra.isEmpty) return portal;
+  if (extra.isEmpty && !changed) return portal;
 
   final days = [
-    for (final d in portal)
+    for (final (i, d) in portal.indexed)
       SubstitutionDay(
         date: d.date,
         entries: [
-          ...d.entries,
+          ...entries[i],
           ...?extra.entries
               .where((e) => sameDay(e.key, d.date))
               .map((e) => e.value)

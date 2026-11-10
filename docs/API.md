@@ -154,8 +154,9 @@ hidden types) and adds a `filter` field to the envelope:
 |---|---|
 | `alle=1` | the full plan without the permanent filter (`"filter": {"active": false, "hidden": 0}`) |
 
-With [WebUntis](#webuntis-second-source) switched on, entries that the Schulportal plan does not
-have are added (marked `"source": "WebUntis"`), before the filters are applied.
+With [WebUntis](#webuntis-second-source) switched on, the plan is combined with WebUntis before
+the filters are applied: entries that exist in both are completed (`"source": "Schulportal + WebUntis"`),
+entries only WebUntis has are added (`"source": "WebUntis"`).
 
 An entry matches if one of its classes (`className`, several separated by `,` `;` `?` `/`) is one
 of the own classes, compared case-insensitively; entries without class only if
@@ -612,14 +613,18 @@ Optional second source for the substitutions: changed lessons of the account's c
 WebUntis web app (a class account such as „klasse5e“ is enough) and reads the changed lessons of
 the next 21 days (cancelled lessons, substitute teachers, room changes, texts).
 
-There is no endpoint of its own: [`GET /api/substitutions`](#get-apisubstitutions) merges the
-entries into the plan. An entry counts as already known if the plan has the same class on the
-same day with overlapping periods; only the other entries are added, with `"source": "WebUntis"`
-and the class of the WebUntis account as `className` (matched with the own classes like any
-other entry). Days after the end of the Schulportal plan are added as new days.
+There is no endpoint of its own: [`GET /api/substitutions`](#get-apisubstitutions) combines the
+Schulportal plan with the WebUntis changes. A WebUntis change is the same lesson if the plan has
+the same class on the same day with overlapping periods. Then the Schulportal entry is completed
+with what only WebUntis knows – the original teacher, the substitute, a room change, the subject,
+a text – but only where the Schulportal has nothing (the Schulportal's values win); it gets
+`"source": "Schulportal + WebUntis"`. Changes without a counterpart are added with
+`"source": "WebUntis"` and the class of the WebUntis account as `className` (matched with the own
+classes like any other entry). Days after the end of the Schulportal plan are added as new days.
 
 The background sync (task `untis`, same interval as the substitutions) keeps it up to date;
-notifications cover the added entries as well.
+notifications cover the added entries as well (not the completions, so a lesson is not
+notified twice).
 
 ### `POST /api/server-settings/test-untis`
 
@@ -687,7 +692,8 @@ grades), `messages` (Nachrichten, not used yet).
 }
 ```
 
-`source` (only present on entries not from the Schulportal): `"WebUntis"`.
+`source` (only present when WebUntis is involved): `"WebUntis"` (only in WebUntis) or
+`"Schulportal + WebUntis"` (Schulportal entry completed from WebUntis).
 
 `notices[].lines` are **HTML**. `type` is the portal's wording (e.g. „Vertretung“, „Entfall“,
 „Raumänderung“).

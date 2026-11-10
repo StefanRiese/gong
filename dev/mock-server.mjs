@@ -133,7 +133,8 @@ const substitutions = [
     date: ymd(d1),
     entries: [
       { period: '3 - 4', type: 'Vertretung', subject: 'Deutsch', previousSubject: null, teacher: 'Yilmaz',
-        substitute: 'Schmitt', room: 'A112', previousRoom: 'A104', className: '7b', note: 'Arbeitsblätter im Fach' },
+        substitute: 'Schmitt', room: 'A112', previousRoom: 'A104', className: '7b', note: 'Arbeitsblätter im Fach',
+        source: 'Schulportal + WebUntis' },
       { period: '6', type: 'Entfall', subject: 'Musik', previousSubject: null, teacher: 'Schuster',
         substitute: null, room: null, previousRoom: 'M1', className: '7b', note: null },
       // Other classes: the portal's plan contains the whole school.
@@ -169,6 +170,8 @@ const untisDay = {
     { period: '1', type: 'Vertretung', subject: 'Mathematik', previousSubject: null, teacher: 'Becker',
       substitute: 'Wolf', room: 'N104', previousRoom: 'B1', className: '07bG', note: null, source: 'WebUntis' },
     { period: '2', type: 'Entfall', subject: 'Deutsch', previousSubject: null, teacher: 'Yilmaz',
+      substitute: null, room: null, previousRoom: null, className: '07bG', note: null, source: 'WebUntis' },
+    { period: '3', type: 'Vertretung', subject: 'Englisch', previousSubject: null, teacher: 'Novak',
       substitute: null, room: null, previousRoom: null, className: '07bG', note: null, source: 'WebUntis' },
   ],
   notices: [],
