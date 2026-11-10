@@ -6,6 +6,8 @@ export 'src/api/cache.dart';
 export 'src/api/embedded_web.dart';
 export 'src/api/server_control.dart';
 export 'src/caseda/caseda.dart';
+export 'src/untis/merge.dart';
+export 'src/untis/untis.dart';
 export 'src/auth/password.dart';
 export 'src/auth/sessions.dart';
 export 'src/config/app_config.dart';

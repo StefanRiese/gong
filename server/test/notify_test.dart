@@ -480,6 +480,60 @@ void main() {
       expect(night.isActive(DateTime(2026, 1, 1, 12)), isFalse);
     });
 
+    test(
+      'untis task: merges into the plan listeners and the poller see',
+      () async {
+        final fake = _Untis();
+        final withUntis = SyncService(
+          service: service,
+          cache: cache,
+          db: db,
+          untis: fake,
+          config: const SyncConfig(pause: Duration.zero),
+          now: () => clock,
+        );
+        expect(withUntis.tasks, contains(SyncTask.untis));
+        expect(
+          sync.tasks,
+          isNot(contains(SyncTask.untis)),
+          reason: 'not set up',
+        );
+        final seen = <(SyncTask, Object?)>[];
+        withUntis.addListener((t, d) async => seen.add((t, d)));
+
+        // Before the Schulportal plan is known there is nothing to compare.
+        await withUntis.refreshNow([SyncTask.untis]);
+        expect(seen.single, (SyncTask.untis, null));
+        expect(cache.peek<UntisSnapshot>(CacheKeys.untis), isNotNull);
+        expect(withUntis.status(SyncTask.untis).lastSuccess, clock);
+
+        seen.clear();
+        await withUntis.refreshNow([SyncTask.substitutions, SyncTask.untis]);
+        for (final (_, data) in seen) {
+          final days = data as List<SubstitutionDay>;
+          final extra = [
+            for (final d in days)
+              for (final e in d.entries)
+                if (e.source == 'WebUntis') e,
+          ];
+          expect(extra.single.period, '1');
+        }
+        expect(seen.map((e) => e.$1), [SyncTask.substitutions, SyncTask.untis]);
+
+        fake.error = const UntisException('x', isAuth: true);
+        await withUntis.refreshNow([SyncTask.untis]);
+        expect(
+          withUntis.status(SyncTask.untis).lastError,
+          'Anmeldung bei WebUntis fehlgeschlagen',
+        );
+        expect(SyncService.taskFor(CacheKeys.untis), SyncTask.untis);
+        expect(
+          SyncService.describeError(const UntisException('x')),
+          'WebUntis nicht erreichbar',
+        );
+      },
+    );
+
     test('meals task only with Caseda; fills the meals entry', () async {
       final withMeals = SyncService(
         service: service,
@@ -824,4 +878,25 @@ class _Meals implements MealsGateway {
   @override
   Future<MealsSnapshot> load(DateTime today) async =>
       const MealsSnapshot(balanceCents: 500, orders: []);
+}
+
+class _Untis implements UntisGateway {
+  Object? error;
+
+  @override
+  Future<UntisSnapshot> load(DateTime today) async {
+    if (error != null) throw error!;
+    return UntisSnapshot(
+      className: '5eG',
+      changes: [
+        UntisChange(
+          date: DateTime(2026, 11, 19),
+          period: '1',
+          start: '08:00',
+          end: '08:45',
+          type: 'Entfall',
+        ),
+      ],
+    );
+  }
 }

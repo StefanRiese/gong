@@ -17,6 +17,38 @@ class CasedaConfig {
   });
 }
 
+/// WebUntis login (second source for substitutions); null in
+/// [AppConfig.untis] = off.
+class UntisConfig {
+  /// Host name, e.g. "ghs-griesheim.webuntis.com".
+  final String server;
+
+  /// School name in WebUntis (default: first part of [server]).
+  final String school;
+  final String username;
+  final String password;
+
+  const UntisConfig({
+    required this.server,
+    required this.school,
+    required this.username,
+    required this.password,
+  });
+
+  /// Host name from a host or a pasted web address
+  /// ("https://xyz.webuntis.com/timetable/…"); null if invalid.
+  static String? parseServer(String input) {
+    var v = input.trim();
+    if (v.isEmpty) return null;
+    if (!v.contains('://')) v = 'https://$v';
+    final host = Uri.tryParse(v)?.host.toLowerCase() ?? '';
+    return RegExp(r'^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$').hasMatch(host) &&
+            host.contains('.')
+        ? host
+        : null;
+  }
+}
+
 class NtfyConfig {
   final Uri server;
   final String topic;
@@ -69,6 +101,9 @@ class AppConfig {
   /// Balance below this is highlighted in the web UI (CASEDA_BALANCE_WARNING).
   final int mealsBalanceWarningCents;
 
+  /// WebUntis as a second source for substitutions; null = off.
+  final UntisConfig? untis;
+
   const AppConfig({
     required this.sph,
     required this.appPasswordHash,
@@ -87,6 +122,7 @@ class AppConfig {
     this.updateCheck = true,
     this.caseda,
     this.mealsBalanceWarningCents = 1000,
+    this.untis,
     this.missing = const [],
   });
 
@@ -273,6 +309,43 @@ class AppConfig {
       }
     }
 
+    // --- WebUntis (second source for substitutions) ---
+    // UNTIS_ENABLED=false switches it off but keeps the login.
+    UntisConfig? untis;
+    final untisServerRaw = get('UNTIS_SERVER');
+    final untisUser = get('UNTIS_USERNAME');
+    final untisPassword = get('UNTIS_PASSWORD');
+    final untisEnabled = !const {
+      '0',
+      'false',
+      'no',
+      'off',
+    }.contains(env['UNTIS_ENABLED']?.trim().toLowerCase());
+    if (untisEnabled &&
+        (untisServerRaw != null ||
+            untisUser != null ||
+            untisPassword != null)) {
+      final server = untisServerRaw == null
+          ? null
+          : UntisConfig.parseServer(untisServerRaw);
+      if (untisServerRaw == null ||
+          untisUser == null ||
+          untisPassword == null) {
+        problems.add(
+          'UNTIS_SERVER, UNTIS_USERNAME and UNTIS_PASSWORD are all needed',
+        );
+      } else if (server == null) {
+        problems.add('UNTIS_SERVER must be a host name like xyz.webuntis.com');
+      } else {
+        untis = UntisConfig(
+          server: server,
+          school: get('UNTIS_SCHOOL') ?? server.split('.').first,
+          username: untisUser,
+          password: untisPassword,
+        );
+      }
+    }
+
     if (problems.isNotEmpty) throw ConfigException(problems);
 
     return AppConfig(
@@ -312,6 +385,7 @@ class AppConfig {
       }.contains(env['UPDATE_CHECK']?.trim().toLowerCase()),
       caseda: caseda,
       mealsBalanceWarningCents: warning ?? 1000,
+      untis: untis,
       missing: missing,
     );
   }

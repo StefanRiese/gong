@@ -20,6 +20,8 @@ import '../sph/sph_service.dart';
 import '../storage/settings_store.dart';
 import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
+import '../untis/merge.dart';
+import '../untis/untis.dart';
 import '../update/update_service.dart';
 import 'cache.dart';
 import 'embedded_web.dart';
@@ -76,6 +78,7 @@ const _eventPing = Duration(seconds: 25);
 ///   GET  /api/schools?q=…   school search (public list of Schulportal Hessen)
 ///   GET  /api/meals         school meals (Caseda): balance and own orders
 ///   POST /api/server-settings/test-caseda  {username, password?, url?}
+///   POST /api/server-settings/test-untis   {server, username, password?, school?}
 ///   GET  /api/update        version, latest release, update state
 ///   POST /api/update/check  look for a new release now
 ///   POST /api/update/install  install the latest release (202, async)
@@ -133,6 +136,9 @@ class Api {
   /// Balance below this is highlighted in the web UI.
   int mealsBalanceWarningCents = 1000;
 
+  /// WebUntis switched on: its changes are merged into the substitutions.
+  bool untisEnabled = false;
+
   /// PBKDF2 cost for new web UI passwords; null = default (tests: lower).
   final int? passwordIterations;
   final SettingsStore settings;
@@ -175,7 +181,8 @@ class Api {
         e is SphUnavailableException ||
         e is SphDataException ||
         e is SphAuthException ||
-        e is CasedaException,
+        e is CasedaException ||
+        e is UntisException,
   );
 
   Handler get handler {
@@ -249,6 +256,7 @@ class Api {
       ..put('/api/server-settings', _putServerSettings)
       ..post('/api/server-settings/test-login', _testLogin)
       ..post('/api/server-settings/test-caseda', _testCaseda)
+      ..post('/api/server-settings/test-untis', _testUntis)
       ..get('/api/meals', _meals)
       ..get('/api/schools', _schools)
       ..get('/api/update', _updateStatus)
@@ -453,16 +461,20 @@ class Api {
       'true',
     }.contains(request.url.queryParameters['alle']);
     if (value is! List<SubstitutionDay>) return const {};
+    // WebUntis (second source) adds what the Schulportal plan does not have.
+    final plan = untisEnabled
+        ? mergeUntis(value, cache.peek<UntisSnapshot>(CacheKeys.untis))
+        : value;
     // URL filters (klasse, art, ohne_art, suche, von, bis) on top.
     List<SubstitutionDay> query(List<SubstitutionDay> days) =>
         filterSubstitutionsByQuery(days, request.url.queryParameters) ?? days;
     if (all || !filter.isActive) {
       return {
-        'data': query(value),
+        'data': query(plan),
         'filter': {'active': false, 'hidden': 0},
       };
     }
-    final (days, hidden) = filter.apply(value);
+    final (days, hidden) = filter.apply(plan);
     return {
       'data': query(days),
       'filter': {'active': true, 'hidden': hidden, 'classes': filter.classes},
@@ -703,6 +715,10 @@ class Api {
       return e.isAuth
           ? _error(400, 'meals_login_failed', e.message)
           : _error(503, 'meals_unavailable', e.message);
+    } on UntisException catch (e) {
+      return e.isAuth
+          ? _error(400, 'untis_login_failed', e.message)
+          : _error(503, 'untis_unavailable', e.message);
     }
 
     final headers = <String, String>{};
@@ -767,6 +783,64 @@ class Api {
       return e.isAuth
           ? _error(400, 'meals_login_failed', e.message)
           : _error(503, 'meals_unavailable', e.message);
+    } on ArgumentError catch (e) {
+      return _error(400, 'bad_request', '${e.message}');
+    }
+  }
+
+  /// Tests a WebUntis login (second source for substitutions) without
+  /// storing it; answers with the class of the account.
+  Future<Response> _testUntis(Request request) async {
+    final c = control;
+    if (c == null) return _error(404, 'not_found', 'Not available');
+    if (!_settingsAuthorized(request)) return _settingsDenied();
+    if (!_isJson(request)) {
+      return _error(415, 'unsupported_media_type', 'Use application/json');
+    }
+    final now = _now();
+    _testLogins.removeWhere(
+      (t) => now.difference(t) > const Duration(minutes: 5),
+    );
+    if (_testLogins.length >= 5) {
+      return _error(
+        429,
+        'too_many_attempts',
+        'Too many test logins, try again later',
+        headers: {'retry-after': '300'},
+      );
+    }
+    final String server;
+    final String username;
+    final String? password;
+    final String? school;
+    try {
+      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
+      if (body is! Map) throw const FormatException();
+      server = (body['server'] as String).trim();
+      username = (body['username'] as String).trim();
+      password = body['password'] as String?;
+      school = body['school'] as String?;
+      if (server.isEmpty || username.isEmpty) throw const FormatException();
+    } on Object {
+      return _error(
+        400,
+        'bad_request',
+        'Expected {"server", "username", "password"?, "school"?}',
+      );
+    }
+    _testLogins.add(now);
+    try {
+      final className = await c.testUntisLogin(
+        server: server,
+        username: username,
+        password: password == null || password.isEmpty ? null : password,
+        school: school == null || school.trim().isEmpty ? null : school.trim(),
+      );
+      return _json(200, {'ok': true, 'className': className});
+    } on UntisException catch (e) {
+      return e.isAuth
+          ? _error(400, 'untis_login_failed', e.message)
+          : _error(503, 'untis_unavailable', e.message);
     } on ArgumentError catch (e) {
       return _error(400, 'bad_request', '${e.message}');
     }

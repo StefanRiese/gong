@@ -479,6 +479,52 @@ void main() {
       expect(r.statusCode, 401);
     });
 
+    test('WebUntis entries are merged when switched on', () async {
+      final snapshot = UntisSnapshot(
+        className: '5eG',
+        changes: [
+          UntisChange(
+            date: DateTime(2026, 11, 11),
+            period: '3',
+            start: '09:45',
+            end: '10:30',
+            type: 'Vertretung',
+          ),
+          UntisChange(
+            date: DateTime(2026, 11, 19),
+            period: '1',
+            start: '08:00',
+            end: '08:45',
+            type: 'Entfall',
+            subject: 'M',
+          ),
+        ],
+      );
+      api.cache.put(CacheKeys.untis, snapshot);
+      Future<List<dynamic>> days() async =>
+          (await body(
+                await send('GET', '/api/substitutions?alle=1', cookie: cookie),
+              ))['data']
+              as List;
+
+      expect(await days(), hasLength(2), reason: 'off: plan only');
+      api.untisEnabled = true;
+      final merged = await days();
+      expect(merged.map((d) => d['date']), [
+        '2026-11-10',
+        '2026-11-11',
+        '2026-11-19',
+      ]);
+      final extra = merged.last['entries'].single;
+      expect(extra['source'], 'WebUntis');
+      expect(extra['className'], '5eG');
+      expect(
+        (merged[1]['entries'] as List).every((e) => e['source'] == null),
+        isTrue,
+        reason: 'the 11.11. lesson is already in the plan',
+      );
+    });
+
     test('substitutions are filtered by the permanent filter', () async {
       Future<Map<String, dynamic>> subs([String q = '']) async =>
           body(await send('GET', '/api/substitutions$q', cookie: cookie));
@@ -774,7 +820,7 @@ void main() {
       expect(b['running'], isFalse);
       expect((b['tasks'] as Map).keys, [
         for (final t in SyncTask.values)
-          if (t != SyncTask.meals) t.name,
+          if (t != SyncTask.meals && t != SyncTask.untis) t.name,
       ]);
       expect(b['tasks']['homework']['lastSuccess'], isNotNull);
       expect(b['tasks']['homework']['intervalMinutes'], 15);

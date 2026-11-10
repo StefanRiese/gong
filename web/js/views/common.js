@@ -211,7 +211,8 @@ export function substitutionCard(s) {
           ? h('span', { class: 'subject-dot', style: subjectStyle(s.subject ?? s.previousSubject), 'aria-hidden': 'true' })
           : null,
         h('strong', null, s.subject ?? s.previousSubject ?? 'Unterricht'),
-        s.type ? badge(s.type, cancelled ? 'danger' : 'warn') : null),
+        s.type ? badge(s.type, cancelled ? 'danger' : 'warn') : null,
+        s.source ? badge(`laut ${s.source}`, 'info') : null),
       changes.length
         ? h('dl', { class: 'facts' }, changes.map(([k, v]) => [h('dt', null, k), h('dd', null, v)]))
         : null,

@@ -15,6 +15,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Setup and server settings](#setup-and-server-settings)
 - [App updates](#app-updates)
 - [School meals](#school-meals)
+- [WebUntis (second source)](#webuntis-second-source)
 - [Data models](#data-models)
 - [Errors](#errors)
 - [Examples](#examples)
@@ -152,6 +153,9 @@ hidden types) and adds a `filter` field to the envelope:
 | Parameter | |
 |---|---|
 | `alle=1` | the full plan without the permanent filter (`"filter": {"active": false, "hidden": 0}`) |
+
+With [WebUntis](#webuntis-second-source) switched on, entries that the Schulportal plan does not
+have are added (marked `"source": "WebUntis"`), before the filters are applied.
 
 An entry matches if one of its classes (`className`, several separated by `,` `;` `?` `/`) is one
 of the own classes, compared case-insensitively; entries without class only if
@@ -465,7 +469,7 @@ Content-Type: application/json
 
 | Field | |
 |---|---|
-| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK`, `CASEDA_ENABLED`, `CASEDA_URL`, `CASEDA_USERNAME`, `CASEDA_PASSWORD`, `CASEDA_BALANCE_WARNING` |
+| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK`, `CASEDA_ENABLED`, `CASEDA_URL`, `CASEDA_USERNAME`, `CASEDA_PASSWORD`, `CASEDA_BALANCE_WARNING`, `UNTIS_ENABLED`, `UNTIS_SERVER`, `UNTIS_SCHOOL`, `UNTIS_USERNAME`, `UNTIS_PASSWORD` |
 | `appPassword` | new web UI password (at least 8 characters); stored as hash |
 | `currentPassword` | required with `appPassword`, except during the setup |
 
@@ -601,6 +605,30 @@ The background sync refreshes it every 2 hours (task `meals`). Errors: `404 meal
 (without `password` the stored one is used). → `200 {"ok": true}`, `400 meals_login_failed`,
 `503 meals_unavailable`; shares the limit of 5 test logins per 5 minutes.
 
+## WebUntis (second source)
+
+Optional second source for the substitutions: changed lessons of the account's class from
+**WebUntis**, read-only. Set up in the server settings (`UNTIS_*`). The server logs in like the
+WebUntis web app (a class account such as „klasse5e“ is enough) and reads the changed lessons of
+the next 21 days (cancelled lessons, substitute teachers, room changes, texts).
+
+There is no endpoint of its own: [`GET /api/substitutions`](#get-apisubstitutions) merges the
+entries into the plan. An entry counts as already known if the plan has the same class on the
+same day with overlapping periods; only the other entries are added, with `"source": "WebUntis"`
+and the class of the WebUntis account as `className` (matched with the own classes like any
+other entry). Days after the end of the Schulportal plan are added as new days.
+
+The background sync (task `untis`, same interval as the substitutions) keeps it up to date;
+notifications cover the added entries as well.
+
+### `POST /api/server-settings/test-untis`
+
+`{"server": "…", "username": "…", "password"?: "…", "school"?: "…"}` – tests a WebUntis login
+without storing it (without `password` the stored one is used; `server` may be a pasted web
+address, `school` defaults to the first part of the host name). →
+`200 {"ok": true, "className": "05eG"}`, `400 untis_login_failed`, `503 untis_unavailable`;
+shares the limit of 5 test logins per 5 minutes.
+
 ## Data models
 
 `null` marks fields that can be empty. Fields marked **HTML** may contain simple HTML from the
@@ -658,6 +686,8 @@ grades), `messages` (Nachrichten, not used yet).
   "notices": [{"title": "Hinweise", "lines": ["Wandertag der 6. Klassen"]}]
 }
 ```
+
+`source` (only present on entries not from the Schulportal): `"WebUntis"`.
 
 `notices[].lines` are **HTML**. `type` is the portal's wording (e.g. „Vertretung“, „Entfall“,
 „Raumänderung“).
@@ -744,6 +774,8 @@ Errors have a status code and a JSON body:
 | 409 | `notifications_disabled` | ntfy is not set up |
 | 409 | `no_update` | no update can be installed |
 | 400 | `meals_login_failed` | new or tested Caseda login does not work |
+| 400 | `untis_login_failed` | new or tested WebUntis login does not work |
+| 503 | `untis_unavailable` | WebUntis not reachable |
 | 404 | `meals_disabled` | school meals not set up or switched off |
 | 503 | `meals_auth_failed` / `meals_unavailable` | Caseda login rejected / Caseda not reachable |
 | 415 | `unsupported_media_type` | body without `Content-Type: application/json` |

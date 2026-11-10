@@ -194,8 +194,9 @@ LXC container.
    *Ideas from comparing with native apps (Lanis Mobile, Ranzen):* messages (read and reply),
    several children / accounts per server, Dateispeicher, iCal feed for timetable and calendar,
    holidays and countdowns on Heute, attendance overview across courses, grade calculator.
-   WebUntis as second substitution source was tested and dropped for now (class accounts see
-   no teachers, so no substitutions).
+   WebUntis as an optional second substitution source (0.10.0): the old JSON-RPC interface
+   shows no teachers for class accounts, but the REST interface of the web app does, so changed
+   lessons are merged into the plan (`lib/src/untis/`).
 
 ## 8. Security & privacy
 

@@ -118,7 +118,7 @@ class Poller {
   };
 
   static WatchKind? _kindFor(SyncTask task) => switch (task) {
-    SyncTask.substitutions => WatchKind.substitutions,
+    SyncTask.substitutions || SyncTask.untis => WatchKind.substitutions,
     SyncTask.homework => WatchKind.homework,
     SyncTask.lessons => WatchKind.grades,
     _ => null,
@@ -143,6 +143,8 @@ class Poller {
   Future<void> _onData(SyncTask task, Object? data) async {
     final kind = _kindFor(task);
     if (kind == null || !config.kinds.contains(kind)) return;
+    // WebUntis task: null until the Schulportal plan is known.
+    if (data == null) return;
     final seen = db.seen(kind.name);
     final detection = switch (kind) {
       WatchKind.substitutions => detectSubstitutions(

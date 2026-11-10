@@ -5,6 +5,8 @@ import '../api/cache.dart';
 import '../caseda/caseda.dart';
 import '../models/models.dart';
 import '../sph/errors.dart';
+import '../untis/merge.dart';
+import '../untis/untis.dart';
 import '../sph/sph_service.dart';
 import '../storage/app_database.dart';
 import 'cache_keys.dart';
@@ -22,6 +24,10 @@ enum SyncTask {
 
   /// School meals (Caseda): balance and own orders; only when set up.
   meals,
+
+  /// WebUntis: changed lessons as a second source for substitutions; only
+  /// when set up.
+  untis,
 }
 
 class SyncConfig {
@@ -62,7 +68,7 @@ class SyncConfig {
   });
 
   Duration intervalFor(SyncTask task) => switch (task) {
-    SyncTask.substitutions || SyncTask.homework => interval,
+    SyncTask.substitutions || SyncTask.homework || SyncTask.untis => interval,
     SyncTask.lessons => detailsInterval,
     SyncTask.calendar => calendarInterval,
     SyncTask.account || SyncTask.timetable => slowInterval,
@@ -150,11 +156,15 @@ class SyncService {
   /// School meals (Caseda); null = not set up, the task is skipped.
   final MealsGateway? meals;
 
+  /// WebUntis; null = not set up, the task is skipped.
+  final UntisGateway? untis;
+
   SyncService({
     required this.service,
     required this.cache,
     required this.db,
     this.meals,
+    this.untis,
     this.config = const SyncConfig(),
     void Function(String message)? log,
     DateTime Function()? now,
@@ -205,10 +215,12 @@ class SyncService {
             if (!nextRun(t).isAfter(now)) t,
         ];
 
-  /// Tasks of this installation (without meals if Caseda is not set up).
+  /// Tasks of this installation (without meals / untis if not set up).
   List<SyncTask> get tasks => [
     for (final t in SyncTask.values)
-      if (t != SyncTask.meals || meals != null) t,
+      if ((t != SyncTask.meals || meals != null) &&
+          (t != SyncTask.untis || untis != null))
+        t,
   ];
 
   /// How long a cached entry counts as fresh for the web UI while the
@@ -233,6 +245,7 @@ class SyncService {
       CacheKeys.grades ||
       CacheKeys.allHomework => SyncTask.lessons,
       CacheKeys.meals => SyncTask.meals,
+      CacheKeys.untis => SyncTask.untis,
       _ => null,
     };
   }
@@ -318,7 +331,14 @@ class SyncService {
       case SyncTask.timetable:
         return _fresh(CacheKeys.timetable, service.timetable);
       case SyncTask.substitutions:
-        return _fresh(CacheKeys.substitutions, service.substitutions);
+        final days = await _fresh(
+          CacheKeys.substitutions,
+          service.substitutions,
+        );
+        // Listeners (notifications) see the plan with the WebUntis entries.
+        return untis == null
+            ? days
+            : mergeUntis(days, cache.peek<UntisSnapshot>(CacheKeys.untis));
       case SyncTask.homework:
         final current = await _fresh(CacheKeys.homework, service.homework);
         _mergeIntoAllHomework(current);
@@ -342,6 +362,13 @@ class SyncService {
         final snap = await meals!.load(_now());
         cache.put(CacheKeys.meals, snap);
         return snap;
+      case SyncTask.untis:
+        final snap = await untis!.load(_now());
+        cache.put(CacheKeys.untis, snap);
+        // The plan as it shows now, for the notifications; null until the
+        // Schulportal plan was loaded once.
+        final plan = cache.peek<List<SubstitutionDay>>(CacheKeys.substitutions);
+        return plan == null ? null : mergeUntis(plan, snap);
     }
   }
 
@@ -380,6 +407,8 @@ class SyncService {
     SphDataException() => 'Unerwartete Daten vom Schulportal',
     CasedaException(isAuth: true) => 'Anmeldung bei Caseda fehlgeschlagen',
     CasedaException() => 'Caseda Schulmenü nicht erreichbar',
+    UntisException(isAuth: true) => 'Anmeldung bei WebUntis fehlgeschlagen',
+    UntisException() => 'WebUntis nicht erreichbar',
     _ => 'Unerwarteter Fehler',
   };
 }

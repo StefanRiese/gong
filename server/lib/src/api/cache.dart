@@ -151,6 +151,12 @@ class ResponseCache {
   }
 
   /// Stores [value] as freshly loaded (e.g. results of a sync run).
+  /// Cached value without loading anything; null if there is none (or another type).
+  T? peek<T>(String key) {
+    final v = _entries[key]?.value;
+    return v is T ? v : null;
+  }
+
   void put<T>(String key, T value) => _set(key, _Entry(value, _now()));
 
   /// Removes all entries.

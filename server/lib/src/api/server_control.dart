@@ -42,6 +42,15 @@ abstract interface class ServerControl {
     String? url,
   });
 
+  /// Tries to log in to WebUntis; throws UntisException on failure. Returns
+  /// the class of the account. [password] / [school] null = stored / derived.
+  Future<String> testUntisLogin({
+    required String server,
+    required String username,
+    String? password,
+    String? school,
+  });
+
   /// Validates and stores [changes] (config keys → values) and applies them
   /// without restart where possible. Throws ConfigException for invalid
   /// values and SphException if new Schulportal credentials do not work.

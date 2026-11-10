@@ -1,4 +1,4 @@
-- [ ] untis as additional source for the substitution (evaluated, dropped for now)
+- [x] untis as additional source for the substitution (optional, REST interface of the web app)
 - [x] category filter for rest api (Klausuren, Arbeiten)
 - [x] maybe integrade caseda Schulmenü (readable only)
 - [x] Schulessen page with the own orders of the whole week (0.9.2)

@@ -10,6 +10,7 @@ import '../api/embedded_web.dart';
 import '../api/server_control.dart';
 import '../auth/sessions.dart';
 import '../caseda/caseda.dart';
+import '../untis/untis.dart';
 import '../config/app_config.dart';
 import '../config/env.dart';
 import '../config/server_settings.dart';
@@ -33,6 +34,9 @@ typedef GatewayFactory = SphGateway Function(SphCredentials credentials);
 
 /// Creates the school meals access (tests: fake).
 typedef MealsGatewayFactory = MealsGateway Function(CasedaConfig config);
+
+/// Creates the WebUntis access (tests: fake).
+typedef UntisGatewayFactory = UntisGateway Function(UntisConfig config);
 
 /// Startup failure with a sysexits-style exit code.
 class AppServerException implements Exception {
@@ -61,6 +65,7 @@ class AppServer implements ServerControl {
   final WebSettingsStore _web;
   final GatewayFactory _gateway;
   final MealsGatewayFactory _mealsGateway;
+  final UntisGatewayFactory _untisGateway;
   final SchoolDirectory _schools;
   final LogLine _log;
 
@@ -84,6 +89,7 @@ class AppServer implements ServerControl {
     this._web,
     this._gateway,
     this._mealsGateway,
+    this._untisGateway,
     this._schools,
     this._log,
     this._config,
@@ -129,6 +135,7 @@ class AppServer implements ServerControl {
     required LogLine log,
     GatewayFactory? gateway,
     MealsGatewayFactory? mealsGateway,
+    UntisGatewayFactory? untisGateway,
     SchoolDirectory? schools,
     int? passwordIterations,
     Future<void> Function()? onUpdateReady,
@@ -147,6 +154,15 @@ class AppServer implements ServerControl {
         mealsGateway ??
         (c) => CasedaGateway(
           baseUrl: c.url,
+          username: c.username,
+          password: c.password,
+        );
+
+    final makeUntis =
+        untisGateway ??
+        (c) => UntisWebGateway(
+          server: c.server,
+          school: c.school,
           username: c.username,
           password: c.password,
         );
@@ -195,7 +211,15 @@ class AppServer implements ServerControl {
     final cache = Api.createCache(store: db);
     final settings = SettingsStore(db);
     final service = SphService(makeGateway(config.sph));
-    final sync = _createSync(service, cache, db, config, info, makeMeals);
+    final sync = _createSync(
+      service,
+      cache,
+      db,
+      config,
+      info,
+      makeMeals,
+      makeUntis,
+    );
     final api = Api(
       service: service,
       passwordHash: config.appPasswordHash,
@@ -245,7 +269,8 @@ class AppServer implements ServerControl {
     api
       ..update = update
       ..meals = config.caseda == null ? null : makeMeals(config.caseda!)
-      ..mealsBalanceWarningCents = config.mealsBalanceWarningCents;
+      ..mealsBalanceWarningCents = config.mealsBalanceWarningCents
+      ..untisEnabled = config.untis != null;
 
     final server = AppServer._(
       http,
@@ -256,6 +281,7 @@ class AppServer implements ServerControl {
       web,
       makeGateway,
       makeMeals,
+      makeUntis,
       schools ?? SchoolDirectory(),
       log,
       config,
@@ -332,12 +358,14 @@ class AppServer implements ServerControl {
     AppConfig config,
     void Function(String) info,
     MealsGatewayFactory makeMeals,
+    UntisGatewayFactory makeUntis,
   ) => SyncService(
     service: service,
     cache: cache,
     db: db,
     config: config.sync,
     meals: config.caseda == null ? null : makeMeals(config.caseda!),
+    untis: config.untis == null ? null : makeUntis(config.untis!),
     log: info,
   );
 
@@ -441,6 +469,10 @@ class AppServer implements ServerControl {
       'CASEDA_BALANCE_WARNING': (c.mealsBalanceWarningCents / 100)
           .toStringAsFixed(2)
           .replaceAll('.', ','),
+      'UNTIS_ENABLED': c.untis != null,
+      'UNTIS_SERVER': c.untis?.server ?? raw('UNTIS_SERVER') ?? '',
+      'UNTIS_SCHOOL': c.untis?.school ?? raw('UNTIS_SCHOOL') ?? '',
+      'UNTIS_USERNAME': c.untis?.username ?? raw('UNTIS_USERNAME') ?? '',
     };
     return {
       'setupRequired': c.needsSetup,
@@ -450,6 +482,7 @@ class AppServer implements ServerControl {
         'NTFY_TOKEN': (c.ntfy?.token ?? '').isNotEmpty,
         'APP_PASSWORD': c.appPasswordHash.isNotEmpty,
         'CASEDA_PASSWORD': raw('CASEDA_PASSWORD') != null,
+        'UNTIS_PASSWORD': raw('UNTIS_PASSWORD') != null,
       },
       'sources': {
         for (final k in [
@@ -457,6 +490,7 @@ class AppServer implements ServerControl {
           'SPH_PASSWORD',
           'NTFY_TOKEN',
           'CASEDA_PASSWORD',
+          'UNTIS_PASSWORD',
         ])
           k: web.containsKey(k)
               ? 'web'
@@ -515,6 +549,28 @@ class AppServer implements ServerControl {
   }
 
   @override
+  Future<String> testUntisLogin({
+    required String server,
+    required String username,
+    String? password,
+    String? school,
+  }) async {
+    final host = UntisConfig.parseServer(server);
+    if (host == null) {
+      throw ArgumentError('server must be a host name like xyz.webuntis.com');
+    }
+    final snap = await _untisGateway(
+      UntisConfig(
+        server: host,
+        school: school ?? host.split('.').first,
+        username: username,
+        password: password ?? _config.untis?.password ?? '',
+      ),
+    ).load(DateTime.now());
+    return snap.className;
+  }
+
+  @override
   Future<ApplyResult> apply(Map<String, String> changes) {
     // One change at a time.
     final result = _applying.then((_) => _apply(changes));
@@ -553,6 +609,20 @@ class AppServer implements ServerControl {
       _cache.remove(CacheKeys.meals); // another Caseda account (or none)
     }
 
+    final pu = previous.untis, nu = next.untis;
+    if (nu != null &&
+        (pu?.server != nu.server ||
+            pu?.school != nu.school ||
+            pu?.username != nu.username ||
+            pu?.password != nu.password)) {
+      await _untisGateway(nu).load(DateTime.now());
+    }
+    if (pu?.server != nu?.server ||
+        pu?.school != nu?.school ||
+        pu?.username.toLowerCase() != nu?.username.toLowerCase()) {
+      _cache.remove(CacheKeys.untis); // another account (or switched off)
+    }
+
     _web.save(web);
     final wasSetup = previous.needsSetup;
     await _reconfigure(
@@ -587,13 +657,22 @@ class AppServer implements ServerControl {
       _cache.clear();
       _db.resetPortalState();
     }
-    _sync = _createSync(_service, _cache, _db, next, _info, _mealsGateway);
+    _sync = _createSync(
+      _service,
+      _cache,
+      _db,
+      next,
+      _info,
+      _mealsGateway,
+      _untisGateway,
+    );
     _api
       ..service = _service
       ..sync = _sync
       ..poller = _createPoller(_sync, _db, _api.settings, next, _info)
       ..meals = next.caseda == null ? null : _mealsGateway(next.caseda!)
       ..mealsBalanceWarningCents = next.mealsBalanceWarningCents
+      ..untisEnabled = next.untis != null
       ..passwordHash = next.appPasswordHash;
     _update.checkEnabled = next.updateCheck;
     _config = next;

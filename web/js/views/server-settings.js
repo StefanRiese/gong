@@ -72,6 +72,7 @@ export async function render() {
       passwordSection(save)),
     group('Daten', syncSection(v, sync, save)),
     group('Benachrichtigungen', notifySection(v, settings.secrets, save)),
+    group('Vertretungen', untisSection(v, settings.secrets, save)),
     group('Schulessen', mealsSection(v, settings.secrets, save)),
     group('System',
       update && !update.available ? updateSection(update, v, save) : null,
@@ -338,6 +339,80 @@ function mealsSection(v, secrets, save) {
       password.value = '';
       window.dispatchEvent(new Event('gong:meals-changed'));
     }
+  });
+  return section;
+}
+
+// --- WebUntis (second source for substitutions) -----------------------------------------
+
+function untisSection(v, secrets, save) {
+  const enabled = checkbox('WebUntis als zweite Quelle für Vertretungen nutzen', v.UNTIS_ENABLED);
+  const server = input({
+    type: 'text', value: v.UNTIS_SERVER ?? '', placeholder: 'meineschule.webuntis.com',
+    autocapitalize: 'none', spellcheck: false,
+  });
+  const school = input({ type: 'text', value: v.UNTIS_SCHOOL ?? '', placeholder: 'wie vor „.webuntis.com“' });
+  const username = input({ type: 'text', value: v.UNTIS_USERNAME ?? '', autocomplete: 'off' });
+  const password = input({
+    type: 'password', autocomplete: 'off',
+    placeholder: secrets.UNTIS_PASSWORD ? 'unverändert' : '',
+  });
+  const msg = messageArea();
+  const check = h('button', { type: 'button', class: 'button' }, 'Anmeldung prüfen');
+  const submit = h('button', { type: 'submit', class: 'button primary' }, 'Speichern');
+  const fields = h('div', { class: 'stack' },
+    field('Adresse von WebUntis', server,
+      'Die Adresse der Webseite genügt, z. B. aus dem Browser kopiert.'),
+    field('Benutzername', username),
+    field('Passwort', password, secrets.UNTIS_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
+    h('details', null, h('summary', null, 'Erweitert'),
+      field('Name der Schule in WebUntis', school, 'Nur nötig, wenn er nicht dem Anfang der Adresse entspricht.')));
+  const showFields = () => {
+    fields.hidden = !enabled.box.checked;
+  };
+  enabled.box.addEventListener('change', showFields);
+  showFields();
+
+  check.addEventListener('click', async () => {
+    msg.ok('Anmeldung wird geprüft …');
+    check.disabled = true;
+    try {
+      const res = await api('/api/server-settings/test-untis', {
+        method: 'POST',
+        body: {
+          server: server.value.trim(), username: username.value.trim(),
+          password: password.value || undefined, school: school.value.trim() || undefined,
+        },
+      });
+      msg.ok(res.className
+        ? `Anmeldung bei WebUntis erfolgreich, Klasse ${res.className}.`
+        : 'Anmeldung bei WebUntis erfolgreich.');
+    } catch (err) {
+      msg.error(err);
+    } finally {
+      check.disabled = false;
+    }
+  });
+
+  const section = card('WebUntis',
+    'Ergänzt die Vertretungen um Änderungen aus WebUntis, die im Schulportal (noch) fehlen – zum Beispiel für spätere Tage. Diese Einträge sind mit „WebUntis“ gekennzeichnet. Nur lesend.',
+    'webuntis',
+    enabled.el,
+    fields,
+    msg.el,
+    h('div', { class: 'button-row' }, submit, check));
+  onSubmit(section.querySelector('form'), async () => {
+    const settings = { UNTIS_ENABLED: String(enabled.box.checked) };
+    if (enabled.box.checked) {
+      Object.assign(settings, {
+        UNTIS_SERVER: server.value.trim(),
+        UNTIS_USERNAME: username.value.trim(),
+        UNTIS_SCHOOL: school.value.trim(),
+      });
+      if (password.value) settings.UNTIS_PASSWORD = password.value;
+      msg.ok('Anmeldung wird geprüft …');
+    }
+    if (await save(msg, submit, { settings })) password.value = '';
   });
   return section;
 }

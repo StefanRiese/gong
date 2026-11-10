@@ -31,6 +31,7 @@ const serverValues = {
   PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false, UPDATE_CHECK: true,
   CASEDA_ENABLED: true, CASEDA_URL: 'https://www.caseda-schulmenue.de', CASEDA_USERNAME: 'eltern@example.org',
   CASEDA_BALANCE_WARNING: '10,00',
+  UNTIS_ENABLED: true, UNTIS_SERVER: 'musterschule.webuntis.com', UNTIS_SCHOOL: 'musterschule', UNTIS_USERNAME: 'klasse7b',
 };
 const SCHOOLS = [
   { id: 9999, name: 'Musterschule', city: 'Musterstadt' },
@@ -160,6 +161,19 @@ const substitutions = [
     notices: [],
   },
 ];
+
+// WebUntis (second source): a change on a day the Schulportal plan does not cover yet.
+const untisDay = {
+  date: ymd(nextSchoolDay(addDays(d2, 5))),
+  entries: [
+    { period: '1', type: 'Vertretung', subject: 'Mathematik', previousSubject: null, teacher: 'Becker',
+      substitute: 'Wolf', room: 'N104', previousRoom: 'B1', className: '07bG', note: null, source: 'WebUntis' },
+    { period: '2', type: 'Entfall', subject: 'Deutsch', previousSubject: null, teacher: 'Yilmaz',
+      substitute: null, room: null, previousRoom: null, className: '07bG', note: null, source: 'WebUntis' },
+  ],
+  notices: [],
+};
+const allSubstitutions = () => (serverValues.UNTIS_ENABLED ? [...substitutions, untisDay] : substitutions);
 
 const courses = [
   ['101', 'Mathematik 7b', ['Becker']], ['102', 'Deutsch 7b', ['Yilmaz']],
@@ -400,7 +414,7 @@ async function handleApi(req, res, url) {
       const f = settings.substitutionFilter;
       const active = f.classes.length > 0 || f.hiddenTypes.length > 0 || f.hiddenNotices.length > 0;
       if (!active || url.searchParams.get('alle') === '1') {
-        return data(res, 'substitutions', substitutions, { filter: { active: false, hidden: 0 } });
+        return data(res, 'substitutions', allSubstitutions(), { filter: { active: false, hidden: 0 } });
       }
       const classesOf = (c) => (c ?? '').split(/[,;?/]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
       const wanted = new Set(f.classes.map((c) => c.toLowerCase()));
@@ -412,7 +426,7 @@ async function handleApi(req, res, url) {
         return own.length === 0 ? f.showUnassigned : own.some((c) => wanted.has(c));
       };
       let hidden = 0;
-      const days = substitutions.map((d) => {
+      const days = allSubstitutions().map((d) => {
         const entries = d.entries.filter(keep);
         hidden += d.entries.length - entries.length;
         const hiddenNotices = new Set(f.hiddenNotices.map((t) => t.toLowerCase()));
@@ -485,6 +499,11 @@ async function handleServerSettings(req, res, url) {
     if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
     return json(res, 200, { ok: true });
   }
+  if (path === '/api/server-settings/test-untis') {
+    const b = JSON.parse((await readBody(req)) || '{}');
+    if (b.password === 'falsch') return error(res, 400, 'untis_login_failed', 'Login failed');
+    return json(res, 200, { ok: true, className: '07bG' });
+  }
   if (path === '/api/server-settings/test-caseda') {
     const b = JSON.parse((await readBody(req)) || '{}');
     if (b.password === 'falsch') return error(res, 400, 'meals_login_failed', 'Login failed');
@@ -493,7 +512,7 @@ async function handleServerSettings(req, res, url) {
   if (req.method === 'GET') {
     return json(res, 200, {
       setupRequired, values: serverValues, desktop: false,
-      secrets: { SPH_PASSWORD: !setupRequired, NTFY_TOKEN: false, APP_PASSWORD: !setupRequired, CASEDA_PASSWORD: true },
+      secrets: { SPH_PASSWORD: !setupRequired, NTFY_TOKEN: false, APP_PASSWORD: !setupRequired, CASEDA_PASSWORD: true, UNTIS_PASSWORD: true },
       sources: {}, restartRequired: [],
     });
   }
@@ -512,7 +531,7 @@ async function handleServerSettings(req, res, url) {
   }
   const restart = [];
   for (const [k, v] of Object.entries(s)) {
-    if (k === 'SPH_PASSWORD' || k === 'NTFY_TOKEN' || k === 'CASEDA_PASSWORD') continue;
+    if (k === 'SPH_PASSWORD' || k === 'NTFY_TOKEN' || k === 'CASEDA_PASSWORD' || k === 'UNTIS_PASSWORD') continue;
     if (['HOST', 'PORT'].includes(k) && String(serverValues[k]) !== String(v)) restart.push(k);
     serverValues[k] = typeof serverValues[k] === 'number' ? Number(v)
       : typeof serverValues[k] === 'boolean' ? v === 'true' : v;

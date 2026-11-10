@@ -6,6 +6,14 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- **WebUntis as an optional second source for the substitutions.** Changed lessons of the
+  class (cancellations, substitute teachers, room changes, texts) are added to the Vertretungen
+  when the Schulportal plan does not have them yet – for example for later days. These entries
+  are marked „laut WebUntis“; notifications cover them too. Set up in *Einstellungen → Server →
+  Vertretungen* (address, user name, password – a class account is enough; login test shows
+  the class). Read-only. `bin/untis.dart` compares both sources on the command line.
+
 ## [0.9.2] – 2026-11-10
 
 ### Added

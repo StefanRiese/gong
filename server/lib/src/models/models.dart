@@ -192,6 +192,9 @@ class Substitution {
   final String? className;
   final String? note;
 
+  /// Where the entry comes from when not the Schulportal ("WebUntis").
+  final String? source;
+
   const Substitution({
     required this.period,
     this.type,
@@ -203,6 +206,7 @@ class Substitution {
     this.previousRoom,
     this.className,
     this.note,
+    this.source,
   });
 
   factory Substitution.fromJson(Map<String, Object?> j) => Substitution(
@@ -216,6 +220,7 @@ class Substitution {
     previousRoom: j['previousRoom'] as String?,
     className: j['className'] as String?,
     note: j['note'] as String?,
+    source: j['source'] as String?,
   );
 
   Map<String, Object?> toJson() => {
@@ -229,6 +234,7 @@ class Substitution {
     'previousRoom': previousRoom,
     'className': className,
     'note': note,
+    if (source != null) 'source': source,
   };
 }
 

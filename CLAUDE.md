@@ -33,6 +33,7 @@ server/                 Dart package (own pubspec)
   lib/src/sync/         SyncService (background sync of all data), cache keys + codecs
   lib/src/notify/       poller (notifications from synced data), change detection, ntfy
   lib/src/caseda/       Caseda Schulmenü (school meals): client, parser, MealsGateway – read-only
+  lib/src/untis/        WebUntis (second source for substitutions): client, mapper, merge into the plan
   lib/src/update/       UpdateService: GitHub release check, install per platform (systemd
                         request file / Windows exe swap / macOS bundle via exit code 80)
   lib/src/config/       AppConfig, config.env, web UI settings (DB), setup token, school list
@@ -105,6 +106,7 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
 - **Writes to the real portal** (marking homework done) only when the user asks for it.
   Caseda (school meals) is read-only: never order or cancel meals; `bin/caseda.dart --summary`
   for debugging without personal data.
+  WebUntis is read-only too; `bin/untis.dart --summary` for debugging.
   The same applies to logins with new or test credentials (setup, test login): use the fake
   gateway or the mock server; run real servers in tests with `SYNC=false`.
 - **ntfy:** do not send to the public ntfy.sh server without the user's consent; test with a

@@ -68,6 +68,9 @@ dart run bin/sph.dart grades
 `bin/caseda.dart` prints the Caseda balance and own orders (`--summary`: counts only;
 credentials `CASEDA_USERNAME` / `CASEDA_PASSWORD` in `.env`).
 
+`bin/untis.dart` prints the WebUntis changes and compares them with the Schulportal plan
+(`--summary`: counts only; `UNTIS_SERVER`, `UNTIS_USERNAME`, `UNTIS_PASSWORD` in `.env`).
+
 Exit codes: 3 auth, 4 portal unavailable, 5 feature disabled / not found, 6 unexpected data.
 
 ### Tests
@@ -117,6 +120,7 @@ time with short pauses:
 | `lessons` | `GRADES_INTERVAL_MINUTES` (120) | `courses`, `course:<id>`, `grades`, `homework:all` – one request per course |
 | `calendar` | 60 min | `calendar:<today>:<+60 days>` |
 | `meals` | 2 h (only with Caseda) | `meals` – balance and own orders of three weeks (`lib/src/caseda/`) |
+| `untis` | like `substitutions` (only with WebUntis) | `untis` – changed lessons of the class (`lib/src/untis/`), merged into `/api/substitutions` |
 | `account`, `timetable` | 6 h | `account`, `timetable` |
 
 Failures are retried after 5, 10, 20 … min (at most the interval); `SYNC=false` disables the
@@ -175,6 +179,7 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | GET | `/api/schools?q=…` | school search in the public school list of Schulportal Hessen |
 | GET | `/api/meals` | school meals (Caseda): balance and own orders (read-only) |
 | POST | `/api/server-settings/test-caseda` | test a Caseda login |
+| POST | `/api/server-settings/test-untis` | test a WebUntis login (answers with the class) |
 | GET | `/api/update` | version, latest release, update state |
 | POST | `/api/update/check` | look for a new release now |
 | POST | `/api/update/install` | install the latest release (202, async; see docs/API.md) |

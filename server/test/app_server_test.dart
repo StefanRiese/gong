@@ -19,6 +19,8 @@ void main() {
   late List<SphCredentials> logins;
   late FakeMeals meals;
   late List<CasedaConfig> mealsLogins;
+  late FakeUntis untis;
+  late List<UntisConfig> untisLogins;
   AppServer? server;
   final client = HttpClient();
 
@@ -28,6 +30,8 @@ void main() {
     logins = [];
     meals = FakeMeals();
     mealsLogins = [];
+    untis = FakeUntis();
+    untisLogins = [];
   });
 
   tearDown(() async {
@@ -59,6 +63,10 @@ void main() {
         mealsGateway: (c) {
           mealsLogins.add(c);
           return meals;
+        },
+        untisGateway: (c) {
+          untisLogins.add(c);
+          return untis;
         },
         schools: SchoolDirectory(fetch: () async => _schoolList),
         passwordIterations: 10,
@@ -151,6 +159,7 @@ void main() {
         'NTFY_TOKEN': false,
         'APP_PASSWORD': false,
         'CASEDA_PASSWORD': false,
+        'UNTIS_PASSWORD': false,
       });
       expect(settings.body['values']['PORT'], s.port);
     });
@@ -391,6 +400,165 @@ void main() {
     });
   });
 
+  group('WebUntis (second source)', () {
+    test('not set up: off, no sync task', () async {
+      final s = await start();
+      final cookie = await completeSetup(s);
+      final d = await call('GET', '/api/server-settings', cookie: cookie);
+      expect(d.body['values']['UNTIS_ENABLED'], isFalse);
+      expect(d.body['secrets']['UNTIS_PASSWORD'], isFalse);
+      final sync = await call('GET', '/api/sync', cookie: cookie);
+      expect((sync.body['tasks'] as Map).keys, isNot(contains('untis')));
+    });
+
+    test('set up in the settings: login tested, task added', () async {
+      final s = await start();
+      final cookie = await completeSetup(s);
+
+      untis.error = const UntisException('bad', isAuth: true);
+      var r = await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {
+            'UNTIS_SERVER': 'https://schule.webuntis.com/timetable/x',
+            'UNTIS_USERNAME': 'klasse5e',
+            'UNTIS_PASSWORD': 'falsch',
+          },
+        },
+      );
+      expect(r.status, 400);
+      expect(r.body['error']['code'], 'untis_login_failed');
+      expect(s.config.untis, isNull);
+
+      untis.error = null;
+      r = await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {
+            'UNTIS_SERVER': 'https://schule.webuntis.com/timetable/x',
+            'UNTIS_USERNAME': 'klasse5e',
+            'UNTIS_PASSWORD': 'richtig',
+          },
+        },
+      );
+      expect(r.status, 200, reason: '${r.body}');
+      expect(untisLogins.last.server, 'schule.webuntis.com');
+      expect(untisLogins.last.school, 'schule', reason: 'from the host name');
+
+      final d = await call('GET', '/api/server-settings', cookie: cookie);
+      expect(d.body['values']['UNTIS_ENABLED'], isTrue);
+      expect(d.body['values']['UNTIS_SERVER'], 'schule.webuntis.com');
+      expect(d.body['values']['UNTIS_USERNAME'], 'klasse5e');
+      expect(d.body['secrets']['UNTIS_PASSWORD'], isTrue);
+      expect(jsonEncode(d.body), isNot(contains('richtig')));
+      final sync = await call('GET', '/api/sync', cookie: cookie);
+      expect((sync.body['tasks'] as Map).keys, contains('untis'));
+    });
+
+    test('incomplete or invalid settings are refused', () async {
+      final s = await start();
+      final cookie = await completeSetup(s);
+      for (final settings in [
+        {'UNTIS_SERVER': 'schule.webuntis.com'},
+        {
+          'UNTIS_SERVER': 'ohne punkt',
+          'UNTIS_USERNAME': 'a',
+          'UNTIS_PASSWORD': 'b',
+        },
+      ]) {
+        final r = await call(
+          'PUT',
+          '/api/server-settings',
+          cookie: cookie,
+          json: {'settings': settings},
+        );
+        expect(r.status, 400);
+        expect(r.body['error']['code'], 'invalid_settings');
+      }
+    });
+
+    test('switched off and on again: login is kept', () async {
+      final s = await start({
+        'UNTIS_SERVER': 'schule.webuntis.com',
+        'UNTIS_SCHOOL': 'meine-schule',
+        'UNTIS_USERNAME': 'klasse5e',
+        'UNTIS_PASSWORD': 'gespeichert',
+      });
+      final cookie = await completeSetup(s);
+      expect(s.config.untis?.school, 'meine-schule');
+
+      var r = await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {'UNTIS_ENABLED': 'false'},
+        },
+      );
+      expect(r.status, 200);
+      expect(s.config.untis, isNull);
+      final d = await call('GET', '/api/server-settings', cookie: cookie);
+      expect(d.body['values']['UNTIS_ENABLED'], isFalse);
+      expect(d.body['values']['UNTIS_USERNAME'], 'klasse5e');
+      expect(d.body['secrets']['UNTIS_PASSWORD'], isTrue);
+
+      final before = untisLogins.length;
+      r = await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {'UNTIS_ENABLED': 'true'},
+        },
+      );
+      expect(r.status, 200);
+      expect(untisLogins.length, greaterThan(before), reason: 'login tested');
+      expect(s.config.untis?.password, 'gespeichert');
+    });
+
+    test(
+      'test login answers with the class; stored password is used',
+      () async {
+        final s = await start({
+          'UNTIS_SERVER': 'schule.webuntis.com',
+          'UNTIS_USERNAME': 'klasse5e',
+          'UNTIS_PASSWORD': 'gespeichert',
+        });
+        final cookie = await completeSetup(s);
+        var r = await call(
+          'POST',
+          '/api/server-settings/test-untis',
+          cookie: cookie,
+          json: {'server': 'schule.webuntis.com', 'username': 'klasse5e'},
+        );
+        expect(r.body, {'ok': true, 'className': '05eG'});
+        expect(untisLogins.last.password, 'gespeichert');
+
+        untis.error = const UntisException('down');
+        r = await call(
+          'POST',
+          '/api/server-settings/test-untis',
+          cookie: cookie,
+          json: {'server': 'schule.webuntis.com', 'username': 'klasse5e'},
+        );
+        expect(r.status, 503);
+        expect(r.body['error']['code'], 'untis_unavailable');
+
+        r = await call(
+          'POST',
+          '/api/server-settings/test-untis',
+          cookie: cookie,
+          json: {'server': 'kein host', 'username': 'x'},
+        );
+        expect(r.status, 400);
+      },
+    );
+  });
+
   group('school meals (Caseda)', () {
     test('not set up: /api/meals answers meals_disabled', () async {
       final s = await start();
@@ -545,5 +713,16 @@ class FakeMeals implements MealsGateway {
         ),
       ],
     );
+  }
+}
+
+/// Fake WebUntis: a fixed snapshot, or an error.
+class FakeUntis implements UntisGateway {
+  Object? error;
+
+  @override
+  Future<UntisSnapshot> load(DateTime today) async {
+    if (error != null) throw error!;
+    return UntisSnapshot(className: '05eG', changes: const []);
   }
 }

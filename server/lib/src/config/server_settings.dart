@@ -34,6 +34,11 @@ abstract final class ServerSettingKeys {
     'CASEDA_USERNAME',
     'CASEDA_PASSWORD',
     'CASEDA_BALANCE_WARNING',
+    'UNTIS_ENABLED',
+    'UNTIS_SERVER',
+    'UNTIS_SCHOOL',
+    'UNTIS_USERNAME',
+    'UNTIS_PASSWORD',
   };
 
   /// Never sent to the browser (only whether they are set).
@@ -42,6 +47,7 @@ abstract final class ServerSettingKeys {
     'NTFY_TOKEN',
     'APP_PASSWORD_HASH',
     'CASEDA_PASSWORD',
+    'UNTIS_PASSWORD',
   };
 
   /// Take effect only after a restart of the server.

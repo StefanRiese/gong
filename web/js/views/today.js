@@ -114,6 +114,7 @@ function lessonList(lessons, subDay, ownClasses) {
         h('div', { class: 'muted' }, [l.room, l.teacher].filter(Boolean).join(' · ')),
         matching.map((s) => h('div', { class: 'lesson-change' },
           badge(s.type ?? 'Änderung', isCancellation(s) ? 'danger' : 'warn'),
+          s.source ? badge(`laut ${s.source}`, 'info') : null,
           [s.substitute && `Vertretung: ${s.substitute}`,
             s.room && s.room !== l.room && `Raum ${s.room}`,
             s.note].filter(Boolean).join(' · '))),

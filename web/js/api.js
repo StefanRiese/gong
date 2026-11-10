@@ -87,6 +87,11 @@ export function errorMessage(err) {
     case 'meals_login_failed':
     case 'meals_auth_failed':
       return 'Die Anmeldung bei Caseda ist fehlgeschlagen. Bitte E-Mail und Passwort prüfen.';
+    case 'untis_login_failed':
+    case 'untis_auth_failed':
+      return 'Die Anmeldung bei WebUntis ist fehlgeschlagen. Bitte Adresse, Benutzername und Passwort prüfen.';
+    case 'untis_unavailable':
+      return 'WebUntis ist gerade nicht erreichbar.';
     case 'meals_unavailable':
       return 'Caseda Schulmenü ist gerade nicht erreichbar.';
     default:
