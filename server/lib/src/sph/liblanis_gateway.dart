@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:liblanis/easy_client.dart' as lanis;
 
+import 'portal_fixes.dart';
 import 'sph_gateway.dart';
 
 /// [SphGateway] backed by liblanis' [lanis.EasyLanisClient].
@@ -36,7 +37,13 @@ class LiblanisGateway implements SphGateway {
   @override
   Future<void> login() async {
     await _client.login();
-    if (!keepAlive) _client.session?.preventLogoutTimer?.cancel();
+    final session = _client.session;
+    if (!keepAlive) session?.preventLogoutTimer?.cancel();
+    final interceptors = session?.dio.interceptors;
+    if (interceptors != null &&
+        !interceptors.any((i) => i is PortalFixInterceptor)) {
+      interceptors.add(PortalFixInterceptor());
+    }
   }
 
   @override

@@ -19,6 +19,7 @@ export 'src/notify/poller.dart';
 export 'src/server/app_server.dart';
 export 'src/sph/errors.dart';
 export 'src/sph/liblanis_gateway.dart';
+export 'src/sph/portal_fixes.dart';
 export 'src/sph/sph_gateway.dart';
 export 'src/sph/sph_service.dart';
 export 'src/storage/app_database.dart';

@@ -6,6 +6,11 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Fixed
+- Hausaufgaben, Noten and Kurse failed with „Das Schulportal hat unerwartete Daten geliefert.“:
+  the portal changed the teacher list on the course pages, which liblanis 0.1.4 cannot read
+  any more. Gong now adapts the page before liblanis parses it.
+
 ## [0.9.0] – 2026-11-10
 
 ### Added
