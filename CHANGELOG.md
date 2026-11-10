@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.9.2] – 2026-11-10
+
 ### Added
 - New page **Schulessen** (menu item when Caseda is switched on): own orders of this week and
   the next two weeks day by day, with price, allergens, weekly total, the balance and the
@@ -247,7 +249,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/StefanRiese/gong/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/StefanRiese/gong/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/StefanRiese/gong/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/StefanRiese/gong/compare/v0.8.2...v0.8.3
