@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.10.1] – 2026-11-10
+
 ### Changed
 - WebUntis and the Schulportal are now really combined: a Schulportal entry that WebUntis also
   has is completed with what only WebUntis knows (original teacher, substitute, room change,
@@ -269,7 +271,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/StefanRiese/gong/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/StefanRiese/gong/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/StefanRiese/gong/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/StefanRiese/gong/compare/v0.9.0...v0.9.1
