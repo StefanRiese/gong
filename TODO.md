@@ -1,8 +1,4 @@
 ## Open
-- [ ] Windows/macOS: install the 0.15.0 apps and rename the old data folders (`gong` → `lumo`)
-- [ ] Lumo name: check Google Play and the DPMA register (App Store has „Lumo for Students“)
-- [ ] decide whether the Lumo indigo scheme becomes the default (blue is still the default; the manifest `theme_color` is still blue)
-- [ ] check the new settings page (0.11.0 / 0.11.1) on the real server and the phone: save, unsaved-changes entry at the top, old links (`/einstellungen/server`)
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
 - [ ] phone tab bar: with 8 entries „Aufgaben“ is cut off (shorter label?)
@@ -12,6 +8,8 @@
 - [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
+- [x] decisions: the name stays Lumo, blue stays the default color scheme, no migration from Gong (never an update path)
+- [x] new settings page checked on the real server and the phone
 - [x] Proxmox container migrated from Gong to Lumo and updated to 0.15.0
 - [x] light/dark switch in the top bar, data age removed from the top bar (0.15.0; works on the phone)
 - [x] color scheme Lumo (Indigo) as second option, logout moved to the settings, README screenshots (0.14.0)
