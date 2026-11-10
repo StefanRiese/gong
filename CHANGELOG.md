@@ -6,6 +6,11 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- The settings page no longer has a full-width save bar: „Speichern“ and „Verwerfen“ are a small
+  floating entry at the top that appears only while something is unsaved; „Gespeichert.“ shows
+  briefly, errors stay until the next change.
+
 ## [0.11.0] – 2026-11-10
 
 ### Changed

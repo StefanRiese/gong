@@ -74,32 +74,49 @@ export async function render(ctx) {
     update && !update.available ? updateGroup({ ...base, status: update }) : null,
   ];
 
-  // --- save bar ---
+  // --- floating save entry: appears at the top while there is something to save or to say ---
   const message = messageArea();
-  const status = h('span', { class: 'settings-status', 'aria-live': 'polite' });
-  const discard = h('button', { type: 'button', class: 'button', hidden: true }, 'Verwerfen');
-  const submit = h('button', { type: 'submit', class: 'button primary', disabled: true }, 'Speichern');
-  const bar = h('div', { class: 'settings-bar' },
-    message.el,
-    h('div', { class: 'settings-bar-row' }, status, discard, submit));
+  const status = h('span', { class: 'settings-status' },
+    h('span', { class: 'long' }, 'Ungespeicherte Änderungen'), h('span', { class: 'short' }, 'Ungespeichert'));
+  const discard = h('button', { type: 'button', class: 'button' }, 'Verwerfen');
+  const submit = h('button', { type: 'submit', class: 'button primary' }, 'Speichern');
+  const row = h('div', { class: 'settings-float-row' }, status, discard, submit);
+  const float = h('div', { class: 'settings-float', role: 'status', hidden: true }, message.el, row);
 
   const root = h('form', { class: 'settings-page' },
     pageHeader('Einstellungen'),
     h('p', { class: 'hint' }, 'Alles auf einer Seite. Gilt für alle Geräte und wird auf dem Server gespeichert.'),
     restartNotice,
     groups,
-    bar);
+    float);
 
   let saving = false;
   let leaving = false;
+  let hideTimer = null;
   const refresh = () => {
     const dirty = form.dirty();
     submit.disabled = saving || !dirty;
     discard.hidden = !dirty || saving;
-    status.textContent = dirty ? 'Ungespeicherte Änderungen' : '';
+    row.hidden = !dirty;
+    float.hidden = !dirty && message.el.childElementCount === 0;
   };
   form.onChange(refresh);
+  /** Shows a message in the floating entry; [ms] > 0: hides it again (when nothing is unsaved). */
+  const say = (kind, arg, ms = 0) => {
+    clearTimeout(hideTimer);
+    message[kind](arg);
+    refresh();
+    if (ms > 0) {
+      hideTimer = setTimeout(() => {
+        if (!form.dirty() && !saving) {
+          message.clear();
+          refresh();
+        }
+      }, ms);
+    }
+  };
   const edited = () => {
+    clearTimeout(hideTimer);
     message.clear();
     form.touch();
   };
@@ -117,12 +134,12 @@ export async function render(ctx) {
     if (saving || !form.dirty()) return;
     const problem = form.firstProblem();
     if (problem) {
-      message.error(new ApiError(400, 'bad_request', problem));
+      say('error', new ApiError(400, 'bad_request', problem));
       return;
     }
     saving = true;
     refresh();
-    message.ok('Speichern …');
+    say('ok', 'Speichern …');
     try {
       const serverChanges = form.changed('server');
       const extra = form.extraBody();
@@ -147,13 +164,13 @@ export async function render(ctx) {
       if (Object.keys(serverChanges).some((k) => k.startsWith('CASEDA_'))) {
         window.dispatchEvent(new Event('gong:meals-changed')); // menu item Schulessen
       }
-      message.ok(result?.accountChanged
+      say('ok', result?.accountChanged
         ? 'Gespeichert. Die Daten des neuen Kontos werden jetzt geladen.'
         : extra.appPassword
           ? 'Gespeichert. Das Passwort wurde geändert, andere Geräte sind abgemeldet.'
-          : 'Gespeichert.');
+          : 'Gespeichert.', result?.accountChanged || extra.appPassword ? 6000 : 2500);
     } catch (err) {
-      message.error(err);
+      say('error', err);
     } finally {
       saving = false;
       refresh();

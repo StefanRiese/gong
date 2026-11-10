@@ -33,13 +33,14 @@ page, see „Settings page“; `/einstellungen/server` redirects there),
 shown instead of the login while the server is not set up; the token from the setup link is
 kept in `sessionStorage` and removed from the address bar).
 
-**Settings page** (`/einstellungen`): one form, one „Speichern“ button in a bar at the bottom,
-eight flat groups (Schulportal, Vertretungen incl. WebUntis, Schulessen, Fächer & Farben,
+**Settings page** (`/einstellungen`): one form, one „Speichern“ button in a small floating entry
+at the top that only appears while something is unsaved (or a message is shown: „Gespeichert.“
+fades after a moment, errors stay), eight flat groups (Schulportal, Vertretungen incl. WebUntis, Schulessen, Fächer & Farben,
 Benachrichtigungen, Abgleich, Web-Oberfläche, Update; no nested headings or sub-pages). Every
 control registers with `createForm()`; a save sends only what changed – the server settings
 (`PUT /api/server-settings`, checked first) and the personal ones (`PUT /api/settings`: filter,
-colors) – so values that come from `config.env` are not pinned into the database. The bar shows
-„Ungespeicherte Änderungen“ with „Verwerfen“; leaving by a link or closing asks first. Buttons
+colors) – so values that come from `config.env` are not pinned into the database. The entry
+shows „Ungespeicherte Änderungen“ with „Verwerfen“; leaving by a link or closing asks first. Buttons
 inside the groups only run actions („Anmeldung prüfen“, update). Old anchors still work
 (`#schulportal`, `#vertretungsplan`, `#webuntis`, `#schulessen`, `#farben`, `#benachrichtigungen`,
 `#abgleich`, `#passwort`, `#netzwerk`, `#update`).
