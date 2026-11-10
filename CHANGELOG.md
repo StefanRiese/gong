@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.14.0] – 2026-11-10
+
 ### Added
 - Second color scheme **Lumo (Indigo)** from the app icon, light and dark (follows the device).
   Choose it in *Einstellungen → Web-Oberfläche → Farbschema*; it applies immediately and is
