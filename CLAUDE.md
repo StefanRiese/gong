@@ -7,8 +7,9 @@ Guidance for Claude Code when working in this repository.
 **Gong** – „dein Schulportal-Begleiter für Hessen“: self-hosted client for **Schulportal
 Hessen** (school 6128): a Dart server (portal access via
 [liblanis](https://pub.dev/packages/liblanis), background sync into a SQLite cache, REST API
-with Server-Sent Events, ntfy notifications, setup and settings in the web UI) plus a plain
-HTML/JS web UI. Deployed as a native binary + systemd service in a Proxmox LXC container, and
+with Server-Sent Events, ntfy notifications, setup and settings in the web UI; optional extras:
+school meals from Caseda Schulmenü and WebUntis as a second source for substitutions) plus a
+plain HTML/JS web UI. Deployed as a native binary + systemd service in a Proxmox LXC container, and
 as desktop apps (Windows tray exe, macOS menu bar app). License GPL-3.0 (required by liblanis).
 Plan and decisions: `docs/PLAN.md`; API reference: `docs/API.md` (keep it in sync with
 `lib/src/api/api.dart`); configuration: `server/README.md`.
@@ -26,14 +27,20 @@ server/                 Dart package (own pubspec)
   bin/server.dart       HTTP server entry point (also `check`, `version`)
   bin/sph.dart          CLI: prints API data as JSON (debugging against the real portal)
   bin/hash_password.dart  creates APP_PASSWORD_HASH
+  bin/caseda.dart       CLI: Caseda balance and orders (`--summary`: counts only)
+  bin/untis.dart        CLI: WebUntis changes compared with the Schulportal plan (`--summary`)
   bin/spike.dart        milestone-1 probe
-  lib/src/sph/          SphGateway (liblanis seam), SphService (session policy), mappers, errors
+  lib/src/sph/          SphGateway (liblanis seam), SphService (session policy), mappers, errors;
+                        portal_fixes.dart: workaround for a changed course page (liblanis issue #3,
+                        remove once fixed upstream)
   lib/src/api/          shelf API (api.dart), ResponseCache (stale-while-revalidate, persisted),
-                        ServerControl (setup page / server settings)
+                        ServerControl (setup page / server settings), query_filters.dart
+                        (URL filters of the list endpoints)
   lib/src/sync/         SyncService (background sync of all data), cache keys + codecs
   lib/src/notify/       poller (notifications from synced data), change detection, ntfy
   lib/src/caseda/       Caseda Schulmenü (school meals): client, parser, MealsGateway – read-only
-  lib/src/untis/        WebUntis (second source for substitutions): client, mapper, merge into the plan
+  lib/src/untis/        WebUntis (second source for substitutions, REST interface of the web app):
+                        client, mapper, merge into the plan (merge.dart) – read-only
   lib/src/update/       UpdateService: GitHub release check, install per platform (systemd
                         request file / Windows exe swap / macOS bundle via exit code 80)
   lib/src/config/       AppConfig, config.env, web UI settings (DB), setup token, school list
@@ -46,8 +53,10 @@ server/                 Dart package (own pubspec)
   tool/                 embed_assets.dart (web UI into the exe), set_exe_icon.dart,
                         set_gui_subsystem.dart
 web/                    web UI: index.html, css/app.css, js/ (ES modules, no build step)
-  js/views/             one module per page (setup.js, server-settings.js, forms.js: settings)
+  js/views/             one module per page (setup.js, server-settings.js, forms.js: settings;
+                        meals.js: Schulessen; common.js: shared cards, teacherChange, badges)
   js/colors.js          subject colors + course ↔ timetable-abbreviation matching
+  js/update.js          update hint/install, watchServerVersion (reloads the installed app)
 dev/mock-server.mjs     Node mock API with invented data (password "demo"; MOCK_SETUP=1: setup page)
 deploy/                 systemd units (incl. -update.path/.service), install.sh, build-release.sh, guide
   build-macos-app.sh    universal macOS app from the arm64 + x64 builds (lipo)
@@ -67,6 +76,8 @@ dart analyze --fatal-infos                          # CI fails on infos
 dart test
 WEB_DIR=../web dart run bin/server.dart             # without server/.env: setup mode, link in the log
 dart run bin/sph.dart timetable                     # JSON from the real portal
+dart run bin/caseda.dart --summary                  # Caseda: counts only (credentials in server/.env)
+dart run bin/untis.dart --summary                   # WebUntis vs. Schulportal: counts only
 ```
 
 Web UI / scripts (repo root):
@@ -76,6 +87,7 @@ node dev/mock-server.mjs                            # UI dev without portal, :80
 MOCK_SETUP=1 node dev/mock-server.mjs               # setup page: /einrichtung?token=demo-token
 MOCK_UPDATE=1 node dev/mock-server.mjs              # app update available
 MOCK_ABBREV=1 node dev/mock-server.mjs              # subject abbreviations like the real portal
+curl -X POST localhost:8090/dev/bump-version         # mock "server update" (installed-app reload)
 for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
 shellcheck -s bash deploy/*.sh
 bash deploy/build-release.sh                        # → dist/ (Linux .tar.gz, Windows .exe, macOS build dir)
@@ -94,6 +106,8 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
 - **Server mappers:** plain-text fields use `_text()`/`_name()` (decode HTML entities); fields
   that contain HTML (descriptions, homework) use `_clean()` and are converted in the UI.
 - **liblanis** is pinned (pre-1.0). Keep all access behind `SphGateway` so tests use the fake.
+  Caseda and WebUntis sit behind `MealsGateway` / `UntisGateway` the same way. Notifications use
+  `mergeUntis(..., enrich: false)`: completing entries would change their fingerprints.
 - **Settings:** web UI settings (database) take precedence over env / `config.env`. New
   editable keys go into `ServerSettingKeys` and `AppServer.describeSettings`. Cache keys and
   their JSON codecs live in `lib/src/sync/cache_keys.dart` (models need `fromJson`).
@@ -101,8 +115,8 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
   `ctx.get()` so the page follows updates of its cache keys.
 - **UI texts are German; code, comments, docs and commit messages are English.**
 - **Personal data:** `server/.env`, `*.db` and `dist/` are git-ignored — never commit them.
-  Do not print grades, homework or messages from the real portal into logs or output; use
-  counts. Delete test data and screenshots with real data after use.
+  Do not print grades, homework, messages, Caseda orders or WebUntis data from the real
+  services into logs or output; use counts. Delete test data and screenshots with real data after use.
 - **Writes to the real portal** (marking homework done) only when the user asks for it.
   Caseda (school meals) is read-only: never order or cancel meals; `bin/caseda.dart --summary`
   for debugging without personal data.
@@ -120,7 +134,10 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
 
 - Solo repository: commit directly to `main`, only when the user asks; push after committing.
 - Never mention Claude in commits or PRs (no `Co-Authored-By: Claude`).
-- Update `CHANGELOG.md` (section *Unreleased*) with every user-visible change.
+- Update `CHANGELOG.md` (section *Unreleased*) with every user-visible change. Changes that
+  only touch Markdown files do not run CI (`paths-ignore: ['**.md']`).
+- After a change to the web UI that installed apps must pick up: they reload themselves after
+  a server update (`watchServerVersion`), but only from the release that introduced it on.
 - Releases: move *Unreleased* to a new version section, commit and push, then tag `vX.Y.Z`
   and push the tag (only on request). Before tagging, run `gh workflow run release.yml --ref
   main` and wait for it to pass: GitHub Actions builds Linux x64/arm64, the Windows exe and

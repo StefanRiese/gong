@@ -61,8 +61,12 @@ upstream with a PR instead of forking.
 ```
 
 - **Backend:** Dart with `shelf` + `shelf_router`. One process, compiled to a native binary.
-- **Storage:** SQLite (via liblanis' optional database + own tables for app users and
-  notification state). Credentials encrypted with a key from an environment variable.
+- **Storage:** SQLite (`gong.db`: cache of the portal data, web sessions (hashed), notification
+  state, settings made in the web UI). Credentials are stored in the database and in
+  `config.env`, not encrypted at rest (see section 8).
+- **Optional second sources** (read-only, behind gateway interfaces like liblanis):
+  Caseda Schulmenü for school meals and WebUntis for substitutions. WebUntis changes are
+  combined with the Schulportal plan when the API answers.
 - **Web UI:** plain HTML/CSS/JavaScript modules in `web/`, served as static files by the
   backend (`WEB_DIR`). No framework, no build step.
 - **API sketch:**
@@ -93,18 +97,22 @@ Notes:
 ```
 gong/
 ├── server/                 # Dart backend (own pubspec.yaml)
-│   ├── bin/server.dart     # entry point
-│   ├── lib/
-│   │   ├── api/            # shelf routes, auth middleware
-│   │   ├── service/        # SphService: wraps liblanis, maps to our models
-│   │   ├── storage/        # SQLite, credential encryption
-│   │   └── jobs/           # polling, change detection, notifications
+│   ├── bin/                # server.dart (entry point), CLIs: sph, caseda, untis, hash_password
+│   ├── lib/src/
+│   │   ├── sph/            # SphService + SphGateway: wraps liblanis, maps to our models
+│   │   ├── api/            # shelf routes, auth, response cache, URL filters, server control
+│   │   ├── sync/           # background sync of all data, cache keys
+│   │   ├── notify/         # change detection, ntfy
+│   │   ├── caseda/         # school meals (read-only)
+│   │   ├── untis/          # WebUntis second source (read-only), merge into the plan
+│   │   ├── update/         # release check and install
+│   │   ├── config/ storage/ server/ models/ desktop/
 │   └── test/
 ├── web/                    # Web UI (plain HTML/CSS/JS)
 ├── dev/                    # mock API server for UI development
 ├── docs/
-├── deploy/                 # systemd unit, install/update script, example config
-└── .github/workflows/      # CI: analyze, test, build binaries for win/linux/mac
+├── deploy/                 # systemd units, install/update script, example config, desktop apps
+└── .github/workflows/      # CI: analyze, test; release: binaries for win/linux/mac
 ```
 
 ## 6. Deployment on Proxmox (LXC)
@@ -196,12 +204,18 @@ LXC container.
    holidays and countdowns on Heute, attendance overview across courses, grade calculator.
    WebUntis as an optional second substitution source (0.10.0): the old JSON-RPC interface
    shows no teachers for class accounts, but the REST interface of the web app does, so changed
-   lessons are merged into the plan (`lib/src/untis/`).
+   lessons are merged into the plan (`lib/src/untis/`); 0.10.1 completes Schulportal entries
+   with what only WebUntis knows and strikes through the replaced teacher.
+   *Also (2026-11-10):* school meals from Caseda Schulmenü (0.9.0, page *Schulessen* 0.9.2),
+   a workaround for a changed course page in liblanis (0.9.1, liblanis issue #3), and installed
+   apps reload themselves after a server update (0.10.2).
 
 ## 8. Security & privacy
 
 - Student data is personal data (DSGVO). Self-host for your own family only; no public service.
-- SPH credentials stored encrypted; secret key only in env / `.env` (git-ignored).
+- Credentials (Schulportal, Caseda, WebUntis) are stored in `config.env` (mode 600) and in the
+  database (settings made in the web UI), **not encrypted at rest**: protect the container and
+  its backups. `.env` and `*.db` are git-ignored. Caseda and WebUntis are read-only.
 - Web UI has its own login; backend never exposed to the internet without authentication
   (prefer VPN/Tailscale, otherwise reverse proxy with TLS).
 - Gentle on the portal: caching, polling no more often than every 15 minutes, clear User-Agent.

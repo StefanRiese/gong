@@ -16,15 +16,19 @@ js/router.js            history-based router
 js/api.js               fetch wrapper, German error messages
 js/dom.js               h() element builder, htmlToText(), icons
 js/format.js            German date formatting
-js/views/*.js           one module per page
+js/colors.js            subject colors, course ↔ timetable-abbreviation matching
+js/substitution-filter.js  helpers for the substitution filters
+js/update.js            update hint and installation, reload of an installed app after an update
+js/views/*.js           one module per page (common.js: shared cards and helpers)
 js/views/forms.js       form helpers for setup and server settings (fields, school search)
 ```
 
 Pages: `/` (Heute), `/stundenplan` (week table; compact on phones), `/vertretungen`, `/hausaufgaben`, `/noten`,
 `/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
-`/kalender`, `/einstellungen` (gear icon: substitution filter with „Meine Klasse“,
+`/kalender`, `/schulessen` (only with Caseda), `/einstellungen` (gear icon: substitution filter with „Meine Klasse“,
 notification and server links, subject colors), `/einstellungen/server` (grouped: Konto,
-Daten, Benachrichtigungen, System; sections linkable by anchor),
+Daten, Benachrichtigungen, Vertretungen (WebUntis), Schulessen, System; sections linkable by
+anchor),
 `/benachrichtigungen` (ntfy status, test message, check now), and `/einrichtung` (setup page,
 shown instead of the login while the server is not set up; the token from the setup link is
 kept in `sessionStorage` and removed from the address bar).
@@ -78,6 +82,12 @@ App updates (`js/update.js`): a hint bar below the top bar when a new release is
 Update* (`#update`) shows versions and release notes and installs the update, then waits for
 the restarted server and reloads the page. Mock: `MOCK_UPDATE=1 node dev/mock-server.mjs`.
 
+Installed app: a home screen app stays in memory and is not reloaded when opened again, so
+`watchServerVersion()` compares the server version (`/api/update` → `current`) at start, when
+the app becomes visible again, when the network is back and every 10 minutes, and reloads the
+page after an update (files refetched past the HTTP cache first; not while typing).
+`POST /dev/bump-version` on the mock server simulates an update.
+
 The calendar can be filtered by text (`?suche=…`, searches title, description, place and
 category), by `?kategorie=Klausuren,Arbeiten` (temporary, does not change the saved chips; a chip
 click returns to them), by category (chips) and by hiding past events. Hidden categories and "hide past" are
@@ -113,8 +123,3 @@ MOCK_ABBREV=1 node dev/mock-server.mjs  # timetable with subject abbreviations (
 ```
 
 Edit files and reload the browser — there is nothing to build.
-
-Installed app: a home screen app stays in memory and is not reloaded when opened again, so
-`watchServerVersion()` (`js/update.js`) compares the server version (`/api/update` → `current`)
-with the one seen at start and reloads the page after an update (files refetched past the HTTP
-cache first). `POST /dev/bump-version` on the mock server simulates an update.

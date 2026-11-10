@@ -37,6 +37,10 @@ lib/
   src/sph/mappers.dart         liblanis → app models
   src/sph/sph_service.dart     session policy, retries, error mapping
   src/sph/errors.dart          SphAuth/Unavailable/FeatureDisabled/NotFound/DataException
+  src/sph/portal_fixes.dart    workaround for a changed course page (liblanis issue #3)
+  src/caseda/caseda.dart       Caseda Schulmenü: client, parser, MealsGateway (read-only)
+  src/untis/untis.dart         WebUntis: client (REST), mapper, UntisGateway (read-only)
+  src/untis/merge.dart         combines the WebUntis changes with the Schulportal plan
   src/config/env.dart          .env loader, credentials
 ```
 
@@ -123,6 +127,24 @@ time with short pauses:
 | `untis` | like `substitutions` (only with WebUntis) | `untis` – changed lessons of the class (`lib/src/untis/`), merged into `/api/substitutions` |
 | `account`, `timetable` | 6 h | `account`, `timetable` |
 
+### Optional sources
+
+Both are off until set up (*Einstellungen → Server*, or `CASEDA_*` / `UNTIS_*` in the config
+file; `…_ENABLED=false` switches off but keeps the login). Both are read-only and sit behind
+gateway interfaces (`MealsGateway`, `UntisGateway`), so tests use fakes.
+
+- **School meals (Caseda Schulmenü):** balance and own orders of three weeks; page *Schulessen*,
+  today's meal on Heute. `CASEDA_URL`, `CASEDA_USERNAME`, `CASEDA_PASSWORD`,
+  `CASEDA_BALANCE_WARNING`.
+- **WebUntis:** changed lessons of the account's class for 21 days from the REST interface of
+  the WebUntis web app (a class account is enough). `GET /api/substitutions` combines them
+  with the plan (`mergeUntis`): entries in both sources are completed (original teacher,
+  substitute, room change, subject, text – the Schulportal's values win, `source: "Schulportal +
+  WebUntis"`), entries only WebUntis has are added (`source: "WebUntis"`), days after the end of
+  the plan become new days. Notifications get the plan without the completions (fingerprints).
+  `UNTIS_SERVER` (host or pasted address), `UNTIS_SCHOOL` (default: first part of the host),
+  `UNTIS_USERNAME`, `UNTIS_PASSWORD`.
+
 Failures are retried after 5, 10, 20 … min (at most the interval); `SYNC=false` disables the
 schedule (data is then loaded on demand). The `ResponseCache` answers from the cache right away
 and refreshes expired entries in the background (stale-while-revalidate); entries are persisted
@@ -180,7 +202,7 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | GET | `/api/meals` | school meals (Caseda): balance and own orders (read-only) |
 | POST | `/api/server-settings/test-caseda` | test a Caseda login |
 | POST | `/api/server-settings/test-untis` | test a WebUntis login (answers with the class) |
-| GET | `/api/update` | version, latest release, update state |
+| GET | `/api/update` | version (`current`), latest release, update state; the web UI also compares `current` to reload an installed app after an update |
 | POST | `/api/update/check` | look for a new release now |
 | POST | `/api/update/install` | install the latest release (202, async; see docs/API.md) |
 
@@ -200,11 +222,14 @@ Errors: `{"error": {"code": "…", "message": "…"}}`
 | 400 | `sph_login_failed` | new Schulportal credentials do not work |
 | 401 | `unauthorized` / `invalid_password` | not logged in / wrong web UI password |
 | 403 | `setup_token_invalid` / `invalid_password` | setup token missing or wrong / wrong current password |
+| 400 | `meals_login_failed` / `untis_login_failed` | new or tested Caseda / WebUntis login does not work |
 | 404 | `feature_disabled` / `not_found` | applet not enabled / unknown course or path |
+| 404 | `meals_disabled` | school meals not set up or switched off |
 | 415 | `unsupported_media_type` | request without JSON content type |
 | 429 | `too_many_attempts` | too many failed logins or test logins (`Retry-After` header) |
 | 502 | `sph_bad_response` | unexpected portal response |
 | 503 | `sph_auth_failed` / `sph_unavailable` / `setup_required` | Schulportal login failed / portal down / not set up |
+| 503 | `meals_auth_failed` / `meals_unavailable` / `untis_unavailable` | Caseda login rejected / Caseda or WebUntis not reachable |
 
 If `WEB_DIR` is set, the server also serves the web UI from there (the desktop builds embed
 it); unknown non-API paths return `index.html`.
@@ -224,6 +249,7 @@ lib/src/notify/notifier.dart        ntfy JSON publisher
 - first run per kind records a baseline without notifications
 - an item is marked as seen only after its notification was sent
 - more than 8 new items at once → one summary notification
+- entries added from WebUntis are notified like the others
 
 ## Native build
 

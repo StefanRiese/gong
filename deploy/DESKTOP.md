@@ -34,7 +34,7 @@ Right click on the icon (macOS: click):
 
 - **Gong öffnen** – web UI in the browser (Windows: also double click on the icon)
 - **Einstellungen** – server settings in the web UI (Schulportal login, password, sync,
-  notifications, network)
+  notifications, WebUntis, school meals, network)
 - **Protokoll anzeigen** – log file
 - **Neu starten**, **Beenden**
 
