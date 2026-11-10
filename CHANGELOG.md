@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.9.1] – 2026-11-10
+
 ### Fixed
 - Hausaufgaben, Noten and Kurse failed with „Das Schulportal hat unerwartete Daten geliefert.“:
   the portal changed the teacher list on the course pages, which liblanis 0.1.4 cannot read
@@ -236,7 +238,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/StefanRiese/gong/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/StefanRiese/gong/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/StefanRiese/gong/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/StefanRiese/gong/compare/v0.8.1...v0.8.2
