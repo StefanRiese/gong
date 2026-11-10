@@ -773,7 +773,8 @@ void main() {
       expect(b['enabled'], isTrue);
       expect(b['running'], isFalse);
       expect((b['tasks'] as Map).keys, [
-        for (final t in SyncTask.values) t.name,
+        for (final t in SyncTask.values)
+          if (t != SyncTask.meals) t.name,
       ]);
       expect(b['tasks']['homework']['lastSuccess'], isNotNull);
       expect(b['tasks']['homework']['intervalMinutes'], 15);

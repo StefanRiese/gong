@@ -72,6 +72,7 @@ export async function render() {
       passwordSection(save)),
     group('Daten', syncSection(v, sync, save)),
     group('Benachrichtigungen', notifySection(v, settings.secrets, save)),
+    group('Schulessen', mealsSection(v, settings.secrets, save)),
     group('System',
       update && !update.available ? updateSection(update, v, save) : null,
       networkSection(v, settings.desktop, save)),
@@ -266,6 +267,74 @@ function notifySection(v, secrets, save) {
     };
     if (token.value) settings.NTFY_TOKEN = token.value;
     return save(msg, submit, { settings });
+  });
+  return section;
+}
+
+// --- school meals (Caseda) -------------------------------------------------------------
+
+function mealsSection(v, secrets, save) {
+  const enabled = checkbox('Schulessen von Caseda anzeigen (Guthaben und eigene Bestellungen)', v.CASEDA_ENABLED);
+  const username = input({ type: 'email', value: v.CASEDA_USERNAME ?? '', autocomplete: 'off' });
+  const password = input({
+    type: 'password', autocomplete: 'off',
+    placeholder: secrets.CASEDA_PASSWORD ? 'unverändert' : '',
+  });
+  const warning = input({
+    type: 'text', inputmode: 'decimal', value: v.CASEDA_BALANCE_WARNING ?? '10,00',
+    class: 'input narrow', pattern: '[0-9]+([,.][0-9]{1,2})?',
+  });
+  const url = input({ type: 'url', value: v.CASEDA_URL ?? 'https://www.caseda-schulmenue.de' });
+  const msg = messageArea();
+  const check = h('button', { type: 'button', class: 'button' }, 'Anmeldung prüfen');
+  const submit = h('button', { type: 'submit', class: 'button primary' }, 'Speichern');
+  const fields = h('div', { class: 'stack' },
+    field('E-Mail (Caseda-Konto)', username),
+    field('Passwort', password, secrets.CASEDA_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
+    field('Hinweis bei Guthaben unter … €', warning),
+    h('details', null, h('summary', null, 'Erweitert'),
+      field('Adresse des Bestellsystems', url, 'Andere Caterer mit schulmenueplaner.de funktionieren ebenso.')));
+  const showFields = () => {
+    fields.hidden = !enabled.box.checked;
+  };
+  enabled.box.addEventListener('change', showFields);
+  showFields();
+
+  check.addEventListener('click', async () => {
+    msg.ok('Anmeldung wird geprüft …');
+    check.disabled = true;
+    try {
+      await api('/api/server-settings/test-caseda', {
+        method: 'POST',
+        body: { username: username.value.trim(), password: password.value || undefined, url: url.value.trim() },
+      });
+      msg.ok('Anmeldung bei Caseda erfolgreich.');
+    } catch (err) {
+      msg.error(err);
+    } finally {
+      check.disabled = false;
+    }
+  });
+
+  const section = card('Schulessen (Caseda)',
+    'Zeigt auf der Seite Heute das bestellte Essen und das Guthaben – nur lesend; bestellt wird weiterhin bei Caseda.',
+    'schulessen',
+    enabled.el,
+    fields,
+    msg.el,
+    h('div', { class: 'button-row' }, submit, check));
+  onSubmit(section.querySelector('form'), async () => {
+    const settings = { CASEDA_ENABLED: String(enabled.box.checked) };
+    if (enabled.box.checked) {
+      Object.assign(settings, {
+        CASEDA_USERNAME: username.value.trim(),
+        CASEDA_BALANCE_WARNING: warning.value.trim(),
+        CASEDA_URL: url.value.trim(),
+      });
+      if (password.value) settings.CASEDA_PASSWORD = password.value;
+      msg.ok('Anmeldung wird geprüft …');
+    }
+    if (await save(msg, submit, { settings })) password.value = '';
   });
   return section;
 }

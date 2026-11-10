@@ -34,6 +34,14 @@ abstract interface class ServerControl {
     String? password,
   });
 
+  /// Tries to log in to Caseda Schulmenü; throws CasedaException on failure.
+  /// [password] / [url] null = the stored values.
+  Future<void> testCasedaLogin({
+    required String username,
+    String? password,
+    String? url,
+  });
+
   /// Validates and stores [changes] (config keys → values) and applies them
   /// without restart where possible. Throws ConfigException for invalid
   /// values and SphException if new Schulportal credentials do not work.

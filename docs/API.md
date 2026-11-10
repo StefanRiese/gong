@@ -14,6 +14,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Notifications](#notifications)
 - [Setup and server settings](#setup-and-server-settings)
 - [App updates](#app-updates)
+- [School meals](#school-meals)
 - [Data models](#data-models)
 - [Errors](#errors)
 - [Examples](#examples)
@@ -464,7 +465,7 @@ Content-Type: application/json
 
 | Field | |
 |---|---|
-| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK` |
+| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK`, `CASEDA_ENABLED`, `CASEDA_URL`, `CASEDA_USERNAME`, `CASEDA_PASSWORD`, `CASEDA_BALANCE_WARNING` |
 | `appPassword` | new web UI password (at least 8 characters); stored as hash |
 | `currentPassword` | required with `appPassword`, except during the setup |
 
@@ -559,6 +560,46 @@ checked against the published `.sha256` file.
 
 During the restart the server is not reachable for a moment; clients poll `GET /api/update`
 until `current` changes (the web UI then reloads itself).
+
+## School meals
+
+Read-only view of the school meal ordering system **Caseda Schulmenü** (schulmenueplaner.de):
+balance and own orders. Set up in the server settings (`CASEDA_*`); ordering stays on the
+Caseda website.
+
+### `GET /api/meals`
+
+```json
+{
+  "data": {
+    "balanceCents": 845,
+    "orders": [
+      {"date": "2026-11-10", "line": "Menü 1", "name": "Gemüsemaultaschen", "allergens": ["a", "g"],
+       "priceCents": 390, "ordered": 1, "deadlinePassed": true}
+    ]
+  },
+  "balanceWarningCents": 1000,
+  "orderUrl": "https://www.caseda-schulmenue.de/kunden/essen/",
+  "key": "meals", …
+}
+```
+
+| Field | |
+|---|---|
+| `balanceCents` | account balance in cents (`null` if not shown) |
+| `orders` | ordered dishes of the current and the next two weeks, by date; `ordered` = quantity, `deadlinePassed` = can no longer be changed |
+| `balanceWarningCents` | `CASEDA_BALANCE_WARNING`; the web UI highlights a lower balance |
+| `orderUrl` | ordering page of the caterer |
+
+The background sync refreshes it every 2 hours (task `meals`). Errors: `404 meals_disabled`
+(not set up or switched off), `503 meals_auth_failed` (login rejected),
+`503 meals_unavailable`; cached data is served as `stale` when Caseda is down.
+
+### `POST /api/server-settings/test-caseda`
+
+`{"username": "…", "password"?: "…", "url"?: "…"}` – tests a Caseda login without storing it
+(without `password` the stored one is used). → `200 {"ok": true}`, `400 meals_login_failed`,
+`503 meals_unavailable`; shares the limit of 5 test logins per 5 minutes.
 
 ## Data models
 
@@ -702,6 +743,9 @@ Errors have a status code and a JSON body:
 | 404 | `feature_disabled` | portal area not enabled for the account |
 | 409 | `notifications_disabled` | ntfy is not set up |
 | 409 | `no_update` | no update can be installed |
+| 400 | `meals_login_failed` | new or tested Caseda login does not work |
+| 404 | `meals_disabled` | school meals not set up or switched off |
+| 503 | `meals_auth_failed` / `meals_unavailable` | Caseda login rejected / Caseda not reachable |
 | 415 | `unsupported_media_type` | body without `Content-Type: application/json` |
 | 429 | `too_many_attempts` | too many failed logins / test logins; `Retry-After` header |
 | 502 | `sph_bad_response` | unexpected answer from the portal |

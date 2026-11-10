@@ -257,6 +257,7 @@ function serverLinks() {
         link('schulportal', 'Schulportal-Zugang', 'Schule, Benutzername, Passwort'),
         link('passwort', 'Passwort dieser Web-Oberfläche', 'ändern, andere Geräte abmelden'),
         link('abgleich', 'Abgleich', 'wie oft die Daten geladen werden'),
+        link('schulessen', 'Schulessen (Caseda)', 'Guthaben und bestelltes Essen anzeigen'),
         link('netzwerk', 'Netzwerk', 'Erreichbarkeit, Port, Anmeldedauer'),
         link('update', 'Update', 'Version, neue Versionen installieren'))));
 }

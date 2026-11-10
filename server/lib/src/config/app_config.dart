@@ -4,6 +4,19 @@ import '../sync/sync_service.dart';
 import 'env.dart';
 
 /// ntfy push notification settings; null in [AppConfig.ntfy] = disabled.
+/// Caseda Schulmenü login (school meals); null in [AppConfig.caseda] = off.
+class CasedaConfig {
+  final Uri url;
+  final String username;
+  final String password;
+
+  const CasedaConfig({
+    required this.url,
+    required this.username,
+    required this.password,
+  });
+}
+
 class NtfyConfig {
   final Uri server;
   final String topic;
@@ -50,6 +63,12 @@ class AppConfig {
   /// Look for new releases on GitHub (UPDATE_CHECK, default on).
   final bool updateCheck;
 
+  /// School meals (Caseda Schulmenü): balance and own orders; null = off.
+  final CasedaConfig? caseda;
+
+  /// Balance below this is highlighted in the web UI (CASEDA_BALANCE_WARNING).
+  final int mealsBalanceWarningCents;
+
   const AppConfig({
     required this.sph,
     required this.appPasswordHash,
@@ -66,6 +85,8 @@ class AppConfig {
     this.sync = const SyncConfig(),
     this.openBrowser = false,
     this.updateCheck = true,
+    this.caseda,
+    this.mealsBalanceWarningCents = 1000,
     this.missing = const [],
   });
 
@@ -212,6 +233,46 @@ class AppConfig {
       }
     }
 
+    // --- school meals (Caseda Schulmenü) ---
+    // CASEDA_ENABLED=false switches it off but keeps the login.
+    CasedaConfig? caseda;
+    final casedaUser = get('CASEDA_USERNAME');
+    final casedaPassword = get('CASEDA_PASSWORD');
+    final casedaEnabled = !const {
+      '0',
+      'false',
+      'no',
+      'off',
+    }.contains(env['CASEDA_ENABLED']?.trim().toLowerCase());
+    if (casedaEnabled && (casedaUser != null || casedaPassword != null)) {
+      final url = Uri.tryParse(
+        get('CASEDA_URL') ?? 'https://www.caseda-schulmenue.de',
+      );
+      if (casedaUser == null || casedaPassword == null) {
+        problems.add('CASEDA_USERNAME and CASEDA_PASSWORD are both needed');
+      } else if (url == null || !url.isScheme('https') || url.host.isEmpty) {
+        problems.add('CASEDA_URL must be an https URL');
+      } else {
+        caseda = CasedaConfig(
+          url: url,
+          username: casedaUser,
+          password: casedaPassword,
+        );
+      }
+    }
+    int? warning;
+    final warningRaw = get('CASEDA_BALANCE_WARNING');
+    if (warningRaw != null) {
+      final euros = double.tryParse(warningRaw.replaceAll(',', '.'));
+      if (euros == null || euros < 0 || euros > 1000) {
+        problems.add(
+          'CASEDA_BALANCE_WARNING must be an amount in euros (0–1000)',
+        );
+      } else {
+        warning = (euros * 100).round();
+      }
+    }
+
     if (problems.isNotEmpty) throw ConfigException(problems);
 
     return AppConfig(
@@ -249,6 +310,8 @@ class AppConfig {
         'no',
         'off',
       }.contains(env['UPDATE_CHECK']?.trim().toLowerCase()),
+      caseda: caseda,
+      mealsBalanceWarningCents: warning ?? 1000,
       missing: missing,
     );
   }

@@ -17,12 +17,15 @@ export async function render(ctx) {
   const now = new Date();
   // Homework is loaded lazily (see below): the full list needs one portal
   // request per course and should not delay the rest of the page.
-  const [tt, subsRes, cal] = await Promise.all([
+  const [tt, subsRes, cal, mealsRes] = await Promise.all([
     load(ctx, 'timetable', '/api/timetable'),
     // Filtered by the server to the own classes (settings).
     ctx.features.has('substitutions') ? settle(ctx.getFull('/api/substitutions')) : null,
     load(ctx, 'calendar', '/api/calendar'),
+    // School meals (Caseda); 404 meals_disabled when switched off.
+    settle(ctx.getFull('/api/meals')),
   ]);
+  const meals = mealsRes.ok || mealsRes.error?.code !== 'meals_disabled' ? mealsRes : null;
   const subs = subsRes && (subsRes.ok ? { ok: true, value: subsRes.value.data } : subsRes);
   const ownClasses = subsRes?.ok ? subsRes.value.filter?.classes ?? [] : [];
 
@@ -45,6 +48,7 @@ export async function render(ctx) {
         subs ? substitutionsSection(subs, subDay, target, ownClasses) : null,
       ),
       h('div', null,
+        meals ? mealsSection(meals, target) : null,
         lazySection('Hausaufgaben',
           ctx.features.has('lessons') ? () => ctx.get('/api/homework?alle=1') : null,
           (items) => homeworkList(items, now)),
@@ -183,6 +187,41 @@ function homeworkList(items, now) {
         })),
     ]);
   })), moreLink];
+}
+
+const euro = (cents) => `${(cents / 100).toFixed(2).replace('.', ',')} €`;
+const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** Ordered meal of the shown day, the next orders and the balance (read-only). */
+function mealsSection(result, target) {
+  const res = result.ok ? result.value : null;
+  const order = res?.orderUrl
+    ? h('a', { href: res.orderUrl, target: '_blank', rel: 'noopener', class: 'button small' }, 'Bei Caseda bestellen')
+    : null;
+  return section('Schulessen', result.ok ? { ok: true, value: res.data } : result, (data) => {
+    const day = ymd(target);
+    const today = data.orders.filter((o) => o.date === day);
+    const next = data.orders.filter((o) => o.date > day).slice(0, 4);
+    const low = data.balanceCents != null && data.balanceCents < (res.balanceWarningCents ?? 1000);
+    return [
+      today.length
+        ? h('ul', { class: 'meal-list' }, today.map((o) => h('li', null,
+          h('strong', null, o.name), h('span', { class: 'muted' }, ` · ${o.line}`))))
+        : empty('Kein Essen bestellt.'),
+      next.length
+        ? h('details', { class: 'meal-next' },
+          h('summary', null, `Weitere Bestellungen (${data.orders.filter((o) => o.date > day).length})`),
+          h('ul', { class: 'meal-list compact' }, next.map((o) => {
+            const d = parseYmd(o.date);
+            return h('li', null, h('span', { class: 'muted' }, `${WEEKDAYS[d.getDay()]} ${shortDate(d)} `), o.name);
+          })))
+        : null,
+      h('div', { class: ['meal-balance', low && 'low'] },
+        data.balanceCents == null ? 'Guthaben unbekannt' : `Guthaben: ${euro(data.balanceCents)}`,
+        low ? badge('niedrig', 'warn') : null,
+        order),
+    ];
+  });
 }
 
 function eventList(events, now) {

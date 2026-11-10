@@ -7,6 +7,14 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 ## [Unreleased]
 
 ### Added
+- School meals from **Caseda Schulmenü**: Heute shows the meal ordered for the day, further
+  orders and the balance (highlighted when it is low), with a link to the ordering page.
+  Read-only – ordering stays on the Caseda website. Set up and switched on/off in
+  *Einstellungen → Server → Schulessen* (e-mail, password, login test, warning amount); the
+  background sync refreshes it every 2 hours. `GET /api/meals`; `bin/caseda.dart` for the
+  command line.
+
+### Added
 - REST API: the filters of the web UI pages also work as URL parameters on the API, e.g.
   `/kalender?suche=05eg` → `/api/calendar?suche=05eg`. `/api/substitutions` accepts `suche`,
   `klasse`, `art`, `ohne_art`, `von` and `bis` (on top of the permanent filter, or of the

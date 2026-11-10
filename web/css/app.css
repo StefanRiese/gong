@@ -790,3 +790,12 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .more-filters summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 .more-filters[open] summary { margin-bottom: .6rem; }
 .more-filters .field + .field { margin-top: .8rem; }
+
+/* --- school meals --- */
+.meal-list { list-style: none; margin: 0 0 .5rem; padding: 0; display: grid; gap: .3rem; }
+.meal-list li { padding: .45rem .7rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
+.meal-list.compact li { padding: .3rem .6rem; font-size: .9rem; }
+.meal-next summary { cursor: pointer; color: var(--accent); font-size: .9rem; margin-bottom: .4rem; }
+.meal-balance { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; margin-top: .5rem; font-weight: 500; }
+.meal-balance.low { color: var(--warn); }
+.meal-balance .button { margin-left: auto; }

@@ -414,7 +414,7 @@ void main() {
         expect(cache.fetchedAt(CacheKeys.course(c.id)), clock);
       }
       expect(gw.lessonDetailCalls, courses.length);
-      for (final t in SyncTask.values) {
+      for (final t in sync.tasks) {
         expect(sync.status(t).lastSuccess, clock, reason: t.name);
       }
     });
@@ -451,7 +451,8 @@ void main() {
     });
 
     test('schedule: intervals, active hours, never-run tasks', () async {
-      expect(sync.dueTasks(now), SyncTask.values);
+      expect(sync.dueTasks(now), sync.tasks);
+      expect(sync.tasks, isNot(contains(SyncTask.meals)), reason: 'no Caseda');
       expect(sync.dueTasks(DateTime(2026, 11, 9, 23)), isEmpty);
       await sync.refreshNow();
       expect(sync.dueTasks(now.add(const Duration(minutes: 14))), isEmpty);
@@ -479,6 +480,32 @@ void main() {
       expect(night.isActive(DateTime(2026, 1, 1, 12)), isFalse);
     });
 
+    test('meals task only with Caseda; fills the meals entry', () async {
+      final withMeals = SyncService(
+        service: service,
+        cache: cache,
+        db: db,
+        meals: _Meals(),
+        config: const SyncConfig(pause: Duration.zero),
+        now: () => clock,
+      );
+      expect(withMeals.tasks, contains(SyncTask.meals));
+      await withMeals.refreshNow([SyncTask.meals]);
+      final r = await cache.read<MealsSnapshot>(
+        CacheKeys.meals,
+        const Duration(hours: 2),
+        () => throw StateError('not loaded'),
+      );
+      expect(r.value.balanceCents, 500);
+      expect(withMeals.status(SyncTask.meals).lastSuccess, clock);
+      expect(SyncService.taskFor(CacheKeys.meals), SyncTask.meals);
+      expect(
+        SyncService.describeError(const CasedaException('x', isAuth: true)),
+        'Anmeldung bei Caseda fehlgeschlagen',
+      );
+      await withMeals.stop();
+    });
+
     test('never-run tasks are due even with a ticking clock', () {
       final ticking = SyncService(
         service: service,
@@ -487,7 +514,7 @@ void main() {
         // Every call returns a later time, like the real clock.
         now: () => clock = clock.add(const Duration(microseconds: 1)),
       );
-      expect(ticking.dueTasks(clock), SyncTask.values);
+      expect(ticking.dueTasks(clock), ticking.tasks);
     });
 
     test('failures are retried with backoff, capped at the interval', () async {
@@ -788,4 +815,13 @@ void main() {
       expect(r.statusCode, 401);
     });
   });
+}
+
+class _Meals implements MealsGateway {
+  @override
+  Uri? get orderUrl => null;
+
+  @override
+  Future<MealsSnapshot> load(DateTime today) async =>
+      const MealsSnapshot(balanceCents: 500, orders: []);
 }

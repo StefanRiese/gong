@@ -143,6 +143,44 @@ void main() {
       );
     });
 
+    test('Caseda: login, switch, warning amount', () {
+      final base = {
+        'SPH_USERNAME': 'u',
+        'SPH_PASSWORD': 'p',
+        'APP_PASSWORD_HASH': hash,
+      };
+      expect(AppConfig.fromEnv(base).caseda, isNull);
+      var c = AppConfig.fromEnv({
+        ...base,
+        'CASEDA_USERNAME': 'e@example.org',
+        'CASEDA_PASSWORD': 'pw',
+        'CASEDA_BALANCE_WARNING': '7,5',
+      });
+      expect(c.caseda!.url.host, 'www.caseda-schulmenue.de');
+      expect(c.mealsBalanceWarningCents, 750);
+      c = AppConfig.fromEnv({
+        ...base,
+        'CASEDA_USERNAME': 'e@example.org',
+        'CASEDA_PASSWORD': 'pw',
+        'CASEDA_ENABLED': 'false',
+      });
+      expect(c.caseda, isNull);
+      expect(
+        () => AppConfig.fromEnv({
+          ...base,
+          'CASEDA_USERNAME': 'e@example.org',
+          'CASEDA_URL': 'http://x',
+          'CASEDA_BALANCE_WARNING': 'viel',
+        }),
+        throwsA(
+          isA<ConfigException>().having((e) => e.problems, 'problems', [
+            contains('CASEDA_USERNAME and CASEDA_PASSWORD'),
+            contains('CASEDA_BALANCE_WARNING'),
+          ]),
+        ),
+      );
+    });
+
     test('APP_PASSWORD (plain) is hashed and wins over the hash', () {
       final c = AppConfig.fromEnv({
         'SPH_USERNAME': 'u',

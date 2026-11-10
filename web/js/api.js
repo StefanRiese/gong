@@ -84,6 +84,11 @@ export function errorMessage(err) {
       return 'Der Server ist noch nicht eingerichtet.';
     case 'invalid_settings':
       return 'Einige Angaben sind ungültig.';
+    case 'meals_login_failed':
+    case 'meals_auth_failed':
+      return 'Die Anmeldung bei Caseda ist fehlgeschlagen. Bitte E-Mail und Passwort prüfen.';
+    case 'meals_unavailable':
+      return 'Caseda Schulmenü ist gerade nicht erreichbar.';
     default:
       return err.message || 'Unerwarteter Fehler.';
   }

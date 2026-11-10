@@ -8,6 +8,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:shelf_static/shelf_static.dart';
 
 import '../auth/password.dart';
+import '../caseda/caseda.dart';
 import '../auth/sessions.dart';
 import '../config/app_config.dart';
 import '../config/server_settings.dart';
@@ -37,6 +38,7 @@ class CacheTtl {
   static const courseDetails = Duration(minutes: 30);
   static const homework = Duration(minutes: 15);
 
+  static const meals = Duration(hours: 2);
   static const allHomework = Duration(minutes: 45);
   static const grades = Duration(hours: 1);
 }
@@ -72,6 +74,8 @@ const _eventPing = Duration(seconds: 25);
 ///   PUT  /api/server-settings       {settings, appPassword?, currentPassword?}
 ///   POST /api/server-settings/test-login  {schoolId, username, password?}
 ///   GET  /api/schools?q=…   school search (public list of Schulportal Hessen)
+///   GET  /api/meals         school meals (Caseda): balance and own orders
+///   POST /api/server-settings/test-caseda  {username, password?, url?}
 ///   GET  /api/update        version, latest release, update state
 ///   POST /api/update/check  look for a new release now
 ///   POST /api/update/install  install the latest release (202, async)
@@ -123,6 +127,12 @@ class Api {
   /// Update check and installation; null = not available (tests).
   UpdateService? update;
 
+  /// School meals (Caseda); null = not set up.
+  MealsGateway? meals;
+
+  /// Balance below this is highlighted in the web UI.
+  int mealsBalanceWarningCents = 1000;
+
   /// PBKDF2 cost for new web UI passwords; null = default (tests: lower).
   final int? passwordIterations;
   final SettingsStore settings;
@@ -164,7 +174,8 @@ class Api {
     serveStaleOn: (e) =>
         e is SphUnavailableException ||
         e is SphDataException ||
-        e is SphAuthException,
+        e is SphAuthException ||
+        e is CasedaException,
   );
 
   Handler get handler {
@@ -237,6 +248,8 @@ class Api {
       ..get('/api/server-settings', _getServerSettings)
       ..put('/api/server-settings', _putServerSettings)
       ..post('/api/server-settings/test-login', _testLogin)
+      ..post('/api/server-settings/test-caseda', _testCaseda)
+      ..get('/api/meals', _meals)
       ..get('/api/schools', _schools)
       ..get('/api/update', _updateStatus)
       ..post('/api/update/check', _updateCheck)
@@ -396,11 +409,40 @@ class Api {
         });
       } on SphException catch (e) {
         return _sphError(e);
+      } on CasedaException catch (e) {
+        return _casedaError(e);
       } on ArgumentError catch (e) {
         return _error(400, 'bad_request', '${e.message}');
       }
     };
   }
+
+  // --- school meals (Caseda) ---------------------------------------------------
+
+  /// Balance and own orders; 404 meals_disabled if Caseda is not set up.
+  Future<Response> _meals(Request request) async {
+    if (control?.setupRequired ?? false) return _setupRequired();
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final m = meals;
+    if (m == null) {
+      return _error(404, 'meals_disabled', 'School meals are not set up');
+    }
+    return _data(
+      CacheKeys.meals,
+      CacheTtl.meals,
+      (_) => m.load(_now()),
+      present: (_, _) => {
+        'balanceWarningCents': mealsBalanceWarningCents,
+        'orderUrl': m.orderUrl?.toString(),
+      },
+    )(request);
+  }
+
+  Response _casedaError(CasedaException e) => e.isAuth
+      ? _error(503, 'meals_auth_failed', e.message)
+      : _error(503, 'meals_unavailable', e.message);
 
   /// The permanent filter from the settings (own classes, hidden types);
   /// `?alle=1` returns the full plan.
@@ -539,7 +581,7 @@ class Api {
       'running': s.running,
       'activeHours': [c.activeFromHour, c.activeToHour],
       'tasks': {
-        for (final t in SyncTask.values)
+        for (final t in s.tasks)
           t.name: {
             ...s.status(t).toJson(),
             'intervalMinutes': c.intervalFor(t).inMinutes,
@@ -657,6 +699,10 @@ class Api {
       return _error(400, 'sph_login_failed', e.message);
     } on SphException catch (e) {
       return _sphError(e);
+    } on CasedaException catch (e) {
+      return e.isAuth
+          ? _error(400, 'meals_login_failed', e.message)
+          : _error(503, 'meals_unavailable', e.message);
     }
 
     final headers = <String, String>{};
@@ -675,6 +721,56 @@ class Api {
   }
 
   final _testLogins = <DateTime>[];
+
+  /// Tests a Caseda login (school meals) without storing it.
+  Future<Response> _testCaseda(Request request) async {
+    final c = control;
+    if (c == null) return _error(404, 'not_found', 'Not available');
+    if (!_settingsAuthorized(request)) return _settingsDenied();
+    if (!_isJson(request)) {
+      return _error(415, 'unsupported_media_type', 'Use application/json');
+    }
+    final now = _now();
+    _testLogins.removeWhere(
+      (t) => now.difference(t) > const Duration(minutes: 5),
+    );
+    if (_testLogins.length >= 5) {
+      return _error(
+        429,
+        'too_many_attempts',
+        'Too many test logins, try again later',
+        headers: {'retry-after': '300'},
+      );
+    }
+    final String username;
+    final String? password;
+    final String? url;
+    try {
+      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
+      if (body is! Map) throw const FormatException();
+      username = (body['username'] as String).trim();
+      password = body['password'] as String?;
+      url = body['url'] as String?;
+      if (username.isEmpty) throw const FormatException();
+    } on Object {
+      return _error(400, 'bad_request', 'Expected {"username", "password"?}');
+    }
+    _testLogins.add(now);
+    try {
+      await c.testCasedaLogin(
+        username: username,
+        password: password == null || password.isEmpty ? null : password,
+        url: url == null || url.trim().isEmpty ? null : url.trim(),
+      );
+      return _json(200, {'ok': true});
+    } on CasedaException catch (e) {
+      return e.isAuth
+          ? _error(400, 'meals_login_failed', e.message)
+          : _error(503, 'meals_unavailable', e.message);
+    } on ArgumentError catch (e) {
+      return _error(400, 'bad_request', '${e.message}');
+    }
+  }
 
   Future<Response> _testLogin(Request request) async {
     final c = control;

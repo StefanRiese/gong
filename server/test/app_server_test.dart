@@ -17,6 +17,8 @@ void main() {
   late Directory dir;
   late FakeGateway gw;
   late List<SphCredentials> logins;
+  late FakeMeals meals;
+  late List<CasedaConfig> mealsLogins;
   AppServer? server;
   final client = HttpClient();
 
@@ -24,6 +26,8 @@ void main() {
     dir = Directory.systemTemp.createTempSync('sph_server_');
     gw = FakeGateway();
     logins = [];
+    meals = FakeMeals();
+    mealsLogins = [];
   });
 
   tearDown(() async {
@@ -51,6 +55,10 @@ void main() {
         gateway: (c) {
           logins.add(c);
           return gw;
+        },
+        mealsGateway: (c) {
+          mealsLogins.add(c);
+          return meals;
         },
         schools: SchoolDirectory(fetch: () async => _schoolList),
         passwordIterations: 10,
@@ -142,6 +150,7 @@ void main() {
         'SPH_PASSWORD': false,
         'NTFY_TOKEN': false,
         'APP_PASSWORD': false,
+        'CASEDA_PASSWORD': false,
       });
       expect(settings.body['values']['PORT'], s.port);
     });
@@ -381,7 +390,160 @@ void main() {
       expect(r.body['error']['code'], 'sph_login_failed');
     });
   });
+
+  group('school meals (Caseda)', () {
+    test('not set up: /api/meals answers meals_disabled', () async {
+      final s = await start();
+      final cookie = await completeSetup(s);
+      final r = await call('GET', '/api/meals', cookie: cookie);
+      expect(r.status, 404);
+      expect(r.body['error']['code'], 'meals_disabled');
+      final d = await call('GET', '/api/server-settings', cookie: cookie);
+      expect(d.body['values']['CASEDA_ENABLED'], isFalse);
+    });
+
+    test(
+      'set up in the settings: login tested, then balance and orders',
+      () async {
+        final s = await start();
+        final cookie = await completeSetup(s);
+
+        meals.error = const CasedaException('wrong', isAuth: true);
+        var r = await call(
+          'PUT',
+          '/api/server-settings',
+          cookie: cookie,
+          json: {
+            'settings': {
+              'CASEDA_USERNAME': 'eltern@example.org',
+              'CASEDA_PASSWORD': 'falsch',
+            },
+          },
+        );
+        expect(r.status, 400);
+        expect(r.body['error']['code'], 'meals_login_failed');
+        expect(s.config.caseda, isNull);
+
+        meals.error = null;
+        r = await call(
+          'PUT',
+          '/api/server-settings',
+          cookie: cookie,
+          json: {
+            'settings': {
+              'CASEDA_USERNAME': 'eltern@example.org',
+              'CASEDA_PASSWORD': 'richtig',
+              'CASEDA_BALANCE_WARNING': '7,50',
+            },
+          },
+        );
+        expect(r.status, 200, reason: '${r.body}');
+        expect(mealsLogins.last.username, 'eltern@example.org');
+
+        r = await call('GET', '/api/meals', cookie: cookie);
+        expect(r.status, 200);
+        expect(r.body['data']['balanceCents'], 1230);
+        expect((r.body['data']['orders'] as List).single['name'], 'Nudeln');
+        expect(r.body['balanceWarningCents'], 750);
+        expect(r.body['key'], 'meals');
+
+        final d = await call('GET', '/api/server-settings', cookie: cookie);
+        expect(d.body['values']['CASEDA_ENABLED'], isTrue);
+        expect(d.body['values']['CASEDA_USERNAME'], 'eltern@example.org');
+        expect(d.body['secrets']['CASEDA_PASSWORD'], isTrue);
+        expect(jsonEncode(d.body), isNot(contains('richtig')));
+
+        final sync = await call('GET', '/api/sync', cookie: cookie);
+        expect((sync.body['tasks'] as Map).keys, contains('meals'));
+      },
+    );
+
+    test('switched off and on again: login is kept', () async {
+      final s = await start({
+        'CASEDA_USERNAME': 'eltern@example.org',
+        'CASEDA_PASSWORD': 'gespeichert',
+      });
+      final cookie = await completeSetup(s);
+      expect(s.config.caseda, isNotNull);
+
+      var r = await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {'CASEDA_ENABLED': 'false'},
+        },
+      );
+      expect(r.status, 200);
+      expect(s.config.caseda, isNull);
+      expect(
+        (await call('GET', '/api/meals', cookie: cookie)).body['error']['code'],
+        'meals_disabled',
+      );
+      final d = await call('GET', '/api/server-settings', cookie: cookie);
+      expect(d.body['values']['CASEDA_ENABLED'], isFalse);
+      expect(d.body['values']['CASEDA_USERNAME'], 'eltern@example.org');
+      expect(d.body['secrets']['CASEDA_PASSWORD'], isTrue);
+
+      final before = mealsLogins.length;
+      r = await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {'CASEDA_ENABLED': 'true'},
+        },
+      );
+      expect(r.status, 200);
+      expect(mealsLogins.length, greaterThan(before), reason: 'login tested');
+      expect(s.config.caseda?.password, 'gespeichert');
+      expect((await call('GET', '/api/meals', cookie: cookie)).status, 200);
+    });
+
+    test('test login with the stored password', () async {
+      final s = await start({
+        'CASEDA_USERNAME': 'eltern@example.org',
+        'CASEDA_PASSWORD': 'gespeichert',
+      });
+      final cookie = await completeSetup(s);
+      final r = await call(
+        'POST',
+        '/api/server-settings/test-caseda',
+        cookie: cookie,
+        json: {'username': 'eltern@example.org'},
+      );
+      expect(r.body, {'ok': true});
+      expect(mealsLogins.last.password, 'gespeichert');
+    });
+  });
 }
 
 /// The token of a server that is no longer in setup mode (any value).
 String tokenOf2(AppServer s) => 'beliebig';
+
+/// Fake Caseda: a fixed snapshot, or an error.
+class FakeMeals implements MealsGateway {
+  Object? error;
+
+  @override
+  Uri? get orderUrl => null;
+
+  @override
+  Future<MealsSnapshot> load(DateTime today) async {
+    if (error != null) throw error!;
+    return MealsSnapshot(
+      balanceCents: 1230,
+      orders: [
+        MealOffer(
+          date: DateTime(2026, 11, 10),
+          line: 'Menü 1',
+          name: 'Nudeln',
+          allergens: const ['a'],
+          priceCents: 390,
+          ordered: 1,
+          deadlinePassed: true,
+        ),
+      ],
+    );
+  }
+}

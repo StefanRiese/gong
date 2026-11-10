@@ -1,4 +1,5 @@
 import '../api/cache.dart';
+import '../caseda/caseda.dart';
 import '../models/models.dart';
 
 /// Cache keys of the portal data and how to restore them from JSON.
@@ -10,6 +11,7 @@ abstract final class CacheKeys {
   static const homework = 'homework';
   static const allHomework = 'homework:all';
   static const grades = 'grades';
+  static const meals = 'meals';
 
   static String course(String id) => 'course:$id';
 
@@ -50,6 +52,7 @@ abstract final class CacheKeys {
       courses => CacheCodec((j) => _list(j, Course.fromJson)),
       homework || allHomework => CacheCodec((j) => _list(j, Homework.fromJson)),
       grades => CacheCodec((j) => _list(j, CourseGrades.fromJson)),
+      meals => CacheCodec((j) => MealsSnapshot.fromJson(_map(j))),
       _ => null,
     };
   }

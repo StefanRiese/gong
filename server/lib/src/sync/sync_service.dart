@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import '../api/cache.dart';
+import '../caseda/caseda.dart';
 import '../models/models.dart';
 import '../sph/errors.dart';
 import '../sph/sph_service.dart';
@@ -18,6 +19,9 @@ enum SyncTask {
 
   /// All course pages: course details, grades, full homework list, courses.
   lessons,
+
+  /// School meals (Caseda): balance and own orders; only when set up.
+  meals,
 }
 
 class SyncConfig {
@@ -35,6 +39,9 @@ class SyncConfig {
   /// Account and timetable.
   final Duration slowInterval;
 
+  /// School meals: balance and orders.
+  final Duration mealsInterval;
+
   /// Sync only between these hours (local time), e.g. 6 and 22.
   final int activeFromHour;
   final int activeToHour;
@@ -48,6 +55,7 @@ class SyncConfig {
     this.detailsInterval = const Duration(hours: 2),
     this.calendarInterval = const Duration(hours: 1),
     this.slowInterval = const Duration(hours: 6),
+    this.mealsInterval = const Duration(hours: 2),
     this.activeFromHour = 6,
     this.activeToHour = 22,
     this.pause = const Duration(seconds: 2),
@@ -58,6 +66,7 @@ class SyncConfig {
     SyncTask.lessons => detailsInterval,
     SyncTask.calendar => calendarInterval,
     SyncTask.account || SyncTask.timetable => slowInterval,
+    SyncTask.meals => mealsInterval,
   };
 
   bool isActive(DateTime t) => activeFromHour <= activeToHour
@@ -138,10 +147,14 @@ class SyncService {
   /// requests do not trigger loads shortly before the sync would.
   static const _grace = Duration(minutes: 5);
 
+  /// School meals (Caseda); null = not set up, the task is skipped.
+  final MealsGateway? meals;
+
   SyncService({
     required this.service,
     required this.cache,
     required this.db,
+    this.meals,
     this.config = const SyncConfig(),
     void Function(String message)? log,
     DateTime Function()? now,
@@ -188,9 +201,15 @@ class SyncService {
   List<SyncTask> dueTasks(DateTime now) => !config.isActive(now)
       ? const []
       : [
-          for (final t in SyncTask.values)
+          for (final t in tasks)
             if (!nextRun(t).isAfter(now)) t,
         ];
+
+  /// Tasks of this installation (without meals if Caseda is not set up).
+  List<SyncTask> get tasks => [
+    for (final t in SyncTask.values)
+      if (t != SyncTask.meals || meals != null) t,
+  ];
 
   /// How long a cached entry counts as fresh for the web UI while the
   /// background sync keeps it up to date; null if the sync does not cover
@@ -213,6 +232,7 @@ class SyncService {
       CacheKeys.courses ||
       CacheKeys.grades ||
       CacheKeys.allHomework => SyncTask.lessons,
+      CacheKeys.meals => SyncTask.meals,
       _ => null,
     };
   }
@@ -223,7 +243,7 @@ class SyncService {
     while (_running != null) {
       await _running;
     }
-    await _runTasks((tasks ?? SyncTask.values).toList());
+    await _runTasks((tasks ?? this.tasks).where(this.tasks.contains).toList());
   }
 
   void _tick() {
@@ -318,6 +338,10 @@ class SyncService {
         cache.put(CacheKeys.grades, snap.grades);
         cache.put(CacheKeys.allHomework, snap.allHomework);
         return snap;
+      case SyncTask.meals:
+        final snap = await meals!.load(_now());
+        cache.put(CacheKeys.meals, snap);
+        return snap;
     }
   }
 
@@ -354,6 +378,8 @@ class SyncService {
     SphAuthException() => 'Anmeldung beim Schulportal fehlgeschlagen',
     SphFeatureDisabledException() => 'Bereich nicht freigeschaltet',
     SphDataException() => 'Unerwartete Daten vom Schulportal',
+    CasedaException(isAuth: true) => 'Anmeldung bei Caseda fehlgeschlagen',
+    CasedaException() => 'Caseda Schulmenü nicht erreichbar',
     _ => 'Unerwarteter Fehler',
   };
 }

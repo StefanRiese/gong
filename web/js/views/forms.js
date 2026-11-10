@@ -62,6 +62,9 @@ const PROBLEMS = [
   [/PORT/, 'Der Port muss zwischen 1 und 65535 liegen.'],
   [/SESSION_TTL_DAYS/, 'Die Anmeldedauer muss mindestens 1 Tag sein.'],
   [/NOTIFY: unknown/, 'Unbekannte Art von Benachrichtigung.'],
+  [/CASEDA_USERNAME and CASEDA_PASSWORD/, 'Für das Schulessen werden E-Mail und Passwort des Caseda-Kontos gebraucht.'],
+  [/CASEDA_URL/, 'Die Adresse des Bestellsystems muss mit https:// beginnen.'],
+  [/CASEDA_BALANCE_WARNING/, 'Der Betrag für den Guthaben-Hinweis muss zwischen 0 und 1000 € liegen.'],
 ];
 
 function problemText(p) {

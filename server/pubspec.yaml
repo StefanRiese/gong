@@ -10,6 +10,7 @@ dependencies:
   # Pinned: liblanis is pre-1.0 and its API may change.
   dio: ^5.11.1
   ffi: ^2.2.0
+  html: ^0.15.7
   html_unescape: ^2.0.0
   liblanis: 0.1.4
   shelf: ^1.4.3

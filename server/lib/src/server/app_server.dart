@@ -9,6 +9,7 @@ import '../api/cache.dart';
 import '../api/embedded_web.dart';
 import '../api/server_control.dart';
 import '../auth/sessions.dart';
+import '../caseda/caseda.dart';
 import '../config/app_config.dart';
 import '../config/env.dart';
 import '../config/server_settings.dart';
@@ -20,6 +21,7 @@ import '../sph/sph_gateway.dart';
 import '../sph/sph_service.dart';
 import '../storage/app_database.dart';
 import '../storage/settings_store.dart';
+import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
 import '../update/update_service.dart';
 
@@ -28,6 +30,9 @@ typedef LogLine = void Function(String line, bool isError);
 
 /// Creates the portal access for a set of credentials (tests: fake).
 typedef GatewayFactory = SphGateway Function(SphCredentials credentials);
+
+/// Creates the school meals access (tests: fake).
+typedef MealsGatewayFactory = MealsGateway Function(CasedaConfig config);
 
 /// Startup failure with a sysexits-style exit code.
 class AppServerException implements Exception {
@@ -55,6 +60,7 @@ class AppServer implements ServerControl {
   final Map<String, String> _base;
   final WebSettingsStore _web;
   final GatewayFactory _gateway;
+  final MealsGatewayFactory _mealsGateway;
   final SchoolDirectory _schools;
   final LogLine _log;
 
@@ -77,6 +83,7 @@ class AppServer implements ServerControl {
     this._base,
     this._web,
     this._gateway,
+    this._mealsGateway,
     this._schools,
     this._log,
     this._config,
@@ -121,6 +128,7 @@ class AppServer implements ServerControl {
     Map<String, String> env, {
     required LogLine log,
     GatewayFactory? gateway,
+    MealsGatewayFactory? mealsGateway,
     SchoolDirectory? schools,
     int? passwordIterations,
     Future<void> Function()? onUpdateReady,
@@ -131,6 +139,14 @@ class AppServer implements ServerControl {
         gateway ??
         (c) => LiblanisGateway(
           schoolId: c.schoolId,
+          username: c.username,
+          password: c.password,
+        );
+
+    final makeMeals =
+        mealsGateway ??
+        (c) => CasedaGateway(
+          baseUrl: c.url,
           username: c.username,
           password: c.password,
         );
@@ -179,7 +195,7 @@ class AppServer implements ServerControl {
     final cache = Api.createCache(store: db);
     final settings = SettingsStore(db);
     final service = SphService(makeGateway(config.sph));
-    final sync = _createSync(service, cache, db, config, info);
+    final sync = _createSync(service, cache, db, config, info, makeMeals);
     final api = Api(
       service: service,
       passwordHash: config.appPasswordHash,
@@ -226,7 +242,10 @@ class AppServer implements ServerControl {
       log: info,
       get: updateGet,
     )..cleanUp();
-    api.update = update;
+    api
+      ..update = update
+      ..meals = config.caseda == null ? null : makeMeals(config.caseda!)
+      ..mealsBalanceWarningCents = config.mealsBalanceWarningCents;
 
     final server = AppServer._(
       http,
@@ -236,6 +255,7 @@ class AppServer implements ServerControl {
       env,
       web,
       makeGateway,
+      makeMeals,
       schools ?? SchoolDirectory(),
       log,
       config,
@@ -311,11 +331,13 @@ class AppServer implements ServerControl {
     AppDatabase db,
     AppConfig config,
     void Function(String) info,
+    MealsGatewayFactory makeMeals,
   ) => SyncService(
     service: service,
     cache: cache,
     db: db,
     config: config.sync,
+    meals: config.caseda == null ? null : makeMeals(config.caseda!),
     log: info,
   );
 
@@ -409,6 +431,16 @@ class AppServer implements ServerControl {
       'TRUST_PROXY': c.trustProxy,
       'OPEN_BROWSER': c.openBrowser,
       'UPDATE_CHECK': c.updateCheck,
+      'CASEDA_URL':
+          c.caseda?.url.toString() ??
+          raw('CASEDA_URL') ??
+          'https://www.caseda-schulmenue.de',
+      // Switched off keeps the stored login (shown below).
+      'CASEDA_ENABLED': c.caseda != null,
+      'CASEDA_USERNAME': c.caseda?.username ?? raw('CASEDA_USERNAME') ?? '',
+      'CASEDA_BALANCE_WARNING': (c.mealsBalanceWarningCents / 100)
+          .toStringAsFixed(2)
+          .replaceAll('.', ','),
     };
     return {
       'setupRequired': c.needsSetup,
@@ -417,9 +449,15 @@ class AppServer implements ServerControl {
         'SPH_PASSWORD': c.sph.password.isNotEmpty,
         'NTFY_TOKEN': (c.ntfy?.token ?? '').isNotEmpty,
         'APP_PASSWORD': c.appPasswordHash.isNotEmpty,
+        'CASEDA_PASSWORD': raw('CASEDA_PASSWORD') != null,
       },
       'sources': {
-        for (final k in [...values.keys, 'SPH_PASSWORD', 'NTFY_TOKEN'])
+        for (final k in [
+          ...values.keys,
+          'SPH_PASSWORD',
+          'NTFY_TOKEN',
+          'CASEDA_PASSWORD',
+        ])
           k: web.containsKey(k)
               ? 'web'
               : _base.containsKey(k)
@@ -459,6 +497,24 @@ class AppServer implements ServerControl {
   }
 
   @override
+  Future<void> testCasedaLogin({
+    required String username,
+    String? password,
+    String? url,
+  }) async {
+    final base = url == null
+        ? _config.caseda?.url ?? Uri.parse('https://www.caseda-schulmenue.de')
+        : Uri.tryParse(url);
+    if (base == null || !base.isScheme('https') || base.host.isEmpty) {
+      throw ArgumentError('url must be an https URL');
+    }
+    final pw = password ?? _config.caseda?.password ?? '';
+    await _mealsGateway(
+      CasedaConfig(url: base, username: username, password: pw),
+    ).load(DateTime.now());
+  }
+
+  @override
   Future<ApplyResult> apply(Map<String, String> changes) {
     // One change at a time.
     final result = _applying.then((_) => _apply(changes));
@@ -482,6 +538,19 @@ class AppServer implements ServerControl {
         username: n.username,
         password: n.password,
       );
+    }
+
+    final pc = previous.caseda, nc = next.caseda;
+    final casedaChanged =
+        pc?.url != nc?.url ||
+        pc?.username != nc?.username ||
+        pc?.password != nc?.password;
+    if (nc != null && casedaChanged) {
+      await _mealsGateway(nc).load(DateTime.now());
+    }
+    if (pc?.url != nc?.url ||
+        pc?.username.toLowerCase() != nc?.username.toLowerCase()) {
+      _cache.remove(CacheKeys.meals); // another Caseda account (or none)
     }
 
     _web.save(web);
@@ -518,11 +587,13 @@ class AppServer implements ServerControl {
       _cache.clear();
       _db.resetPortalState();
     }
-    _sync = _createSync(_service, _cache, _db, next, _info);
+    _sync = _createSync(_service, _cache, _db, next, _info, _mealsGateway);
     _api
       ..service = _service
       ..sync = _sync
       ..poller = _createPoller(_sync, _db, _api.settings, next, _info)
+      ..meals = next.caseda == null ? null : _mealsGateway(next.caseda!)
+      ..mealsBalanceWarningCents = next.mealsBalanceWarningCents
       ..passwordHash = next.appPasswordHash;
     _update.checkEnabled = next.updateCheck;
     _config = next;

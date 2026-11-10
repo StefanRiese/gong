@@ -65,6 +65,9 @@ dart run bin/sph.dart course <id>
 dart run bin/sph.dart grades
 ```
 
+`bin/caseda.dart` prints the Caseda balance and own orders (`--summary`: counts only;
+credentials `CASEDA_USERNAME` / `CASEDA_PASSWORD` in `.env`).
+
 Exit codes: 3 auth, 4 portal unavailable, 5 feature disabled / not found, 6 unexpected data.
 
 ### Tests
@@ -113,6 +116,7 @@ time with short pauses:
 | `substitutions`, `homework` | `POLL_INTERVAL_MINUTES` (15) | `substitutions`, `homework` (merged into `homework:all`) |
 | `lessons` | `GRADES_INTERVAL_MINUTES` (120) | `courses`, `course:<id>`, `grades`, `homework:all` – one request per course |
 | `calendar` | 60 min | `calendar:<today>:<+60 days>` |
+| `meals` | 2 h (only with Caseda) | `meals` – balance and own orders of three weeks (`lib/src/caseda/`) |
 | `account`, `timetable` | 6 h | `account`, `timetable` |
 
 Failures are retried after 5, 10, 20 … min (at most the interval); `SYNC=false` disables the
@@ -169,6 +173,8 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | PUT | `/api/server-settings` | `{"settings": {KEY: value}, "appPassword"?, "currentPassword"?}`; new Schulportal credentials are tested first; finishing the setup logs in |
 | POST | `/api/server-settings/test-login` | `{"schoolId", "username", "password"?}`; max. 5 per 5 min |
 | GET | `/api/schools?q=…` | school search in the public school list of Schulportal Hessen |
+| GET | `/api/meals` | school meals (Caseda): balance and own orders (read-only) |
+| POST | `/api/server-settings/test-caseda` | test a Caseda login |
 | GET | `/api/update` | version, latest release, update state |
 | POST | `/api/update/check` | look for a new release now |
 | POST | `/api/update/install` | install the latest release (202, async; see docs/API.md) |

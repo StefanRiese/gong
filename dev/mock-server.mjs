@@ -29,6 +29,8 @@ const serverValues = {
   GRADES_INTERVAL_MINUTES: 120, ACTIVE_HOURS: '6-22', NTFY_URL: 'https://ntfy.sh', NTFY_TOPIC: '',
   NOTIFY: 'substitutions,homework,grades', NOTIFY_GRADE_VALUES: false, APP_URL: '', HOST: '0.0.0.0',
   PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false, UPDATE_CHECK: true,
+  CASEDA_ENABLED: true, CASEDA_URL: 'https://www.caseda-schulmenue.de', CASEDA_USERNAME: 'eltern@example.org',
+  CASEDA_BALANCE_WARNING: '10,00',
 };
 const SCHOOLS = [
   { id: 9999, name: 'Musterschule', city: 'Musterstadt' },
@@ -434,6 +436,17 @@ async function handleApi(req, res, url) {
       return data(res, 'homework:all', all.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')));
     }
     case '/api/grades': return data(res, 'grades', grades);
+    case '/api/meals': {
+      // School meals (Caseda): own orders and balance; off in the settings → 404.
+      if (!serverValues.CASEDA_ENABLED) return error(res, 404, 'meals_disabled', 'School meals are not set up');
+      const order = (date, line, name) => ({ date: ymd(date), line, name, allergens: [], priceCents: 390, ordered: 1, deadlinePassed: false });
+      return data(res, 'meals', {
+        balanceCents: 845,
+        orders: [order(d1, 'Menü 1', 'Gemüsemaultaschen mit Kräuter-Frischkäsesauce'),
+          order(d2, 'Tagesmenue', 'Putensteak mit Bio-Reis und Kräutervelouté'),
+          order(nextSchoolDay(d2), 'Menü 2', 'Ofenkartoffeln mit Kräuterquark')],
+      }, { balanceWarningCents: Math.round(parseFloat(String(serverValues.CASEDA_BALANCE_WARNING).replace(',', '.')) * 100), orderUrl: 'https://www.caseda-schulmenue.de/kunden/essen/' });
+    }
     case '/api/calendar': {
       const from = url.searchParams.get('from') ? new Date(`${url.searchParams.get('from')}T00:00`) : today;
       const to = url.searchParams.get('to') ? new Date(`${url.searchParams.get('to')}T00:00`) : addDays(today, 60);
@@ -462,10 +475,15 @@ async function handleServerSettings(req, res, url) {
     if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
     return json(res, 200, { ok: true });
   }
+  if (path === '/api/server-settings/test-caseda') {
+    const b = JSON.parse((await readBody(req)) || '{}');
+    if (b.password === 'falsch') return error(res, 400, 'meals_login_failed', 'Login failed');
+    return json(res, 200, { ok: true });
+  }
   if (req.method === 'GET') {
     return json(res, 200, {
       setupRequired, values: serverValues, desktop: false,
-      secrets: { SPH_PASSWORD: !setupRequired, NTFY_TOKEN: false, APP_PASSWORD: !setupRequired },
+      secrets: { SPH_PASSWORD: !setupRequired, NTFY_TOKEN: false, APP_PASSWORD: !setupRequired, CASEDA_PASSWORD: true },
       sources: {}, restartRequired: [],
     });
   }
@@ -484,7 +502,7 @@ async function handleServerSettings(req, res, url) {
   }
   const restart = [];
   for (const [k, v] of Object.entries(s)) {
-    if (k === 'SPH_PASSWORD' || k === 'NTFY_TOKEN') continue;
+    if (k === 'SPH_PASSWORD' || k === 'NTFY_TOKEN' || k === 'CASEDA_PASSWORD') continue;
     if (['HOST', 'PORT'].includes(k) && String(serverValues[k]) !== String(v)) restart.push(k);
     serverValues[k] = typeof serverValues[k] === 'number' ? Number(v)
       : typeof serverValues[k] === 'boolean' ? v === 'true' : v;

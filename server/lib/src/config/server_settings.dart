@@ -29,10 +29,20 @@ abstract final class ServerSettingKeys {
     'TRUST_PROXY',
     'OPEN_BROWSER',
     'UPDATE_CHECK',
+    'CASEDA_ENABLED',
+    'CASEDA_URL',
+    'CASEDA_USERNAME',
+    'CASEDA_PASSWORD',
+    'CASEDA_BALANCE_WARNING',
   };
 
   /// Never sent to the browser (only whether they are set).
-  static const secret = {'SPH_PASSWORD', 'NTFY_TOKEN', 'APP_PASSWORD_HASH'};
+  static const secret = {
+    'SPH_PASSWORD',
+    'NTFY_TOKEN',
+    'APP_PASSWORD_HASH',
+    'CASEDA_PASSWORD',
+  };
 
   /// Take effect only after a restart of the server.
   static const restart = {
