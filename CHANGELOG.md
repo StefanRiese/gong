@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.10.0] – 2026-11-10
+
 ### Added
 - **WebUntis as an optional second source for the substitutions.** Changed lessons of the
   class (cancellations, substitute teachers, room changes, texts) are added to the Vertretungen
@@ -257,7 +259,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/StefanRiese/gong/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/StefanRiese/gong/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/StefanRiese/gong/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/StefanRiese/gong/compare/v0.8.3...v0.9.0
