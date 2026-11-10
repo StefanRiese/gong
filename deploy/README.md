@@ -35,7 +35,7 @@ The script
 
 Open the setup link in a browser: choose the school, enter the Schulportal login (it is
 tested right away) and a password for the web UI. The web UI then opens, logged in. Later
-changes: *Einstellungen → Server* in the web UI.
+changes: *Einstellungen* in the web UI.
 
 The setup link only works until the setup is done; it is also in the log
 (`journalctl -u gong`) and in `/var/lib/gong/setup-token`.
@@ -51,7 +51,7 @@ are written to `/etc/gong/config.env` (readable by root only).
 
 ## Push notifications (ntfy)
 
-Set up in the web UI under *Einstellungen → Server → Benachrichtigungen* („Zufälliges Thema“
+Set up in the web UI under *Einstellungen → Benachrichtigungen* („Zufälliges Thema“
 creates a hard-to-guess topic), or with `install.sh --configure`. On your phone, install the **ntfy** app (Android: Play Store/F-Droid, iOS: App Store), tap **+** and
 subscribe to that topic on the same server (default `https://ntfy.sh`). Then open
 **Benachrichtigungen** (bell icon) in the web UI and press **Testnachricht senden**.
@@ -79,7 +79,7 @@ Without internet access on the container, copy a release archive over and use
 
 ## School meals and WebUntis (optional)
 
-Both are read-only and set up in the web UI under *Einstellungen → Server* (or with the
+Both are read-only and set up in the web UI under *Einstellungen* (or with the
 `CASEDA_*` / `UNTIS_*` keys in `config.env`, see `config.env.example`):
 
 - **Schulessen** – login of the Caseda Schulmenü account; shows the own orders (page
@@ -94,10 +94,10 @@ The logins are tested before they are saved and can be switched off without losi
 
 | Task | Command |
 |---|---|
-| Update to the latest release | web UI: *Einstellungen → Server → Update*, or `bash /opt/gong/deploy/install.sh` |
+| Update to the latest release | web UI: *Einstellungen → Update*, or `bash /opt/gong/deploy/install.sh` |
 | Install a specific version | `bash /opt/gong/deploy/install.sh --version v0.1.0` |
 | Back to the previous version | `bash /opt/gong/deploy/install.sh --rollback` |
-| Change credentials / web password / ntfy / sync | web UI: *Einstellungen → Server* (or `install.sh --configure`) |
+| Change credentials / web password / ntfy / sync | web UI: *Einstellungen* (or `install.sh --configure`) |
 | Status | `systemctl status gong` |
 | Logs | `journalctl -u gong -f` |
 | Restart (after editing config.env) | `systemctl restart gong` |
@@ -108,7 +108,7 @@ Updates keep `config.env`. The previous version stays in `/opt/gong.old` for
 `--rollback`.
 
 **Updates from the web UI:** the server checks GitHub for new releases every 12 hours
-(`UPDATE_CHECK`) and shows a notice. „Jetzt aktualisieren“ in *Einstellungen → Server → Update*
+(`UPDATE_CHECK`) and shows a notice. „Jetzt aktualisieren“ in *Einstellungen → Update*
 lets the (unprivileged) service write the wanted version to
 `/var/lib/gong/update-request`; the root units `gong-update.path`
 / `.service` (installed and enabled by `install.sh`) then run `install.sh --auto-update`. It
@@ -135,7 +135,7 @@ Do not forward the port on your router. Options:
 - **VPN / Tailscale** (recommended): install Tailscale in this or another container and open
   `http://<tailscale-ip>:8080`.
 - **Reverse proxy with HTTPS** (e.g. Nginx Proxy Manager, Caddy, Traefik): proxy to
-  `http://<container-ip>:8080`, then enable *Einstellungen → Server → Netzwerk → Erweitert*
+  `http://<container-ip>:8080`, then enable *Einstellungen → Web-Oberfläche*
   „Nur über HTTPS“ and „Hinter einem Reverse-Proxy“ (or in `config.env`:
   `COOKIE_SECURE='true'`, `TRUST_PROXY='true'`) and restart the service. With a proxy on the
   same container you can also choose „Nur auf diesem Gerät“ (`HOST='127.0.0.1'`).

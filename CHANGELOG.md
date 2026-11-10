@@ -6,6 +6,15 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- **Settings restructured:** everything is on one page (*Einstellungen*) in eight flat groups –
+  Schulportal, Vertretungen (own class, filters and WebUntis), Schulessen, Fächer & Farben,
+  Benachrichtigungen, Abgleich, Web-Oberfläche (password, login duration, network) and Update –
+  with **one „Speichern“ button** instead of one per section (and instead of settings that saved
+  themselves). The page shows unsaved changes, asks before they are lost and saves only what
+  changed. The page *Einstellungen → Server* and the long link lists are gone; old addresses and
+  anchors lead to the new page, the desktop apps open it directly.
+
 ## [0.10.2] – 2026-11-10
 
 ### Fixed

@@ -19,8 +19,8 @@ export async function render() {
       back,
       pageHeader('Benachrichtigungen', badge('aus')),
       empty('Push-Benachrichtigungen sind nicht eingerichtet.'),
-      h('p', null, h('a', { href: '/einstellungen/server', class: 'settings-link' },
-        icon('settings'), 'In den Server-Einstellungen einrichten')),
+      h('p', null, h('a', { href: '/einstellungen#benachrichtigungen', class: 'settings-link' },
+        icon('settings'), 'In den Einstellungen einrichten')),
       h('p', { class: 'hint' },
         'Dort ein ntfy-Thema angeben, dann die ntfy-App installieren und dasselbe Thema abonnieren.'),
     );

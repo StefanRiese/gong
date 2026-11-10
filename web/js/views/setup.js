@@ -82,7 +82,7 @@ export function render({ token, onDone }) {
     h('h1', null, 'Gong einrichten'),
     h('p', { class: 'muted' },
       'Der Server meldet sich mit diesen Zugangsdaten beim Schulportal Hessen an und hält die Daten aktuell. ',
-      'Alles lässt sich später unter Einstellungen → Server ändern.'),
+      'Alles lässt sich später unter Einstellungen ändern.'),
 
     h('fieldset', null,
       h('legend', null, '1. Schule'),

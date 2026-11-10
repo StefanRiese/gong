@@ -17,9 +17,17 @@ import * as notifications from './views/notifications.js';
 import * as settings from './views/settings.js';
 import * as subjects from './views/subjects.js';
 import * as setup from './views/setup.js';
-import * as serverSettings from './views/server-settings.js';
 import { initColors } from './colors.js';
 import { updateHint, watchServerVersion } from './update.js';
+
+/** The server settings are part of the settings page now (old links and apps). */
+const serverSettingsMoved = {
+  title: 'Einstellungen',
+  async render() {
+    navigate(`/einstellungen${location.hash}`, { replace: true });
+    return h('div');
+  },
+};
 
 route('/', today);
 route('/stundenplan', timetable);
@@ -31,7 +39,7 @@ route('/kalender', calendar);
 route('/schulessen', meals);
 route('/benachrichtigungen', notifications);
 route('/einstellungen', settings);
-route('/einstellungen/server', serverSettings);
+route('/einstellungen/server', serverSettingsMoved);
 route('/faecher', subjects);
 
 // short: label in the phone tab bar

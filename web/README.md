@@ -20,18 +20,29 @@ js/colors.js            subject colors, course ↔ timetable-abbreviation matchi
 js/substitution-filter.js  helpers for the substitution filters
 js/update.js            update hint and installation, reload of an installed app after an update
 js/views/*.js           one module per page (common.js: shared cards and helpers)
-js/views/forms.js       form helpers for setup and server settings (fields, school search)
+js/views/settings*.js   the settings page: settings.js (page, save bar), settings-groups.js
+                        (one function per group), settings-form.js (registry of the values)
+js/views/forms.js       form helpers for setup and settings (fields, school search)
 ```
 
 Pages: `/` (Heute), `/stundenplan` (week table; compact on phones), `/vertretungen`, `/hausaufgaben`, `/noten`,
 `/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
-`/kalender`, `/schulessen` (only with Caseda), `/einstellungen` (gear icon: substitution filter with „Meine Klasse“,
-notification and server links, subject colors), `/einstellungen/server` (grouped: Konto,
-Daten, Benachrichtigungen, Vertretungen (WebUntis), Schulessen, System; sections linkable by
-anchor),
+`/kalender`, `/schulessen` (only with Caseda), `/einstellungen` (gear icon; everything on one
+page, see „Settings page“; `/einstellungen/server` redirects there),
 `/benachrichtigungen` (ntfy status, test message, check now), and `/einrichtung` (setup page,
 shown instead of the login while the server is not set up; the token from the setup link is
 kept in `sessionStorage` and removed from the address bar).
+
+**Settings page** (`/einstellungen`): one form, one „Speichern“ button in a bar at the bottom,
+eight flat groups (Schulportal, Vertretungen incl. WebUntis, Schulessen, Fächer & Farben,
+Benachrichtigungen, Abgleich, Web-Oberfläche, Update; no nested headings or sub-pages). Every
+control registers with `createForm()`; a save sends only what changed – the server settings
+(`PUT /api/server-settings`, checked first) and the personal ones (`PUT /api/settings`: filter,
+colors) – so values that come from `config.env` are not pinned into the database. The bar shows
+„Ungespeicherte Änderungen“ with „Verwerfen“; leaving by a link or closing asks first. Buttons
+inside the groups only run actions („Anmeldung prüfen“, update). Old anchors still work
+(`#schulportal`, `#vertretungsplan`, `#webuntis`, `#schulessen`, `#farben`, `#benachrichtigungen`,
+`#abgleich`, `#passwort`, `#netzwerk`, `#update`).
 
 **Live updates and refresh:** pages answer from the server's cache right away. `app.js` follows
 `/api/events` (Server-Sent Events): when a cache key used by the current page changes, the page
@@ -75,7 +86,7 @@ settings (event `gong:meals-changed`) and shows the menu item accordingly.
 
 WebUntis (second source): entries with `source` get a badge on Vertretungen and Heute („laut
 WebUntis“, or „Schulportal + WebUntis“ for completed Schulportal entries); a replaced teacher is
-struck through (`teacherChange` in `views/common.js`); set up in *Einstellungen → Server → Vertretungen* (`untisSection`).
+struck through (`teacherChange` in `views/common.js`); set up in *Einstellungen → Vertretungen*.
 
 App updates (`js/update.js`): a hint bar below the top bar when a new release is available
 (dismissable per version, `localStorage` key `updateDismissed`); *Einstellungen → Server →

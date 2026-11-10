@@ -97,7 +97,7 @@ Settings come from three layers (later ones win):
 
 1. `.env` / the file in `ENV_FILE` (see `.env.example`),
 2. environment variables,
-3. settings made in the web UI (setup page, *Einstellungen → Server*), stored in the database
+3. settings made in the web UI (setup page, *Einstellungen*), stored in the database
    (`meta` key `server-config`).
 
 Without Schulportal credentials or web UI password the server starts in **setup mode**: data
@@ -129,7 +129,7 @@ time with short pauses:
 
 ### Optional sources
 
-Both are off until set up (*Einstellungen → Server*, or `CASEDA_*` / `UNTIS_*` in the config
+Both are off until set up (*Einstellungen*, or `CASEDA_*` / `UNTIS_*` in the config
 file; `…_ENABLED=false` switches off but keeps the login). Both are read-only and sit behind
 gateway interfaces (`MealsGateway`, `UntisGateway`), so tests use fakes.
 

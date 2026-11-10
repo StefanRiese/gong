@@ -15,7 +15,7 @@ class ApplyResult {
 }
 
 /// What the API needs from the running server to show and change its
-/// settings (setup page, „Einstellungen → Server“). Implemented by AppServer.
+/// settings (setup page, „Einstellungen“). Implemented by AppServer.
 abstract interface class ServerControl {
   /// Schulportal credentials or web UI password missing: only the setup page
   /// works (authorized by the setup token).

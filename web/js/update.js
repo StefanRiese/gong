@@ -22,7 +22,7 @@ export async function updateHint() {
   }
   const bar = h('div', { class: 'portal-notice update-notice', role: 'status' },
     h('span', null, `Version ${status.latest.replace(/^v/, '')} ist verfügbar.`),
-    h('a', { href: '/einstellungen/server#update', class: 'button small' }, 'Details'),
+    h('a', { href: '/einstellungen#update', class: 'button small' }, 'Details'),
     h('button', {
       type: 'button', class: 'button small', 'aria-label': 'Hinweis ausblenden',
       onclick: () => {

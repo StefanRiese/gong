@@ -72,7 +72,7 @@ web UI password in the browser. Full guide: [deploy/README.md](deploy/README.md)
 
 ## Updating
 
-*Einstellungen → Server → Update* shows new releases with their release notes; „Jetzt
+*Einstellungen → Update* shows new releases with their release notes; „Jetzt
 aktualisieren“ installs them (LXC, Windows and macOS). On the server alternatively:
 `bash /opt/gong/deploy/install.sh`.
 

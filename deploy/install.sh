@@ -341,7 +341,7 @@ start_service() {
   [[ $SKIP_SYSTEMD == 1 ]] && { say "(SKIP_SYSTEMD) Dienst nicht gestartet"; return 0; }
   systemctl daemon-reload
   systemctl enable "$APP" >/dev/null 2>&1
-  # Updates from the web UI (Einstellungen → Server → Update).
+  # Updates from the web UI (Einstellungen → Update).
   if [[ -f $UNIT_DIR/$APP-update.path ]]; then
     systemctl enable --now "$APP-update.path" >/dev/null 2>&1 ||
       warn "Update aus der Web-Oberfläche nicht verfügbar ($APP-update.path)"

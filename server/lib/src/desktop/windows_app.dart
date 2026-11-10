@@ -54,7 +54,7 @@ Future<Never> _run(
   }
 
   // config.env is optional (advanced settings); the normal way to configure
-  // is the setup page / „Einstellungen → Server“ in the web UI.
+  // is the setup page / „Einstellungen“ in the web UI.
   try {
     if (hashPlainPasswordInFile(configPath)) {
       info('Replaced APP_PASSWORD with APP_PASSWORD_HASH in $configPath');
@@ -141,7 +141,7 @@ Future<Never> _run(
   try {
     tray = await WindowsTray.start(
       url: url.toString(),
-      settingsUrl: url.resolve('einstellungen/server').toString(),
+      settingsUrl: url.resolve('einstellungen').toString(),
       logPath: logPath,
       iconPng: base64.decode(trayIconPng),
       startupHint: showHint
@@ -208,7 +208,7 @@ void _openConfigFile(String path) {
     file.writeAsStringSync(
       '# Gong – erweiterte Einstellungen (optional).\r\n'
       '# Normalerweise werden alle Einstellungen in der Web-Oberfläche\r\n'
-      '# vorgenommen (Einstellungen → Server). Beispiel:\r\n'
+      '# vorgenommen (Einstellungen). Beispiel:\r\n'
       '# PORT=8090\r\n',
     );
   }

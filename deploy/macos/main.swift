@@ -219,7 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Server settings page of the web UI.
     @objc private func openSettings() {
-        if let url = webURL?.appendingPathComponent("einstellungen/server") {
+        if let url = webURL?.appendingPathComponent("einstellungen") {
             NSWorkspace.shared.open(url)
         } else if server == nil {
             restartServer()

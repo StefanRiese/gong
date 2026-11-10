@@ -5,7 +5,7 @@ import 'dart:math';
 import '../storage/app_database.dart';
 
 /// Server settings that can be changed in the web UI (setup page and
-/// „Einstellungen → Server“). Names are the config.env keys.
+/// „Einstellungen“). Names are the config.env keys.
 abstract final class ServerSettingKeys {
   static const editable = {
     'SPH_SCHOOL_ID',

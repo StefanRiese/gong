@@ -25,7 +25,7 @@ it opens in the default browser.
    - choose a password for the web UI (min. 8 characters).
 3. „Einrichtung abschließen“ – the web UI opens, already logged in.
 
-Everything can be changed later in the web UI under *Einstellungen → Server* (also reachable
+Everything can be changed later in the web UI under *Einstellungen* (also reachable
 from the tray / menu bar menu). Settings are stored in the database; a text editor is not needed.
 
 ## Menu
@@ -42,7 +42,7 @@ Starting the app a second time opens the web UI instead of a second server.
 
 ## Notes
 
-- By default the web UI is only reachable on this computer. *Einstellungen → Server →
+- By default the web UI is only reachable on this computer. *Einstellungen →
   Netzwerk → „Auch von anderen Geräten im Netzwerk“* (then *Neu starten*) lets phones in the
   same network use it too (Windows asks to allow it in the firewall): `http://<computer-ip>:8080`.
 - If port 8080 is taken by another program, the app offers to open `config.env`: enter e.g.
@@ -52,7 +52,7 @@ Starting the app a second time opens the web UI instead of a second server.
   They only arrive while the computer and the app are running – for notifications around the
   clock use the LXC installation.
 - **Updates** – the app checks GitHub for new versions and shows a notice in the web UI.
-  *Einstellungen → Server → Update → „Jetzt aktualisieren“* downloads the new version, checks
+  *Einstellungen → Update → „Jetzt aktualisieren“* downloads the new version, checks
   its SHA-256 and restarts the app (Windows: the exe replaces itself; macOS: the menu bar app
   swaps the app bundle – if that is not allowed, e.g. without write access to *Programme*, it
   opens the download page instead).

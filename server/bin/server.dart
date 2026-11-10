@@ -1,7 +1,7 @@
 // HTTP server for gong.
 //
 // Configuration via environment variables or server/.env (see .env.example);
-// settings made in the web UI (setup page, Einstellungen → Server) are stored
+// settings made in the web UI (setup page, Einstellungen) are stored
 // in the database and take precedence.
 //
 //   server            run the server

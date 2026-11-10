@@ -53,7 +53,8 @@ server/                 Dart package (own pubspec)
   tool/                 embed_assets.dart (web UI into the exe), set_exe_icon.dart,
                         set_gui_subsystem.dart
 web/                    web UI: index.html, css/app.css, js/ (ES modules, no build step)
-  js/views/             one module per page (setup.js, server-settings.js, forms.js: settings;
+  js/views/             one module per page (setup.js; settings.js = the whole settings page with one save bar,
+                        settings-groups.js / settings-form.js; forms.js: shared fields;
                         meals.js: Schulessen; common.js: shared cards, teacherChange, badges)
   js/colors.js          subject colors + course ↔ timetable-abbreviation matching
   js/update.js          update hint/install, watchServerVersion (reloads the installed app)
@@ -143,7 +144,7 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
   main` and wait for it to pass: GitHub Actions builds Linux x64/arm64, the Windows exe and
   the universal macOS app; the release notes come from that CHANGELOG section
   (`deploy/release-notes.sh`, the release fails if the section is missing).
-- Deployment target: LXC container; update with *Einstellungen → Server → Update* in the web
+- Deployment target: LXC container; update with *Einstellungen → Update* in the web
   UI or `bash /opt/gong/deploy/install.sh`.
 - Before introducing a new product name, check the App Store, Google Play and the DPMA trademark
   register for existing apps around Schulportal Hessen (not only GitHub).
