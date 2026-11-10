@@ -1,16 +1,16 @@
 ## Open
-- [ ] check on the phone that the installed app reloads itself after a release (since 0.10.2; the phone needs one manual restart of the app first) – 0.11.1 is a good test
+- [ ] check on the phone that the installed app reloads itself after a release (since 0.10.2; the phone needs one manual restart of the app first) – 0.12.0 is a good test
 - [ ] check the new settings page (0.11.0 / 0.11.1) on the real server and the phone: save, unsaved-changes entry at the top, old links (`/einstellungen/server`)
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
 - [ ] phone tab bar: with 8 entries „Aufgaben“ is cut off (shorter label?)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
 - [ ] WebUntis: after the Schulportal adds an entry that WebUntis had supplied, one extra notification is possible
-- [ ] WebUntis: check the timetable warning on the real server after the next release (Mo „LRS“ is a real difference at the moment)
+- [ ] WebUntis: check the timetable warning on the real server (update to 0.12.0 first) (Mo „LRS“ is a real difference at the moment)
 - [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
-- [x] WebUntis as second source for the timetable, warning on the Stundenplan page on differences
+- [x] WebUntis as second source for the timetable, warning on the Stundenplan page on differences (0.12.0)
 - [x] settings: floating save entry at the top instead of a full-width bar (0.11.1)
 - [x] settings restructured: one page, eight flat groups, one save button, only changed values are saved (0.11.0)
 - [x] installed web app reloads itself after a server update (0.10.2)
