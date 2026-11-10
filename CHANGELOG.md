@@ -6,6 +6,15 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.12.0] – 2026-11-10
+
+### Added
+- **WebUntis as a second source for the timetable:** the regular lessons of the current and the
+  next week are compared with the Schulportal timetable. If they differ (a lesson only in one
+  source, another subject, another room), the *Stundenplan* page shows a warning that lists the
+  differences. Parallel groups (religion / ethics) and days without WebUntis lessons (holidays)
+  are not reported. `GET /api/timetable` gets an optional `differences` field.
+
 ## [0.11.1] – 2026-11-10
 
 ### Changed

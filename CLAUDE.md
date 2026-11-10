@@ -28,7 +28,7 @@ server/                 Dart package (own pubspec)
   bin/sph.dart          CLI: prints API data as JSON (debugging against the real portal)
   bin/hash_password.dart  creates APP_PASSWORD_HASH
   bin/caseda.dart       CLI: Caseda balance and orders (`--summary`: counts only)
-  bin/untis.dart        CLI: WebUntis changes compared with the Schulportal plan (`--summary`)
+  bin/untis.dart        CLI: WebUntis changes and timetable compared with the Schulportal (`--summary`)
   bin/spike.dart        milestone-1 probe
   lib/src/sph/          SphGateway (liblanis seam), SphService (session policy), mappers, errors;
                         portal_fixes.dart: workaround for a changed course page (liblanis issue #3,

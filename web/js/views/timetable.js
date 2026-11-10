@@ -9,7 +9,8 @@ const DAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 const SHORT_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
 
 export async function render(ctx) {
-  const tt = await ctx.get('/api/timetable');
+  const res = await ctx.getFull('/api/timetable');
+  const tt = res.data;
   initColors({ subjects: tt.lessons.map((l) => l.subject) });
   const hasWeeks = tt.lessons.some((l) => l.week);
   const requested = ctx.query.get('woche');
@@ -38,8 +39,18 @@ export async function render(ctx) {
   return h('div', null,
     pageHeader('Stundenplan', tt.currentWeek ? badge(`Aktuell Woche ${tt.currentWeek}`, 'info') : null, toggle),
     // Week table on all screens; compact on phones (see .tt-grid in app.css).
+    differences(res.differences),
     h('div', { class: 'tt-scroll' }, grid(tt, week, today)),
   );
+}
+
+/** Warning when WebUntis (second source) shows a different timetable. */
+function differences(list) {
+  if (!list?.length) return null;
+  return h('div', { class: 'notice warn', role: 'alert' },
+    h('strong', null, 'Achtung: Schulportal und WebUntis zeigen einen unterschiedlichen Stundenplan'),
+    h('ul', null, list.map((d) => h('li', null, d.text))),
+    h('small', null, 'Prüfe, welcher Plan stimmt – im Schulportal kann der Stundenplan veraltet sein.'));
 }
 
 function slotsOf(tt) {

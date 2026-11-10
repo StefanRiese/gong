@@ -41,6 +41,7 @@ lib/
   src/caseda/caseda.dart       Caseda Schulmenü: client, parser, MealsGateway (read-only)
   src/untis/untis.dart         WebUntis: client (REST), mapper, UntisGateway (read-only)
   src/untis/merge.dart         combines the WebUntis changes with the Schulportal plan
+  src/untis/compare.dart       compares the WebUntis lessons with the Schulportal timetable
   src/config/env.dart          .env loader, credentials
 ```
 
@@ -142,6 +143,9 @@ gateway interfaces (`MealsGateway`, `UntisGateway`), so tests use fakes.
   substitute, room change, subject, text – the Schulportal's values win, `source: "Schulportal +
   WebUntis"`), entries only WebUntis has are added (`source: "WebUntis"`), days after the end of
   the plan become new days. Notifications get the plan without the completions (fingerprints).
+  The regular lessons of the current and the next week are compared with the Schulportal
+  timetable (`compareTimetables`); `GET /api/timetable` then adds `differences` and the page
+  *Stundenplan* shows a warning.
   `UNTIS_SERVER` (host or pasted address), `UNTIS_SCHOOL` (default: first part of the host),
   `UNTIS_USERNAME`, `UNTIS_PASSWORD`.
 

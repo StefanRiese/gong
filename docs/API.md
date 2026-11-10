@@ -678,6 +678,10 @@ grades), `messages` (Nachrichten, not used yet).
 | `lessons[].duration` | number of consecutive periods |
 | `lessons[].week` | `A`/`B` if the lesson only takes place in one week, else `null` |
 
+The envelope of `GET /api/timetable` has an optional `differences` (only with WebUntis and only
+if there are any): `[{weekday, start, text}]` – differences between the Schulportal timetable and the
+regular lessons of WebUntis (current and next week), `text` is German.
+
 ### SubstitutionDay
 
 ```json

@@ -84,13 +84,59 @@ class UntisChange {
   ].join(' · ');
 }
 
-/// Changed lessons of the own class (what is kept in the cache).
+/// A regular lesson of the own class on one day (the timetable without
+/// today's changes), for comparing with the Schulportal timetable.
+class UntisLesson {
+  final DateTime date;
+  final String start;
+  final String end;
+  final String? subject;
+  final String? room;
+  final String? teacher;
+
+  const UntisLesson({
+    required this.date,
+    required this.start,
+    required this.end,
+    this.subject,
+    this.room,
+    this.teacher,
+  });
+
+  factory UntisLesson.fromJson(Map<String, Object?> j) => UntisLesson(
+    date: DateTime.parse(j['date'] as String),
+    start: j['start'] as String,
+    end: j['end'] as String,
+    subject: j['subject'] as String?,
+    room: j['room'] as String?,
+    teacher: j['teacher'] as String?,
+  );
+
+  Map<String, Object?> toJson() => {
+    'date': date.toIso8601String().substring(0, 10),
+    'start': start,
+    'end': end,
+    'subject': subject,
+    'room': room,
+    'teacher': teacher,
+  };
+}
+
+/// Changed lessons and the regular timetable of the own class (what is kept
+/// in the cache).
 class UntisSnapshot {
   /// Class of the WebUntis account, e.g. "05eG".
   final String className;
   final List<UntisChange> changes;
 
-  const UntisSnapshot({required this.className, required this.changes});
+  /// Regular lessons of the current and the next week (empty in old caches).
+  final List<UntisLesson> lessons;
+
+  const UntisSnapshot({
+    required this.className,
+    required this.changes,
+    this.lessons = const [],
+  });
 
   factory UntisSnapshot.fromJson(Map<String, Object?> j) => UntisSnapshot(
     className: j['className'] as String? ?? '',
@@ -98,11 +144,16 @@ class UntisSnapshot {
       for (final c in j['changes'] as List? ?? const [])
         UntisChange.fromJson(c as Map<String, Object?>),
     ],
+    lessons: [
+      for (final l in j['lessons'] as List? ?? const [])
+        UntisLesson.fromJson(l as Map<String, Object?>),
+    ],
   );
 
   Map<String, Object?> toJson() => {
     'className': className,
     'changes': [for (final c in changes) c.toJson()],
+    'lessons': [for (final l in lessons) l.toJson()],
   };
 }
 
@@ -201,6 +252,65 @@ List<UntisChange> mapUntisEntries(
           room: room,
           previousRoom: previousRoom,
           note: note.isEmpty ? null : note,
+        ),
+      );
+    }
+  }
+  out.sort((a, b) {
+    final d = a.date.compareTo(b.date);
+    return d != 0 ? d : a.start.compareTo(b.start);
+  });
+  return out;
+}
+
+/// The regular lessons of a `timetable/entries` response: what the timetable
+/// shows without changes (replaced teachers, rooms and subjects as before the
+/// change). Extra lessons (ADDITIONAL, …) are skipped.
+List<UntisLesson> mapUntisLessons(Map<String, Object?> json) {
+  final out = <UntisLesson>[];
+  for (final day in (json['days'] as List? ?? const []).cast<Map>()) {
+    for (final g in (day['gridEntries'] as List? ?? const []).cast<Map>()) {
+      final status = g['status'] as String?;
+      if (status != 'REGULAR' && status != 'CANCELLED' && status != 'CHANGED') {
+        continue;
+      }
+      // Regular value of a type: the removed one, else the current one.
+      String? regular(String type) {
+        final removed = <String>[], current = <String>[];
+        for (var i = 1; i <= 7; i++) {
+          for (final e in (g['position$i'] as List? ?? const []).cast<Map>()) {
+            for (final (list, key) in [
+              (removed, 'removed'),
+              (current, 'current'),
+            ]) {
+              final x = e[key];
+              if (x is! Map || x['type'] != type) continue;
+              final name = x['shortName'] as String?;
+              if (name == null || name.isEmpty) continue;
+              final st = x['status'];
+              if (key == 'removed' ? st == 'REMOVED' : st != 'ADDED') {
+                list.add(name);
+              }
+            }
+          }
+        }
+        final names = removed.isNotEmpty ? removed : current;
+        return names.isEmpty ? null : names.join(', ');
+      }
+
+      final duration = g['duration'] as Map;
+      final startAt = DateTime.parse(duration['start'] as String);
+      final endAt = DateTime.parse(duration['end'] as String);
+      String hm(DateTime t) =>
+          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      out.add(
+        UntisLesson(
+          date: DateTime(startAt.year, startAt.month, startAt.day),
+          start: hm(startAt),
+          end: hm(endAt),
+          subject: regular('SUBJECT'),
+          room: regular('ROOM'),
+          teacher: regular('TEACHER'),
         ),
       );
     }
@@ -369,6 +479,37 @@ class UntisClient {
     return mapUntisEntries(json, periodByStart: byStart, periodByEnd: byEnd);
   }
 
+  /// Changes from [today] on and the regular lessons of the current and the
+  /// next week (Monday to Friday).
+  Future<(List<UntisChange>, List<UntisLesson>)> load(
+    DateTime today, {
+    int days = 21,
+  }) async {
+    final monday = DateTime(
+      today.year,
+      today.month,
+      today.day - (today.weekday - 1),
+    );
+    final (byStart, byEnd) = await timeGrid();
+    final last = today.add(Duration(days: days - 1));
+    final json = await entries(
+      monday,
+      last.isAfter(monday.add(const Duration(days: 11)))
+          ? last
+          : monday.add(const Duration(days: 11)),
+    );
+    final changes = mapUntisEntries(
+      json,
+      periodByStart: byStart,
+      periodByEnd: byEnd,
+    ).where((c) => !c.date.isBefore(today)).toList();
+    final weeks = monday.add(const Duration(days: 12));
+    final lessons = mapUntisLessons(
+      json,
+    ).where((l) => l.date.isBefore(weeks) && l.date.weekday <= 5).toList();
+    return (changes, lessons);
+  }
+
   Future<void> logout() async {
     if (_token == null) return;
     try {
@@ -408,13 +549,14 @@ class UntisWebGateway implements UntisGateway {
     );
     try {
       await client.login();
-      final changes = await client.changes(
+      final (changes, lessons) = await client.load(
         DateTime(today.year, today.month, today.day),
         days: days,
       );
       return UntisSnapshot(
         className: client.klasse?.$2 ?? '',
         changes: changes,
+        lessons: lessons,
       );
     } on UntisException {
       rethrow;

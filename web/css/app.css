@@ -263,6 +263,12 @@ main:focus { outline: none; }
   background: var(--accent-soft);
 }
 
+.notice.warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+.notice ul { margin: .3rem 0 .3rem 1.1rem; padding: 0; }
+
 .badge {
   display: inline-block;
   padding: .05rem .5rem;

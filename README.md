@@ -35,7 +35,8 @@ official app of the state of Hesse.
   filters on the page; Heute shows substitutions in the lessons of the own classes only
 - Optional second source for substitutions: **WebUntis** (a class account is enough). Entries
   that exist in both sources are completed (original teacher struck through, substitute, room
-  change), entries only WebUntis has – e.g. for later days – are added and marked
+  change), entries only WebUntis has – e.g. for later days – are added and marked; the timetable
+  is compared as well: the page Stundenplan warns if Schulportal and WebUntis differ
 - School meals from **Caseda Schulmenü** (read-only): ordered meals day by day on the page
   Schulessen, today's meal on Heute, balance with a low-balance hint – ordering stays with Caseda
 - Push notifications (ntfy) about new substitutions, homework and grades – from the server,

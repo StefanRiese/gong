@@ -45,11 +45,12 @@ Future<void> main(List<String> args) async {
   );
 
   List<UntisChange> changes;
+  List<UntisLesson> lessons;
   String? className;
   try {
     await client.login();
     className = client.klasse?.$2;
-    changes = await client.changes(today, days: days);
+    (changes, lessons) = await client.load(today, days: days);
   } on UntisException catch (e) {
     stderr.writeln(e.message);
     exitCode = 1;
@@ -61,6 +62,7 @@ Future<void> main(List<String> args) async {
 
   // Schulportal plan for comparison (optional).
   List<SubstitutionDay>? portal;
+  Timetable? timetable;
   final creds = SphCredentials.fromEnv(env);
   if (creds != null) {
     final service = SphService(
@@ -72,6 +74,7 @@ Future<void> main(List<String> args) async {
     );
     try {
       portal = await service.substitutions();
+      timetable = await service.timetable();
     } on SphException catch (e) {
       stderr.writeln('Schulportal: $e');
     } finally {
@@ -137,6 +140,26 @@ Future<void> main(List<String> args) async {
       '${onlyUntis.length} only in WebUntis ${byType(onlyUntis)}, '
       '${beyond.length} after the Schulportal plan ${byType(beyond)}',
     );
+  }
+  if (timetable != null) {
+    final diffs = compareTimetables(
+      timetable,
+      UntisSnapshot(
+        className: className ?? '',
+        changes: changes,
+        lessons: lessons,
+      ),
+      today,
+    );
+    stdout.writeln(
+      'Timetable: ${lessons.length} WebUntis lessons in 2 weeks, '
+      '${diffs.length} differences from the Schulportal timetable',
+    );
+    if (!summary) {
+      for (final d in diffs) {
+        stdout.writeln('  ${d.text}');
+      }
+    }
   }
   if (summary) return;
   for (final (label, list) in [

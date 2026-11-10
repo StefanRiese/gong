@@ -20,6 +20,7 @@ import '../sph/sph_service.dart';
 import '../storage/settings_store.dart';
 import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
+import '../untis/compare.dart';
 import '../untis/merge.dart';
 import '../untis/untis.dart';
 import '../update/update_service.dart';
@@ -204,6 +205,7 @@ class Api {
           CacheKeys.timetable,
           CacheTtl.timetable,
           (_) => service.timetable(),
+          present: _timetableDifferences,
         ),
       )
       ..get(
@@ -451,6 +453,22 @@ class Api {
   Response _casedaError(CasedaException e) => e.isAuth
       ? _error(503, 'meals_auth_failed', e.message)
       : _error(503, 'meals_unavailable', e.message);
+
+  /// Differences between the Schulportal timetable and WebUntis (second
+  /// source): `differences` is only present when there are some.
+  Map<String, Object?> _timetableDifferences(Object? value, Request request) {
+    if (!untisEnabled || value is! Timetable) return const {};
+    final diffs = compareTimetables(
+      value,
+      cache.peek<UntisSnapshot>(CacheKeys.untis),
+      _now(),
+    );
+    return diffs.isEmpty
+        ? const {}
+        : {
+            'differences': [for (final d in diffs) d.toJson()],
+          };
+  }
 
   /// The permanent filter from the settings (own classes, hidden types);
   /// `?alle=1` returns the full plan.

@@ -525,6 +525,37 @@ void main() {
       );
     });
 
+    test('timetable shows differences from WebUntis', () async {
+      final now = DateTime.now();
+      final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+      api.cache.put(
+        CacheKeys.untis,
+        UntisSnapshot(
+          className: '5eG',
+          changes: const [],
+          lessons: [
+            UntisLesson(
+              date: monday,
+              start: '23:00',
+              end: '23:45',
+              subject: 'LRS',
+            ),
+          ],
+        ),
+      );
+      Future<Map<String, dynamic>> tt() async =>
+          body(await send('GET', '/api/timetable', cookie: cookie));
+
+      expect((await tt()).containsKey('differences'), isFalse, reason: 'off');
+      api.untisEnabled = true;
+      final differences = (await tt())['differences'] as List;
+      expect(
+        differences.map((d) => d['text']),
+        contains(contains('WebUntis hat LRS')),
+      );
+      expect(differences.every((d) => d['weekday'] == 1), isTrue);
+    });
+
     test('substitutions are filtered by the permanent filter', () async {
       Future<Map<String, dynamic>> subs([String q = '']) async =>
           body(await send('GET', '/api/substitutions$q', cookie: cookie));

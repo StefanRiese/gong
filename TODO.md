@@ -6,9 +6,11 @@
 - [ ] phone tab bar: with 8 entries „Aufgaben“ is cut off (shorter label?)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
 - [ ] WebUntis: after the Schulportal adds an entry that WebUntis had supplied, one extra notification is possible
+- [ ] WebUntis: check the timetable warning on the real server after the next release (Mo „LRS“ is a real difference at the moment)
 - [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
+- [x] WebUntis as second source for the timetable, warning on the Stundenplan page on differences
 - [x] settings: floating save entry at the top instead of a full-width bar (0.11.1)
 - [x] settings restructured: one page, eight flat groups, one save button, only changed values are saved (0.11.0)
 - [x] installed web app reloads itself after a server update (0.10.2)

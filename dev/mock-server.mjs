@@ -411,7 +411,12 @@ async function handleApi(req, res, url) {
     case '/api/account':
       return data(res, 'account', { schoolId: 9999, username: 'max.muster', accountType: 'student',
         features: ['timetable', 'substitutions', 'calendar', 'lessons'] });
-    case '/api/timetable': return data(res, 'timetable', timetable);
+    case '/api/timetable': return data(res, 'timetable', timetable, serverValues.UNTIS_ENABLED ? {
+      differences: [
+        { weekday: 1, start: '14:00', text: 'Mo 14:00: WebUntis hat LRS, im Schulportal-Stundenplan fehlt sie' },
+        { weekday: 3, start: '09:55', text: 'Mi 09:55: Schulportal Mathe, WebUntis Deutsch' },
+      ],
+    } : {});
     case '/api/substitutions': {
       // Permanent filter from the settings, like the real server.
       const f = settings.substitutionFilter;
