@@ -6,6 +6,8 @@ import 'package:html/parser.dart' as html;
 /// November 2026 the portal puts the name into `<li><span>` instead of
 /// `<li><a>`; liblanis 0.1.4 reads it with `querySelector('ul>li>a')!` and
 /// fails on every course page (homework, grades and courses then fail too).
+/// Reported upstream: https://github.com/lanis-mobile/liblanis/issues/3 –
+/// remove this file once liblanis is fixed.
 ///
 /// Turns the `<span>` back into an `<a>` so liblanis can parse the page.
 /// Returns [page] unchanged when nothing needs fixing.
