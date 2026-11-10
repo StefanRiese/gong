@@ -219,6 +219,20 @@ class MdnsResponder {
         reusePort: !Platform.isWindows,
       );
       socket.multicastLoopback = false;
+      // RFC 6762 §11: mDNS packets must carry IP TTL 255; Windows and Apple
+      // devices drop answers with any other value (Dart's default is 1).
+      socket.multicastHops = 255;
+      try {
+        socket.setRawOption(
+          RawSocketOption.fromInt(
+            RawSocketOption.levelIPv4,
+            Platform.isLinux || Platform.isAndroid ? 2 : 4, // IP_TTL
+            255,
+          ),
+        );
+      } on Object {
+        // unicast answers keep the default TTL
+      }
       var joined = 0;
       try {
         for (final i in await NetworkInterface.list(
