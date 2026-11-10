@@ -111,16 +111,48 @@ class MdnsResponder {
   MdnsResponder._(this.hostname, this._socket, this._addresses, this._log);
 
   /// Addresses worth announcing: IPv4, not loopback / link-local.
+  ///
+  /// Some containers refuse listing interfaces ("Bad value for ai_flags");
+  /// then Linux's own address table is read instead.
   static Future<List<InternetAddress>> localAddresses() async {
     final out = <InternetAddress>[];
-    for (final i in await NetworkInterface.list(
-      type: InternetAddressType.IPv4,
-    )) {
-      for (final a in i.addresses) {
-        if (!a.isLoopback && !a.isLinkLocal) out.add(a);
+    try {
+      for (final i in await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+      )) {
+        for (final a in i.addresses) {
+          if (!a.isLoopback && !a.isLinkLocal) out.add(a);
+        }
+      }
+      return out;
+    } on SocketException {
+      try {
+        return parseFibTrie(await File('/proc/net/fib_trie').readAsString());
+      } on Object {
+        return const [];
       }
     }
-    return out;
+  }
+
+  /// Local IPv4 addresses from `/proc/net/fib_trie` (the `/32 host LOCAL`
+  /// entries), without loopback and link-local ones.
+  static List<InternetAddress> parseFibTrie(String text) {
+    final out = <String>{};
+    String? last;
+    for (final line in text.split('\n')) {
+      final m = RegExp(r'\|--\s+(\d+\.\d+\.\d+\.\d+)').firstMatch(line);
+      if (m != null) {
+        last = m.group(1);
+      } else if (last != null && line.contains('/32 host LOCAL')) {
+        out.add(last);
+      }
+    }
+    return [
+      for (final a in out)
+        if (InternetAddress.tryParse(a) case final ip?
+            when !ip.isLoopback && !ip.isLinkLocal)
+          ip,
+    ];
   }
 
   /// Starts answering for [label].local; null when that is not possible.
@@ -138,15 +170,25 @@ class MdnsResponder {
       );
       socket.multicastLoopback = false;
       var joined = 0;
-      for (final i in await NetworkInterface.list(
-        type: InternetAddressType.IPv4,
-      )) {
-        if (i.addresses.every((a) => a.isLoopback)) continue;
+      try {
+        for (final i in await NetworkInterface.list(
+          type: InternetAddressType.IPv4,
+        )) {
+          if (i.addresses.every((a) => a.isLoopback)) continue;
+          try {
+            socket.joinMulticast(_group, i);
+            joined++;
+          } on Object {
+            // interface without multicast support
+          }
+        }
+      } on SocketException {
+        // Interfaces cannot be listed here: let the system pick one.
         try {
-          socket.joinMulticast(_group, i);
+          socket.joinMulticast(_group);
           joined++;
         } on Object {
-          // interface without multicast support
+          // handled below
         }
       }
       if (joined == 0) {

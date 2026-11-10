@@ -18,6 +18,7 @@ Uint8List query(String name, int type, {int cls = 1}) {
 }
 
 void main() {
+  fibTest();
   test('parses the question of a query', () {
     final q = parseDnsQuestions(query('Lumo.local', 1));
     expect(q, hasLength(1));
@@ -48,5 +49,29 @@ void main() {
     expect(b.getUint16(6), 2);
     expect(a.sublist(a.length - 4), [10, 0, 0, 2]);
     expect(a.sublist(12, 18), [4, ...'lumo'.codeUnits, 5].sublist(0, 6));
+  });
+}
+
+void fibTest() {
+  test('reads local addresses from fib_trie', () {
+    const text = '''
+Main:
+  +-- 0.0.0.0/0 3 0 5
+     |-- 0.0.0.0
+        /0 universe UNICAST
+     +-- 192.168.1.0/24 2 0 2
+        |-- 192.168.1.0
+           /32 link BROADCAST
+        |-- 192.168.1.24
+           /32 host LOCAL
+        |-- 192.168.1.255
+           /32 link BROADCAST
+  +-- 127.0.0.0/8 2 0 2
+     |-- 127.0.0.1
+        /32 host LOCAL
+''';
+    expect(MdnsResponder.parseFibTrie(text).map((a) => a.address), [
+      '192.168.1.24',
+    ]);
   });
 }

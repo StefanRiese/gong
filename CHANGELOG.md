@@ -6,6 +6,11 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.16.1] – 2026-11-10
+
+### Fixed
+- mDNS: `lumo.local` now also works in containers that cannot list network interfaces (error „Bad value for ai_flags“); the addresses are read from `/proc/net/fib_trie` there.
+
 ## [0.16.0] – 2026-11-10
 
 ### Added
@@ -352,7 +357,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/StefanRiese/lumo/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/StefanRiese/lumo/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/StefanRiese/lumo/compare/v0.15.0...v0.15.1
 [0.11.1]: https://github.com/StefanRiese/lumo/compare/v0.11.0...v0.11.1
