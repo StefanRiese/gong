@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.9.0] – 2026-11-10
+
 ### Added
 - School meals from **Caseda Schulmenü**: Heute shows the meal ordered for the day, further
   orders and the balance (highlighted when it is low), with a link to the ordering page.
@@ -13,8 +15,6 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
   *Einstellungen → Server → Schulessen* (e-mail, password, login test, warning amount); the
   background sync refreshes it every 2 hours. `GET /api/meals`; `bin/caseda.dart` for the
   command line.
-
-### Added
 - REST API: the filters of the web UI pages also work as URL parameters on the API, e.g.
   `/kalender?suche=05eg` → `/api/calendar?suche=05eg`. `/api/substitutions` accepts `suche`,
   `klasse`, `art`, `ohne_art`, `von` and `bis` (on top of the permanent filter, or of the
@@ -231,7 +231,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/StefanRiese/gong/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/StefanRiese/gong/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/StefanRiese/gong/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/StefanRiese/gong/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/StefanRiese/gong/compare/v0.8.0...v0.8.1
