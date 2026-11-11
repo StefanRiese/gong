@@ -100,7 +100,7 @@ The logins are tested before they are saved and can be switched off without losi
 | Back to the previous version | `bash /opt/lumo/deploy/install.sh --rollback` |
 | Change credentials / web password / ntfy / sync | web UI: *Einstellungen* (or `install.sh --configure`) |
 | Status | `systemctl status lumo` |
-| Logs | `journalctl -u lumo -f` |
+| Logs | `journalctl -u lumo -f` (failures with account `[id]`, cause and code location) |
 | Restart (after editing config.env) | `systemctl restart lumo` |
 | Remove (keep config + data) | `bash /opt/lumo/deploy/install.sh --uninstall` |
 | Remove everything | `bash /opt/lumo/deploy/install.sh --uninstall --purge` |

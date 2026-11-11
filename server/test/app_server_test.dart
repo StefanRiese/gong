@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -47,30 +48,33 @@ void main() {
     return port;
   }
 
-  Future<AppServer> start([Map<String, String> env = const {}]) async =>
-      server = await AppServer.start(
-        {
-          'DATA_DIR': dir.path,
-          'PORT': '${await freePort()}',
-          'SYNC': 'false',
-          ...env,
-        },
-        log: (_, _) {},
-        gateway: (c) {
-          logins.add(c);
-          return gw;
-        },
-        mealsGateway: (c) {
-          mealsLogins.add(c);
-          return meals;
-        },
-        untisGateway: (c) {
-          untisLogins.add(c);
-          return untis;
-        },
-        schools: SchoolDirectory(fetch: () async => _schoolList),
-        passwordIterations: 10,
-      );
+  Future<AppServer> start([
+    Map<String, String> env = const {},
+    Future<void> Function()? onRestart,
+  ]) async => server = await AppServer.start(
+    {
+      'DATA_DIR': dir.path,
+      'PORT': '${await freePort()}',
+      'SYNC': 'false',
+      ...env,
+    },
+    log: (_, _) {},
+    onRestart: onRestart,
+    gateway: (c) {
+      logins.add(c);
+      return gw;
+    },
+    mealsGateway: (c) {
+      mealsLogins.add(c);
+      return meals;
+    },
+    untisGateway: (c) {
+      untisLogins.add(c);
+      return untis;
+    },
+    schools: SchoolDirectory(fetch: () async => _schoolList),
+    passwordIterations: 10,
+  );
 
   Future<({int status, Map<String, dynamic> body, HttpHeaders headers})> call(
     String method,
@@ -448,6 +452,42 @@ void main() {
         expect(login.status, 200);
       },
     );
+  });
+
+  group('restart', () {
+    test('not offered where the server cannot restart itself', () async {
+      final s = await start();
+      final cookie = await completeSetup(s);
+      expect(s.canRestart, isFalse);
+      final d = await call('GET', '/api/server-settings', cookie: cookie);
+      expect(d.body['canRestart'], isFalse);
+      final r = await call('POST', '/api/restart', cookie: cookie);
+      expect(r.status, 409);
+      expect(r.body['error']['code'], 'restart_unsupported');
+    });
+
+    test('needs a login, then restarts after the answer', () async {
+      final restarted = Completer<void>();
+      final s = await start({}, () async => restarted.complete());
+      final cookie = await completeSetup(s);
+      expect(s.canRestart, isTrue);
+      expect(
+        (await call(
+          'GET',
+          '/api/server-settings',
+          cookie: cookie,
+        )).body['canRestart'],
+        isTrue,
+      );
+
+      expect((await call('POST', '/api/restart')).status, 401);
+      expect(restarted.isCompleted, isFalse);
+
+      final r = await call('POST', '/api/restart', cookie: cookie);
+      expect(r.status, 202);
+      expect(r.body, {'restarting': true});
+      await restarted.future.timeout(const Duration(seconds: 5));
+    });
   });
 
   group('WebUntis (second source)', () {

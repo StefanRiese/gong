@@ -29,6 +29,7 @@ import '../storage/settings_store.dart';
 import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
 import '../update/update_service.dart';
+import '../util/failure.dart';
 
 /// Log sink: one line, [isError] for stderr-like messages.
 typedef LogLine = void Function(String line, bool isError);
@@ -92,6 +93,7 @@ class AppServer implements ServerControl {
 
   AppConfig _config;
   final UpdateService _update;
+  final Future<void> Function()? _onRestart;
   final AccountStore _accountStore;
 
   /// The accounts in display order; the first one answers the API paths
@@ -114,6 +116,7 @@ class AppServer implements ServerControl {
     this._log,
     this._config,
     this._update,
+    this._onRestart,
     this._setupToken,
   ) : startedConfig = _config,
       _accountStore = AccountStore(_db);
@@ -161,6 +164,7 @@ class AppServer implements ServerControl {
     SchoolDirectory? schools,
     int? passwordIterations,
     Future<void> Function()? onUpdateReady,
+    Future<void> Function()? onRestart,
     HttpGet? updateGet,
   }) async {
     void info(String m) => log('${DateTime.now().toIso8601String()} $m', false);
@@ -243,6 +247,7 @@ class AppServer implements ServerControl {
 
     // Routes the requests to the accounts; serves no account itself.
     final api = Api(
+      log: info,
       passwordHash: config.appPasswordHash,
       sessions: SessionStore(ttl: config.sessionTtl, database: db),
       cookieSecure: config.cookieSecure,
@@ -293,6 +298,7 @@ class AppServer implements ServerControl {
       log,
       config,
       update,
+      onRestart,
       null,
     );
     api
@@ -428,8 +434,10 @@ class AppServer implements ServerControl {
     final c = _config;
     for (final a in _accounts.values) {
       _info(
-        'Schulportal account: school ${a.config.sph.schoolId}, '
-        'user ${a.config.sph.username}',
+        'Account [${a.config.id}]: school ${a.config.sph.schoolId}, '
+        'user ${a.config.sph.username}'
+        '${a.config.caseda != null ? ', school meals' : ''}'
+        '${a.config.untis != null ? ', WebUntis' : ''}',
       );
     }
     final sc = c.sync;
@@ -461,6 +469,20 @@ class AppServer implements ServerControl {
 
   @override
   bool checkSetupToken(String? token) => _setupToken?.matches(token) ?? false;
+
+  @override
+  bool get canRestart => _onRestart != null;
+
+  @override
+  void restart() {
+    final restart = _onRestart;
+    if (restart == null) throw StateError('This server cannot restart itself');
+    _info('Restart requested in the web UI');
+    // The response of the request goes out first.
+    Timer(const Duration(milliseconds: 500), () {
+      restart().catchError((Object e) => _info('Restart failed: $e'));
+    });
+  }
 
   @override
   Map<String, Object?> describeSettings() {
@@ -511,6 +533,7 @@ class AppServer implements ServerControl {
       },
       'restartRequired': _pendingRestart(c),
       'desktop': embeddedWebFiles.isNotEmpty,
+      'canRestart': canRestart,
     };
   }
 
@@ -591,13 +614,26 @@ class AppServer implements ServerControl {
 
   // --- accounts (children) -----------------------------------------------------
 
+  /// Log line of an account: the id says which one (see the startup lines).
+  void Function(String) _logFor(String id) =>
+      (message) => _info('[$id] $message');
+
+  SphService _newService(AccountConfig c) =>
+      SphService(_gateway(c.sph), log: _logFor(c.id));
+
   _Account _createAccount(AccountConfig c) {
-    final service = SphService(_gateway(c.sph));
+    final service = _newService(c);
     final cache = Api.createCache(
       store: ScopedCacheStore(_db, scopePrefix(c.id)),
+      onBackgroundError: (key, error, stack) => _logFor(c.id)(
+        'refresh of $key failed (old data is served): '
+        '${describeFailure(error, stack: stack)}',
+      ),
     );
     final api =
         Api(
+            log: _info,
+            accountId: c.id,
             service: service,
             passwordHash: _config.appPasswordHash,
             sessions: _api.sessions,
@@ -623,7 +659,7 @@ class AppServer implements ServerControl {
       _config,
       c.caseda,
       c.untis,
-      _info,
+      _logFor(c.id),
       _mealsGateway,
       _untisGateway,
     );
@@ -635,7 +671,7 @@ class AppServer implements ServerControl {
         state,
         account.api.settings,
         _config,
-        _info,
+        _logFor(c.id),
         () => _label(c.id),
       )
       ..meals = c.caseda == null ? null : _mealsGateway(c.caseda!)
@@ -779,7 +815,7 @@ class AppServer implements ServerControl {
     }
     if (newService) {
       await account.service.dispose();
-      account.service = SphService(_gateway(n));
+      account.service = _newService(next);
     }
     account.config = next;
     _accountStore.save([for (final a in _accounts.values) a.config]);

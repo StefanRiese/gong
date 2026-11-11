@@ -69,6 +69,11 @@ class ResponseCache {
   final int maxEntries;
   final CacheStore? _store;
   final CacheCodec? Function(String key) _codecFor;
+
+  /// Called when the refresh of an expired entry in the background fails
+  /// (the old entry is still served).
+  final void Function(String key, Object error, StackTrace stack)?
+  onBackgroundError;
   final _entries = <String, _Entry>{};
   final _pending = <String, Future<_Entry>>{};
 
@@ -81,6 +86,7 @@ class ResponseCache {
     this.maxEntries = 300,
     CacheStore? store,
     CacheCodec? Function(String key)? codecFor,
+    this.onBackgroundError,
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
        _store = store,
@@ -101,7 +107,13 @@ class ResponseCache {
     if (existing == null) return get(key, ttl, load);
     final expired = _now().difference(existing.fetchedAt) >= ttl;
     if (expired && !_pending.containsKey(key)) {
-      _load(key, load).then<void>((_) {}, onError: (Object _) {}).ignore();
+      _load(key, load)
+          .then<void>(
+            (_) {},
+            onError: (Object e, StackTrace st) =>
+                onBackgroundError?.call(key, e, st),
+          )
+          .ignore();
     }
     return CacheResult(
       existing.value as T,

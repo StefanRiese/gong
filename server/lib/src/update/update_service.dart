@@ -409,6 +409,10 @@ class UpdateService {
 /// Exit code of the macOS server: new app unpacked, swap the bundle.
 const exitUpdateReady = 80;
 
+/// Exit code for „restart me“ (web UI): the macOS menu bar app starts the
+/// server again, systemd restarts the service (`Restart=on-failure`).
+const exitRestart = 81;
+
 class UpdateException implements Exception {
   final String message;
   const UpdateException(this.message);

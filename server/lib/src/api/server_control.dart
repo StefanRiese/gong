@@ -22,6 +22,15 @@ abstract interface class ServerControl {
 
   bool checkSetupToken(String? token);
 
+  /// Whether the server can restart itself here (Windows / macOS app, systemd
+  /// service); otherwise [restart] is not offered.
+  bool get canRestart;
+
+  /// Restarts the server shortly after the call returns (the response of the
+  /// request that asked for it still goes out). Throws [StateError] if
+  /// [canRestart] is false.
+  void restart();
+
   /// Current settings for the web UI (secrets only as "set"/"not set").
   Map<String, Object?> describeSettings();
 

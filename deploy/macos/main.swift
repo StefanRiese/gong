@@ -26,6 +26,7 @@ private let exitConfigInvalid: Int32 = 78
 /// Exit code of the server: a new version is unpacked in
 /// <support>/update/Lumo.app (see update_service.dart).
 private let exitUpdateReady: Int32 = 80
+private let exitRestart: Int32 = 81 // restart asked for in the web UI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -152,6 +153,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch status {
         case exitUpdateReady:
             installUpdate()
+        case exitRestart:
+            startServer()
         case exitConfigInvalid:
             let choice = alert("Die Konfigurationsdatei ist fehlerhaft:\n\n"
                 + problems() + "\n\nNach dem Speichern über das Menü „Neu starten“ wählen.",

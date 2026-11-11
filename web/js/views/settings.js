@@ -12,7 +12,8 @@ import { accountGroup, addChildGroup } from './accounts.js';
 import { messageArea } from './forms.js';
 import { createForm } from './settings-form.js';
 import {
-  accessGroup, colorsGroup, mealsGroup, notifyGroup, substitutionsGroup, syncGroup, updateGroup,
+  accessGroup, colorsGroup, mealsGroup, notifyGroup, restartGroup, restartServer, substitutionsGroup,
+  syncGroup, updateGroup,
 } from './settings-groups.js';
 
 export const title = 'Einstellungen';
@@ -52,12 +53,22 @@ export async function render(ctx) {
   // --- restart notice (network settings) ---
   const restartNotice = h('div');
   const showRestart = (keys) => {
-    restartNotice.replaceChildren(keys.length === 0 ? '' : h('div', { class: 'notice' },
+    if (keys.length === 0) {
+      restartNotice.replaceChildren();
+      return;
+    }
+    const restartMsg = messageArea();
+    const restartButton = h('button', { type: 'button', class: 'button small' }, 'Jetzt neu starten');
+    restartButton.addEventListener('click', () => restartServer({ form, button: restartButton, msg: restartMsg }));
+    restartNotice.replaceChildren(h('div', { class: 'notice' },
       h('strong', null, 'Neustart nötig: '),
-      'Die Netzwerk-Einstellungen gelten erst nach einem Neustart des Servers (',
-      server.desktop ? 'Symbol im Infobereich bzw. in der Menüleiste → „Neu starten“' :
-        h('code', null, 'systemctl restart lumo'),
-      ').'));
+      'Die Netzwerk-Einstellungen gelten erst nach einem Neustart des Servers',
+      server.canRestart ? '.' : [' (',
+        server.desktop ? 'Symbol im Infobereich bzw. in der Menüleiste → „Neu starten“' :
+          h('code', null, 'systemctl restart lumo'),
+        ').'],
+      server.canRestart ? h('div', { class: 'button-row' }, restartButton) : null,
+      server.canRestart ? restartMsg.el : null));
   };
   showRestart(server.restartRequired ?? []);
 
@@ -75,6 +86,7 @@ export async function render(ctx) {
       notifyGroup(base),
       syncGroup({ ...base, sync }),
       accessGroup({ ...base, desktop: server.desktop }),
+      restartGroup({ form, server }),
       update && !update.available ? updateGroup({ ...base, status: update }) : null,
     ]),
     konto: panelOf('konto', [

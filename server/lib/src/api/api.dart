@@ -17,6 +17,7 @@ import '../notify/poller.dart';
 import '../models/models.dart';
 import '../sph/errors.dart';
 import '../sph/sph_service.dart';
+import '../util/failure.dart';
 import '../storage/settings_store.dart';
 import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
@@ -80,6 +81,7 @@ const _eventPing = Duration(seconds: 25);
 ///   GET  /api/update        version, latest release, update state
 ///   POST /api/update/check  look for a new release now
 ///   POST /api/update/install  install the latest release (202, async)
+///   POST /api/restart       restart the server (202; 409 where it cannot)
 /// While the server is not set up, the settings endpoints need the setup
 /// token (header X-Setup-Token) instead of a login.
 ///   GET  /api/settings      user settings (subject colors)
@@ -101,6 +103,13 @@ const _eventPing = Duration(seconds: 25);
 /// "cached": bool, "stale": bool, "refreshing": bool}`; `?refresh=1` waits
 /// for fresh data instead.
 class Api {
+  /// Log line sink for failures (a request that failed, a wrong login); null =
+  /// silent (tests).
+  final void Function(String message)? log;
+
+  /// Id of the account this instance serves, for the log ('' = none).
+  final String accountId;
+
   /// Instances of the accounts by id, set up by the server: each serves the
   /// data endpoints of one account. They share sessions, login limit, update
   /// and server control with the instance that routes to them.
@@ -165,6 +174,8 @@ class Api {
   final DateTime Function() _now;
 
   Api({
+    this.log,
+    this.accountId = '',
     this.service,
     required this.passwordHash,
     SessionStore? sessions,
@@ -193,9 +204,12 @@ class Api {
   static ResponseCache createCache({
     DateTime Function()? now,
     CacheStore? store,
+    void Function(String key, Object error, StackTrace stack)?
+    onBackgroundError,
   }) => ResponseCache(
     now: now,
     store: store,
+    onBackgroundError: onBackgroundError,
     codecFor: CacheKeys.codecFor,
     serveStaleOn: (e) =>
         e is SphUnavailableException ||
@@ -295,6 +309,7 @@ class Api {
       ..post('/api/notifications/test', _notificationTest)
       ..post('/api/notifications/check', _notificationCheck)
       ..get('/api/accounts', _accounts)
+      ..post('/api/restart', _restart)
       ..post('/api/accounts', _addAccount)
       ..post('/api/accounts/test', _testAccount)
       ..put('/api/accounts/<id>', _updateAccount)
@@ -449,15 +464,19 @@ class Api {
       );
     } on AccountNotFound {
       return _error(404, 'unknown_account', 'No such account');
-    } on SphAuthException catch (e) {
+    } on SphAuthException catch (e, st) {
+      _report(request, e, st);
       return _error(400, 'sph_login_failed', e.message);
-    } on SphException catch (e) {
+    } on SphException catch (e, st) {
+      _report(request, e, st);
       return _sphError(e);
-    } on CasedaException catch (e) {
+    } on CasedaException catch (e, st) {
+      _report(request, e, st);
       return e.isAuth
           ? _error(400, 'meals_login_failed', e.message)
           : _error(503, 'meals_unavailable', e.message);
-    } on UntisException catch (e) {
+    } on UntisException catch (e, st) {
+      _report(request, e, st);
       return e.isAuth
           ? _error(400, 'untis_login_failed', e.message)
           : _error(503, 'untis_unavailable', e.message);
@@ -503,6 +522,10 @@ class Api {
     final client = _clientId(request);
     final wait = limiter.retryAfter(client);
     if (wait != null) {
+      log?.call(
+        'login blocked: too many failed attempts from $client '
+        '(${wait.inSeconds + 1} s left)',
+      );
       return _error(
         429,
         'too_many_attempts',
@@ -527,6 +550,7 @@ class Api {
     final ok = await Isolate.run(() => PasswordHasher.verify(password!, hash));
     if (!ok) {
       limiter.recordFailure(client);
+      log?.call('login failed: wrong password from $client');
       return _error(401, 'invalid_password', 'Wrong password');
     }
     limiter.reset(client);
@@ -639,9 +663,11 @@ class Api {
           'stale': result.stale,
           'refreshing': result.refreshing,
         });
-      } on SphException catch (e) {
+      } on SphException catch (e, st) {
+        _report(request, e, st);
         return _sphError(e);
-      } on CasedaException catch (e) {
+      } on CasedaException catch (e, st) {
+        _report(request, e, st);
         return _casedaError(e);
       } on ArgumentError catch (e) {
         return _error(400, 'bad_request', '${e.message}');
@@ -783,7 +809,8 @@ class Api {
     }
     try {
       await _svc.setHomeworkDone(courseId, entryId, done);
-    } on SphException catch (e) {
+    } on SphException catch (e, st) {
+      _report(request, e, st);
       return _sphError(e);
     } on ArgumentError catch (e) {
       return _error(400, 'bad_request', '${e.message}');
@@ -980,6 +1007,26 @@ class Api {
         'School list of Schulportal not reachable',
       );
     }
+  }
+
+  // --- restart ----------------------------------------------------------------
+
+  /// Restarts the server (Windows / macOS app, systemd service): 202 right
+  /// away, the server is away for a few seconds.
+  Response _restart(Request request) {
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final c = control;
+    if (c == null || !c.canRestart) {
+      return _error(
+        409,
+        'restart_unsupported',
+        'The server cannot restart itself here',
+      );
+    }
+    c.restart();
+    return _json(202, {'restarting': true});
   }
 
   // --- app updates ---------------------------------------------------------------
@@ -1253,6 +1300,22 @@ class Api {
         },
       );
     };
+  }
+
+  /// Writes a failed request to the log: what was asked, for which account,
+  /// what failed and where. Expected answers (area not enabled, unknown id)
+  /// are not logged.
+  void _report(Request request, Object error, [StackTrace? stack]) {
+    final write = log;
+    if (write == null) return;
+    if (error is SphFeatureDisabledException || error is SphNotFoundException) {
+      return;
+    }
+    final who = accountId.isEmpty ? '' : ' [$accountId]';
+    write(
+      'api ${request.method} /${request.url.path}$who: '
+      '${describeFailure(error, stack: stack)}',
+    );
   }
 
   Response _sphError(SphException e) => switch (e) {

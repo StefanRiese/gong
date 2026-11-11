@@ -91,6 +91,9 @@ Future<Never> _run(
       onUpdateReady: () async {
         if (!stopped.isCompleted) stopped.complete(TrayCommand.restart);
       },
+      onRestart: () async {
+        if (!stopped.isCompleted) stopped.complete(TrayCommand.restart);
+      },
     );
   } on AppServerException catch (e) {
     info('$e');

@@ -457,3 +457,52 @@ export function updateGroup({ form, v, status }) {
     body, unsavedHint, auto.el, msg.el,
     h('div', { class: 'button-row' }, install, check));
 }
+
+// --- Neustart ---------------------------------------------------------------------------------
+
+/**
+ * Asks the server to restart and reloads the page when it is back. [msg] shows the progress.
+ * @param {{form?: {dirty: () => boolean}, button: HTMLButtonElement, msg: ReturnType<typeof messageArea>}} options
+ */
+export async function restartServer({ form, button, msg }) {
+  const unsaved = form?.dirty() ? '\n\nUngespeicherte Änderungen auf dieser Seite gehen verloren.' : '';
+  if (!confirm(`Den Server jetzt neu starten? Die Seite ist kurz nicht erreichbar und lädt sich danach von selbst neu.${unsaved}`)) return;
+  button.disabled = true;
+  try {
+    await api('/api/restart', { method: 'POST' });
+  } catch (err) {
+    button.disabled = false;
+    msg.error(err);
+    return;
+  }
+  msg.ok('Der Server startet neu …');
+  // Wait until it has gone away and is back (a restart takes a few seconds).
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  const until = Date.now() + 90e3;
+  while (Date.now() < until) {
+    try {
+      const res = await fetch('/healthz', { cache: 'no-store' });
+      if (res.ok) {
+        location.reload();
+        return;
+      }
+    } catch {
+      // not reachable yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  button.disabled = false;
+  msg.error(new ApiError(0, 'network', 'Der Server antwortet noch nicht. Bitte die Seite später neu laden und gegebenenfalls das Protokoll prüfen.'));
+}
+
+/** Restart button; null where the server cannot restart itself (e.g. started by hand). */
+export function restartGroup({ form, server }) {
+  if (!server.canRestart) return null;
+  const msg = messageArea();
+  const button = h('button', { type: 'button', class: 'button' }, 'Server neu starten');
+  button.addEventListener('click', () => restartServer({ form, button, msg }));
+  return group('neustart', 'Neustart',
+    'Startet den Server neu, zum Beispiel damit geänderte Netzwerk-Einstellungen gelten oder nach einem Fehler. Die Daten bleiben erhalten.',
+    h('div', { class: 'button-row' }, button),
+    msg.el);
+}

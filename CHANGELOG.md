@@ -6,6 +6,24 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.19.1] – 2026-11-11
+
+### Added
+- **Restart button.** *Einstellungen → Allgemein → Neustart* restarts the server (also offered in
+  the notice „Neustart nötig“ after changing network settings); the page reloads itself when the
+  server is back. It works in the Windows and macOS app and for the systemd service (the server
+  exits with code 81 and `Restart=on-failure` starts it again); for a server started by hand it
+  is not offered. API: `POST /api/restart`, `canRestart` in the server settings.
+
+### Changed
+- **More in the log (`journalctl -u lumo`) when something fails.** Failed requests, background
+  syncs, refreshes of expired data, wrong web logins and failed account tests now log what
+  failed and where: the account (`[id]`, see the startup lines `Account [id]: …`), the exception
+  with its cause, HTTP method, address (without query) and status of portal requests, and the
+  first lines of the code that threw it. The portal service logs the first failed attempt and the
+  retry after a new login; unhandled errors are logged before the process ends. Expected answers
+  (area not enabled, unknown course) are not logged; passwords and personal data never are.
+
 ## [0.19.0] – 2026-11-11
 
 ### Fixed
@@ -454,7 +472,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/StefanRiese/lumo/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/StefanRiese/lumo/compare/v0.18.2...v0.19.0
 [0.18.2]: https://github.com/StefanRiese/lumo/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/StefanRiese/lumo/compare/v0.18.0...v0.18.1

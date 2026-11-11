@@ -18,6 +18,15 @@ import 'package:lumo_server/desktop.dart';
 import 'package:lumo_server/lumo_server.dart';
 
 Future<void> main(List<String> args) async {
+  // An error nobody caught would end the process with a bare stack trace;
+  // this puts it into the log (journalctl) first.
+  await runZonedGuarded(() => _run(args), (error, stack) {
+    _log('Unhandled error: $error\n$stack', true);
+    exit(70); // EX_SOFTWARE
+  });
+}
+
+Future<void> _run(List<String> args) async {
   switch (args.firstOrNull) {
     case 'check':
       exit(await runSelfCheck(expectEmbedded: args.contains('--desktop')));
@@ -54,6 +63,17 @@ Future<void> main(List<String> args) async {
               _log('Update ready, exiting for the menu bar app', false);
               await server.stop();
               exit(exitUpdateReady);
+            }
+          : null,
+      // The macOS menu bar app starts it again, systemd restarts the service
+      // (INVOCATION_ID is set for services); elsewhere it is not offered.
+      onRestart:
+          desktop == DesktopPlatform.macos ||
+              (desktop == null && Platform.environment['INVOCATION_ID'] != null)
+          ? () async {
+              _log('Restarting', false);
+              await server.stop();
+              exit(exitRestart);
             }
           : null,
     );

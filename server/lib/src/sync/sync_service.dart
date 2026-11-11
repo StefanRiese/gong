@@ -9,6 +9,7 @@ import '../untis/merge.dart';
 import '../untis/untis.dart';
 import '../sph/sph_service.dart';
 import '../storage/portal_state.dart';
+import '../util/failure.dart';
 import 'cache_keys.dart';
 
 /// Kinds of data kept in sync with Schulportal.
@@ -299,8 +300,11 @@ class SyncService {
       // Not enabled for this account: nothing to sync, no retries.
       _save(task, SyncStatus(lastRun: started, lastSuccess: started));
       return;
-    } catch (e) {
-      log('sync ${task.name}: ${e is SphException ? e.message : e}');
+    } catch (e, st) {
+      log(
+        'sync ${task.name} failed (${previous.failures + 1}. time in a row): '
+        '${describeFailure(e, stack: st)}',
+      );
       _save(
         task,
         SyncStatus(

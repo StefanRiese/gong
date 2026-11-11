@@ -132,6 +132,18 @@ time with short pauses:
 | `untis` | like `substitutions` (only with WebUntis) | `untis` – changed lessons of the class (`lib/src/untis/`), merged into `/api/substitutions` |
 | `account`, `timetable` | 6 h | `account`, `timetable` |
 
+### Logging
+
+Everything goes to stdout / stderr (journald under systemd). `lib/src/util/failure.dart`
+(`describeFailure`) turns an error into one line: exception, causes (Dio: method, address without
+query, status) and the first frames of liblanis / our code. Lines of an account start with its id
+(`[k3x9ab] …`, the startup lines `Account [id]: …` tell which is which). Logged: failed requests
+(`Api._report`: `api GET /api/… [id]: …`), failed sync tasks with their failure count, the first
+failure and the retry of `SphService`, failed logins, expired data that could not be refreshed in
+the background (`ResponseCache.onBackgroundError`), wrong web logins, and unhandled errors (zone
+in `bin/server.dart`). Expected answers (feature not enabled, unknown course) and secrets are not
+logged.
+
 ### Accounts and optional sources
 
 All accounts (children) are in the database (`AccountStore`, `lib/src/config/accounts.dart`):

@@ -472,6 +472,11 @@ async function handleApi(req, res, url) {
     }, 1500);
     return json(res, 202, updateStatus());
   }
+  if (req.method === 'POST' && path === '/api/restart') {
+    // The "server" is away for a few seconds (all API calls answer 503 meanwhile).
+    setTimeout(() => { restartingUntil = Date.now() + 3000; }, 500);
+    return json(res, 202, { restarting: true });
+  }
   if (req.method === 'POST' && path === '/api/refresh') {
     simulateSync();
     return json(res, 202, { refreshing: true });
@@ -595,7 +600,7 @@ async function handleServerSettings(req, res, url) {
   }
   if (req.method === 'GET') {
     return json(res, 200, {
-      setupRequired, values: serverValues, desktop: false,
+      setupRequired, values: serverValues, desktop: false, canRestart: true,
       secrets: { NTFY_TOKEN: false, APP_PASSWORD: passwordSet },
       sources: {}, restartRequired: [],
     });
@@ -697,6 +702,10 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/dev/bump-version') {
       update.current = 'v9.9.9';
       return json(res, 200, { current: update.current });
+    }
+    if (url.pathname === '/healthz') {
+      return Date.now() < restartingUntil ? error(res, 503, 'restarting', 'Restarting')
+        : json(res, 200, { status: 'ok', app: 'lumo' });
     }
     if (url.pathname.startsWith('/api/')) await handleApi(req, res, url);
     else await handleStatic(req, res, url);

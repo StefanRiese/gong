@@ -14,6 +14,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Sync and live updates](#sync-and-live-updates)
 - [Notifications](#notifications)
 - [Setup and server settings](#setup-and-server-settings)
+- [Restart](#restart)
 - [App updates](#app-updates)
 - [School meals](#school-meals)
 - [WebUntis (second source)](#webuntis-second-source)
@@ -504,7 +505,8 @@ login answer `503 setup_required`.
   "secrets": {"NTFY_TOKEN": false, "APP_PASSWORD": true},
   "sources": {"NTFY_TOPIC": "web", "PORT": "config", "SYNC": "default", …},
   "restartRequired": [],
-  "desktop": false
+  "desktop": false,
+  "canRestart": true
 }
 ```
 
@@ -515,6 +517,7 @@ login answer `503 setup_required`.
 | `sources` | where a value comes from: `web` (set in the web UI), `config` (config.env / environment), `default` |
 | `restartRequired` | changed settings that only apply after a restart of the server |
 | `desktop` | the server runs as Windows / macOS desktop app |
+| `canRestart` | [`POST /api/restart`](#post-apirestart) is possible |
 
 The meaning of the keys is described in
 [`server/.env.example`](../server/.env.example).
@@ -566,6 +569,15 @@ match), at most 20 results:
 
 The list is loaded from the portal on first use and kept for a day; `503 sph_unavailable` if it
 cannot be loaded.
+
+## Restart
+
+### `POST /api/restart`
+
+Restarts the server: `202 {"restarting": true}`, then the server is away for a few seconds
+(Windows / macOS app, systemd service). Clients poll `GET /healthz` until it answers again. Needs
+a login. `409 restart_unsupported` where the server cannot restart itself (started by hand);
+`GET /api/server-settings` tells with `canRestart`.
 
 ## App updates
 
@@ -825,6 +837,7 @@ Errors have a status code and a JSON body:
 | 404 | `unknown_account` | no account with that id (`/api/accounts/{id}/…`) |
 | 409 | `notifications_disabled` | ntfy is not set up |
 | 409 | `no_update` | no update can be installed |
+| 409 | `restart_unsupported` | the server cannot restart itself here |
 | 400 | `meals_login_failed` | the Caseda login of an account does not work |
 | 400 | `untis_login_failed` | the WebUntis login of an account does not work |
 | 503 | `untis_unavailable` | WebUntis not reachable |

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:liblanis/easy_client.dart' as lanis;
 
 import '../models/models.dart';
+import '../util/failure.dart';
 import 'errors.dart';
 import 'mappers.dart';
 import 'sph_gateway.dart';
@@ -23,6 +24,7 @@ class SphService {
   final Duration idleTimeout;
   final Duration authRetryDelay;
   final DateTime Function() _now;
+  final void Function(String message)? _log;
 
   Future<void>? _login;
   int _inFlight = 0;
@@ -37,7 +39,9 @@ class SphService {
     this.idleTimeout = const Duration(minutes: 5),
     this.authRetryDelay = const Duration(minutes: 10),
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+    void Function(String message)? log,
+  }) : _now = now ?? DateTime.now,
+       _log = log;
 
   bool get isLoggedIn => _gateway.isLoggedIn;
 
@@ -214,20 +218,32 @@ class SphService {
       _checkFeature(feature);
       try {
         return await action();
-      } on SphException catch (e) {
+      } on SphException catch (e, st) {
         if (e is! SphDataException) rethrow;
+        _log?.call(
+          'request failed, logging in again: ${describeFailure(e, stack: st)}',
+        );
         // fall through to retry
-      } catch (_) {
+      } catch (e, st) {
+        _log?.call(
+          'request failed, logging in again: '
+          '${describeFailure(_mapError(e), stack: st)}',
+        );
         // fall through to retry
       }
       await _relogin();
       _checkFeature(feature);
       try {
         return await action();
-      } on SphException {
+      } on SphException catch (e, st) {
+        _log?.call('request failed again: ${describeFailure(e, stack: st)}');
         rethrow;
-      } catch (e) {
-        throw _mapError(e);
+      } catch (e, st) {
+        final mapped = _mapError(e);
+        _log?.call(
+          'request failed again: ${describeFailure(mapped, stack: st)}',
+        );
+        throw mapped;
       }
     } finally {
       _inFlight--;
@@ -277,8 +293,9 @@ class SphService {
       await _gateway.login();
       _authFailure = null;
       _authBlockedUntil = null;
-    } catch (e) {
+    } catch (e, st) {
       final mapped = _mapError(e);
+      _log?.call('login failed: ${describeFailure(mapped, stack: st)}');
       if (mapped is SphAuthException) {
         _authBlockedUntil = mapped.retryAfter ?? _now().add(authRetryDelay);
         _authFailure = SphAuthException(
@@ -357,23 +374,8 @@ class SphService {
       ),
       lanis.NoConnectionException() || lanis.NetworkException() =>
         SphUnavailableException('Schulportal is not reachable', e),
-      _ => SphDataException(
-        'Unexpected response from Schulportal: $e${_where(e)}',
-        e,
-      ),
+      _ => SphDataException('Unexpected response from Schulportal: $e', e),
     };
-  }
-
-  /// " (at package:liblanis/….dart:38)": the first frame of the parser that
-  /// failed, so a log line is enough to find the broken portal markup.
-  static String _where(Object e) {
-    final trace = e is Error ? e.stackTrace : null;
-    if (trace == null) return '';
-    for (final line in trace.toString().split('\n')) {
-      final m = RegExp(r'package:liblanis/\S+:\d+').firstMatch(line);
-      if (m != null) return ' (at ${m.group(0)})';
-    }
-    return '';
   }
 }
 
