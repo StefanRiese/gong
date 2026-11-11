@@ -209,7 +209,7 @@ export function addChildGroup({ defaultSchool }) {
       await loadAccounts();
       // Show the new child's own tab, not this one, after the reload.
       const url = new URL(location.href);
-      url.searchParams.delete('tab');
+      url.searchParams.set('tab', 'konto');
       history.replaceState(null, '', `${url.pathname}${url.search}`);
       changed({ switchTo: created.id });
     } catch (err) {

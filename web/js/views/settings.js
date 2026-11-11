@@ -107,7 +107,7 @@ export async function render(ctx) {
   const tabButtons = new Map();
   const setUrl = (key) => {
     const url = new URL(location.href);
-    if (key === 'allgemein' || key === 'neu') url.searchParams.set('tab', key); else url.searchParams.delete('tab');
+    url.searchParams.set('tab', key === 'konto' ? 'konto' : key);
     history.replaceState(null, '', `${url.pathname}${url.search}`);
   };
   const show = (key, { remember = true } = {}) => {
@@ -129,7 +129,7 @@ export async function render(ctx) {
         if (!t.account || t.key === 'konto') return show(t.key === 'konto' ? 'konto' : t.key);
         // Another child: its page is loaded anew (own filter, colors, login).
         if (form.dirty() && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
-        setUrl('konto');
+        setUrl('konto'); // the other child's page opens on its own tab
         window.dispatchEvent(new CustomEvent('lumo:switch-account', { detail: t.account }));
       });
       return button;
@@ -148,7 +148,8 @@ export async function render(ctx) {
     ? Object.entries(panels).find(([, panel]) => [...panel.querySelectorAll('[id]')].some((el) => el.id === hashId))?.[0]
     : null;
   const param = ctx.query.get('tab');
-  show(byHash ?? (param === 'allgemein' || param === 'neu' ? param : 'konto'), { remember: false });
+  // Opens on Allgemein; a link to a section (#vertretungsplan) or ?tab= picks another tab.
+  show(byHash ?? (['allgemein', 'konto', 'neu'].includes(param) ? param : 'allgemein'), { remember: false });
 
   // --- floating save entry: appears at the top while there is something to save or to say ---
   const message = messageArea();

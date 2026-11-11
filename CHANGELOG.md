@@ -6,6 +6,10 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- The settings page always opens on the tab *Allgemein* (links to a section such as
+  `#vertretungsplan` still open the tab that has it).
+
 ## [0.19.1] – 2026-11-11
 
 ### Added

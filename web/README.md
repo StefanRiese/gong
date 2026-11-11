@@ -51,7 +51,8 @@ logins (`PUT /api/accounts/{id}`, logins are tried first), the server settings
 colors) – so values that come from `config.env` are not pinned into the database. The entry
 shows „Ungespeicherte Änderungen“ with „Verwerfen“; leaving by a link or closing asks first. Buttons
 inside the groups only run actions („Anmeldung prüfen“, remove a child, restart, update). The
-tab is in the address (`?tab=allgemein` / `?tab=neu`); anchors like `#vertretungsplan` or
+page always opens on *Allgemein*; the tab is in the address (`?tab=allgemein` / `konto` / `neu`, set when
+you switch tabs or children); anchors like `#vertretungsplan` or
 `#update` open the tab that has the section.
 
 **Live updates and refresh:** pages answer from the server's cache right away. `app.js` follows
