@@ -726,6 +726,24 @@ class AppServer implements ServerControl {
       });
 
   @override
+  Future<List<String>> testAccount(Map<String, Object?> data) async {
+    final id = data['id'];
+    final base = id is String ? _accounts[id]?.config : null;
+    if (id != null && base == null) throw const AccountNotFound();
+    final cfg = AccountConfig.parse(
+      {...data}..remove('id'),
+      id: base?.id ?? 'test',
+      base: base,
+    );
+    await _verifyLogins(cfg, null);
+    return [
+      'schulportal',
+      if (cfg.caseda != null) 'caseda',
+      if (cfg.untis != null) 'untis',
+    ];
+  }
+
+  @override
   Future<Map<String, Object?>> updateAccount(
     String id,
     Map<String, Object?> data,

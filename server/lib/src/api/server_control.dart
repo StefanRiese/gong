@@ -40,6 +40,12 @@ abstract interface class ServerControl {
   /// UntisException if a login does not work.
   Future<Map<String, Object?>> addAccount(Map<String, Object?> data);
 
+  /// Tries all logins in [data] (the body of an account, plus an optional
+  /// `id`: missing fields and empty passwords then come from that account)
+  /// without storing anything. Returns what was tried (`schulportal`,
+  /// `caseda`, `untis`). Throws like [addAccount] and [AccountNotFound].
+  Future<List<String>> testAccount(Map<String, Object?> data);
+
   /// Changes name or logins of an account (fields not sent are kept). Throws
   /// [AccountNotFound] and the exceptions of [addAccount].
   Future<Map<String, Object?>> updateAccount(

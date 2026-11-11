@@ -87,7 +87,7 @@ Both are read-only and set up per child in the web UI under *Einstellungen* (tab
   *Schulessen*, today's meal on Heute) and the balance. Ordering stays on the Caseda website.
 - **Vertretungen (WebUntis)** – login of the school's WebUntis (a class account is enough);
   completes the Schulportal substitutions with what WebUntis knows and adds changes the
-  Schulportal plan does not have yet. The logins are tested when saving.
+  Schulportal plan does not have yet. „Anmeldung prüfen“ tests the logins.
 
 The logins are tested before they are saved and can be switched off without losing them.
 

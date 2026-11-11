@@ -320,6 +320,12 @@ async function handleApi(req, res, url) {
     }
     return handleServerSettings(req, res, url);
   }
+  if (setupRequired && path === '/api/accounts/test' && req.method === 'POST') {
+    if (req.headers['x-setup-token'] !== SETUP_TOKEN) {
+      return error(res, 403, 'setup_token_invalid', 'Missing or wrong setup token');
+    }
+    return testAccount(req, res);
+  }
   if (setupRequired && path === '/api/accounts' && req.method === 'POST') {
     if (req.headers['x-setup-token'] !== SETUP_TOKEN) {
       return error(res, 403, 'setup_token_invalid', 'Missing or wrong setup token');
@@ -353,6 +359,7 @@ async function handleApi(req, res, url) {
 
   // --- accounts (children) ---
   if (path === '/api/accounts' && req.method === 'GET') return json(res, 200, { accounts: accountList() });
+  if (path === '/api/accounts/test' && req.method === 'POST') return testAccount(req, res);
   if (path === '/api/accounts' && req.method === 'POST') {
     const result = await createAccount(req, res);
     return result ? json(res, 201, result) : undefined;
@@ -622,6 +629,23 @@ async function handleServerSettings(req, res, url) {
     headers['set-cookie'] = `sph_session=${t}; Path=/; HttpOnly; SameSite=Strict`;
   }
   return json(res, 200, { saved: true, setupRequired, restartRequired: restart }, headers);
+}
+
+/** Tries the logins of an account body (password "falsch" fails); stores nothing. */
+async function testAccount(req, res) {
+  const b = JSON.parse((await readBody(req)) || '{}');
+  if (b.id && !accountsMap.has(b.id)) return error(res, 404, 'unknown_account', 'No such account');
+  if (!b.id && (!String(b.username ?? '').trim() || !String(b.password ?? '').trim())) {
+    return json(res, 400, { error: { code: 'invalid_settings', message: 'Invalid settings',
+      problems: ['A password is required'] } });
+  }
+  if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
+  if (b.caseda?.password === 'falsch') return error(res, 400, 'meals_login_failed', 'Login failed');
+  if (b.untis?.password === 'falsch') return error(res, 400, 'untis_login_failed', 'Login failed');
+  const known = b.id ? accountsMap.get(b.id) : null;
+  return json(res, 200, { ok: true, checked: ['schulportal',
+    ...(b.caseda ?? (b.caseda === undefined && known?.caseda) ? ['caseda'] : []),
+    ...(b.untis ?? (b.untis === undefined && known?.untis) ? ['untis'] : [])] });
 }
 
 /** Adds an account from a request body; answers errors itself and then returns null. */

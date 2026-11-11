@@ -18,7 +18,7 @@ const changed = (detail = {}) => window.dispatchEvent(new CustomEvent('lumo:acco
  * The fields of an account. [account] = the stored values when editing (a password
  * left empty stays as it is on the server); null for a new account.
  */
-function accountFields({ account = null, defaultSchool, onChange = () => {} }) {
+function accountFields({ account = null, defaultSchool, onChange = () => {}, headers = {} }) {
   const name = input({ value: account?.name ?? '', maxlength: 40, placeholder: 'Standard: der Benutzername' });
   const school = schoolPicker({ value: account?.schoolId ?? defaultSchool, onChange });
   const username = input({ value: account?.username ?? '', autocapitalize: 'none', spellcheck: false });
@@ -63,7 +63,7 @@ function accountFields({ account = null, defaultSchool, onChange = () => {} }) {
   showWhenOn(untis, untisFields);
 
   const passwords = [password, casedaPassword, untisPassword];
-  return {
+  const fields = {
     el: h('div', { class: 'stack' },
       field('Name', name, 'So heißt das Kind in der Auswahl oben und in Benachrichtigungen.'),
       field('Schule', school.el),
@@ -130,7 +130,37 @@ function accountFields({ account = null, defaultSchool, onChange = () => {} }) {
       });
     },
   };
+
+  // Tries the logins without saving anything (the server uses the stored passwords for empty ones).
+  const testMsg = messageArea();
+  const test = h('button', { type: 'button', class: 'button' }, 'Anmeldung prüfen');
+  test.addEventListener('click', async () => {
+    const problem = fields.problem();
+    if (problem) {
+      testMsg.error(new ApiError(400, 'bad_request', problem));
+      return;
+    }
+    testMsg.ok('Anmeldung wird geprüft …');
+    test.disabled = true;
+    try {
+      const res = await api('/api/accounts/test', {
+        method: 'POST', headers, body: { ...fields.body(), ...(account ? { id: account.id } : {}) },
+      });
+      testMsg.ok(`Anmeldung erfolgreich: ${checkedNames(res.checked)}.`);
+    } catch (err) {
+      testMsg.error(err);
+    } finally {
+      test.disabled = false;
+    }
+  });
+  fields.el.append(h('div', { class: 'button-row' }, test), testMsg.el);
+  return fields;
 }
+
+const CHECKED = { schulportal: 'Schulportal', caseda: 'Caseda', untis: 'WebUntis' };
+
+/** "Schulportal, Caseda" from the list the server answers with. */
+export const checkedNames = (list) => (list ?? ['schulportal']).map((k) => CHECKED[k] ?? k).join(', ');
 
 /**
  * The shown account: its logins (saved with the page's save button) and, if there are

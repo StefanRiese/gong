@@ -4,6 +4,7 @@
 import { api, ApiError } from '../api.js';
 import { h } from '../dom.js';
 import { field, input, messageArea, schoolPicker } from './forms.js';
+import { checkedNames } from './accounts.js';
 
 export const title = 'Einrichtung';
 
@@ -49,11 +50,34 @@ export function render({ token, onDone }) {
   const username = input({ name: 'username', autocomplete: 'off', required: true, placeholder: 'vorname.nachname' });
   const sphPassword = input({ type: 'password', name: 'sph-password', autocomplete: 'off', required: true });
 
+  const checkMsg = messageArea();
+  const check = h('button', { type: 'button', class: 'button small' }, 'Anmeldung prüfen');
+
   const appPassword = input({ type: 'password', autocomplete: 'new-password', required: true, minlength: '8' });
   const appPassword2 = input({ type: 'password', autocomplete: 'new-password', required: true, minlength: '8' });
 
   const message = messageArea();
   const submit = h('button', { type: 'submit', class: 'button primary' }, 'Einrichtung abschließen');
+
+  check.addEventListener('click', async () => {
+    if (school.value == null || !username.value.trim() || !sphPassword.value) {
+      checkMsg.error(new ApiError(400, 'bad_request', 'Bitte Schule, Benutzername und Passwort angeben.'));
+      return;
+    }
+    check.disabled = true;
+    checkMsg.ok('Anmeldung wird geprüft …');
+    try {
+      const res = await api('/api/accounts/test', {
+        method: 'POST', headers,
+        body: { schoolId: school.value, username: username.value.trim(), password: sphPassword.value },
+      });
+      checkMsg.ok(`Anmeldung erfolgreich: ${checkedNames(res.checked)}.`);
+    } catch (err) {
+      checkMsg.error(err);
+    } finally {
+      check.disabled = false;
+    }
+  });
 
   const form = h('form', { class: 'setup-card card' },
     h('img', { src: '/icon.svg', alt: '', class: 'login-logo' }),
@@ -69,7 +93,9 @@ export function render({ token, onDone }) {
     h('fieldset', null,
       h('legend', null, '2. Zugang zum Schulportal'),
       field('Benutzername', username),
-      field('Passwort', sphPassword, 'Die Anmeldung wird beim Abschließen geprüft. Weitere Kinder lassen sich später unter Einstellungen hinzufügen.')),
+      field('Passwort', sphPassword, 'Weitere Kinder lassen sich später unter Einstellungen hinzufügen.'),
+      h('div', { class: 'button-row' }, check),
+      checkMsg.el),
 
     h('fieldset', null,
       h('legend', null, '3. Passwort für diese Web-Oberfläche'),

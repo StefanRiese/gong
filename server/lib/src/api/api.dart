@@ -93,6 +93,7 @@ const _eventPing = Duration(seconds: 25);
 /// the prefix the first account answers).
 ///   GET    /api/accounts      the accounts: id, name, school, …
 ///   POST   /api/accounts      add an account (login is tested first)
+///   POST   /api/accounts/test try the logins of an account body, store nothing
 ///   PUT    /api/accounts/{id}  change name / login of an account
 ///   DELETE /api/accounts/{id}  remove an account (not the last one)
 /// Data endpoints answer from the cache right away (expired entries are
@@ -295,6 +296,7 @@ class Api {
       ..post('/api/notifications/check', _notificationCheck)
       ..get('/api/accounts', _accounts)
       ..post('/api/accounts', _addAccount)
+      ..post('/api/accounts/test', _testAccount)
       ..put('/api/accounts/<id>', _updateAccount)
       ..delete('/api/accounts/<id>', _removeAccount)
       ..all('/api/accounts/<id>/<rest|.*>', _accountScoped);
@@ -461,6 +463,12 @@ class Api {
           : _error(503, 'untis_unavailable', e.message);
     }
   }
+
+  /// Tries the logins of an account body without storing anything.
+  Future<Response> _testAccount(Request request) => _changeAccount(
+    request,
+    (c, body) async => {'ok': true, 'checked': await c.testAccount(body)},
+  );
 
   Future<Response> _addAccount(Request request) =>
       _changeAccount(request, (c, body) => c.addAccount(body), status: 201);

@@ -209,6 +209,25 @@ void main() {
       expect((await call('GET', '/api/schools?q=x')).status, 403);
     });
 
+    test('the login can be tried with the setup token', () async {
+      final s = await start();
+      var r = await call(
+        'POST',
+        '/api/accounts/test',
+        token: tokenOf(s),
+        json: {'username': 'max.muster', 'password': 'geheim'},
+      );
+      expect(r.status, 200, reason: '${r.body}');
+      expect(s.accountCount, 0);
+      expect(s.setupRequired, isTrue);
+      r = await call(
+        'POST',
+        '/api/accounts/test',
+        json: {'username': 'max.muster', 'password': 'geheim'},
+      );
+      expect(r.status, 403);
+    });
+
     test('wrong Schulportal credentials are rejected', () async {
       final s = await start();
       gw.loginErrors.add(const SphAuthException('Wrong username or password'));

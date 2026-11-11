@@ -419,6 +419,72 @@ void main() {
     },
   );
 
+  test(
+    'the login test stores nothing and can use the stored passwords',
+    () async {
+      await start();
+      final cookie = await login();
+      final before = logins.length;
+
+      var r = await call(
+        'POST',
+        '/api/accounts/test',
+        cookie: cookie,
+        json: anna(),
+      );
+      expect(r.status, 200, reason: '${r.body}');
+      expect(r.body, {
+        'ok': true,
+        'checked': ['schulportal'],
+      });
+      expect(logins.length, before + 1);
+      expect(logins.last.username, 'anna.muster');
+      expect(
+        ((await call('GET', '/api/accounts', cookie: cookie)).body['accounts']
+                as List)
+            .length,
+        1,
+        reason: 'nothing was stored',
+      );
+
+      // Wrong login.
+      gatewayFor(
+        'anna.muster',
+      ).loginErrors.add(const SphAuthException('Falsches Passwort'));
+      r = await call(
+        'POST',
+        '/api/accounts/test',
+        cookie: cookie,
+        json: anna(),
+      );
+      expect(r.status, 400);
+      expect(r.body['error']['code'], 'sph_login_failed');
+
+      // An existing account: an empty password means the stored one.
+      r = await call(
+        'POST',
+        '/api/accounts/test',
+        cookie: cookie,
+        json: {'id': 'main', 'username': 'max.muster'},
+      );
+      expect(r.status, 200, reason: '${r.body}');
+      expect(logins.last.password, 'geheim');
+
+      r = await call(
+        'POST',
+        '/api/accounts/test',
+        cookie: cookie,
+        json: {'id': 'nope', 'username': 'x'},
+      );
+      expect(r.status, 404);
+      expect(
+        (await call('POST', '/api/accounts/test', json: anna())).status,
+        401,
+        reason: 'needs a login',
+      );
+    },
+  );
+
   test('server settings changes reach the further accounts', () async {
     await start();
     final cookie = await login();

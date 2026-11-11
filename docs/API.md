@@ -311,6 +311,14 @@ While the server is not set up this works with the setup token (`X-Setup-Token`)
 the first account is created. If the web password is set already, the response then sets the
 session cookie (the setup is complete).
 
+### `POST /api/accounts/test`
+
+Tries the logins of an account body (same fields as `POST /api/accounts`) without storing
+anything. With `"id": "<account>"` fields that are not sent and empty passwords come from that
+account, so a form can test the stored passwords. → `200 {"ok": true, "checked": ["schulportal",
+"caseda", "untis"]}` (what was tried), the errors of `POST /api/accounts`, `404 unknown_account`.
+Works with the setup token during the setup and shares the limit of 5 logins per 5 minutes.
+
 ### `PUT /api/accounts/{id}`
 
 Changes an account; fields that are not sent are kept, an empty `password` keeps the stored one,

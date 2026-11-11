@@ -14,7 +14,7 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
   `CASEDA_USERNAME`, `CASEDA_PASSWORD`, `UNTIS_ENABLED`, `UNTIS_SERVER`, `UNTIS_SCHOOL`,
   `UNTIS_USERNAME` and `UNTIS_PASSWORD` are gone. Schulportal, Caseda and WebUntis logins belong
   to the account, in *Einstellungen* every child's tab has the same form, and a login is tested
-  when saving. Only `CASEDA_BALANCE_WARNING` (for all children) stays a server setting, now in
+  with „Anmeldung prüfen“ or when saving. Only `CASEDA_BALANCE_WARNING` (for all children) stays a server setting, now in
   the tab *Allgemein*.
 - **Update function.** On the first start after the update the server turns the old settings
   (web UI, config file or environment) into the first account, moves its cached data,
@@ -22,7 +22,7 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
   This happens once, in one transaction; accounts added with 0.18 stay. The old keys in
   `config.env` are ignored afterwards. Going back to 0.18 would need a backup of `lumo.db`.
 - Setup page: the account is created with the web password in two steps (password first, then
-  the account with its login test); the separate „Anmeldung prüfen“ button is gone.
+  the account with its login test), so a wrong login can be corrected and sent again.
 - `install.sh --configure` no longer asks for the Schulportal login of an installation that is
   set up already (the accounts are managed in the web UI).
 - API: accounts have random ids (`main` only for an account taken over from the old settings);
@@ -31,8 +31,10 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
   password; the name is optional (default: the user name).
 
 ### Removed
-- API: `POST /api/server-settings/test-login`, `…/test-caseda` and `…/test-untis` (logins are
-  tested when an account is added or changed).
+- API: `POST /api/server-settings/test-login`, `…/test-caseda` and `…/test-untis`; the new
+  `POST /api/accounts/test` replaces them (Schulportal, Caseda and WebUntis of an account at once;
+  empty passwords of an existing account use the stored ones). The button „Anmeldung prüfen“ is
+  in every account form, on the tab *+ Kind* and on the setup page.
 
 ## [0.18.2] – 2026-11-11
 
