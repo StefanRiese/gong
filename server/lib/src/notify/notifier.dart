@@ -66,6 +66,29 @@ class LabeledNotifier implements Notifier {
   }
 }
 
+/// Asks an ntfy server whether it is up (`/v1/health`; nothing is sent, no
+/// topic is named). False for any failure.
+Future<bool> probeNtfy(
+  Uri server, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final client = HttpClient()
+    ..connectionTimeout = timeout
+    ..userAgent = 'lumo';
+  try {
+    final url = server.replace(path: '/v1/health', query: '');
+    final request = await client.getUrl(url).timeout(timeout);
+    final response = await request.close().timeout(timeout);
+    final body = await utf8.decodeStream(response).timeout(timeout);
+    return response.statusCode == 200 &&
+        RegExp(r'"healthy"\s*:\s*true').hasMatch(body);
+  } on Object {
+    return false;
+  } finally {
+    client.close(force: true);
+  }
+}
+
 class NotifyException implements Exception {
   final String message;
 

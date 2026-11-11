@@ -43,6 +43,9 @@ light or dark mode of the device.
 - **Several children** on one server: add Schulportal accounts under *Einstellungen → + Kind*
   and switch between them in the top bar; every child has own data, filters, colors
   and (optional) Caseda / WebUntis login; notifications name the child
+- **Status LEDs** in the top bar show the connection and health of the server, the Schulportal,
+  school meals, WebUntis, ntfy and the update check (green / yellow / red / gray); a click shows
+  the details of all children
 - Heute, Stundenplan (A/B weeks), Vertretungen, Hausaufgaben (mark as done in the portal),
   Noten, Fächer / course pages, Kalender with filters; consistent subject colors
 - Substitution plan of the whole school with a permanent filter for the own classes (also

@@ -6,6 +6,16 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.20.0] – 2026-11-11
+
+### Added
+- **Status LEDs** in the top bar: the connection to the server and the health of the Schulportal,
+  school meals (Caseda) and WebUntis of the shown child, plus ntfy and the update check. Green =
+  fine, yellow = limited or retrying, red = down (login rejected, three failed attempts in a row,
+  server or ntfy not reachable), gray = not known yet. A click shows the details of all children
+  with the last successful update; the state is also written out, not only shown as a color. API:
+  `GET /api/status`. Mock server: `MOCK_STATUS=bad`.
+
 ## [0.19.5] – 2026-11-11
 
 ### Fixed
@@ -507,7 +517,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.5...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/StefanRiese/lumo/compare/v0.19.5...v0.20.0
 [0.19.5]: https://github.com/StefanRiese/lumo/compare/v0.19.4...v0.19.5
 [0.19.4]: https://github.com/StefanRiese/lumo/compare/v0.19.3...v0.19.4
 [0.19.3]: https://github.com/StefanRiese/lumo/compare/v0.19.2...v0.19.3

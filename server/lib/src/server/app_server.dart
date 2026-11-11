@@ -17,6 +17,7 @@ import '../config/migrate_accounts.dart';
 import '../config/env.dart';
 import '../config/server_settings.dart';
 import '../desktop/build_info.g.dart';
+import '../health/health.dart';
 import '../notify/notifier.dart';
 import '../net/ports.dart';
 import '../notify/poller.dart';
@@ -94,6 +95,8 @@ class AppServer implements ServerControl {
   AppConfig _config;
   final UpdateService _update;
   final Future<void> Function()? _onRestart;
+  final Future<bool> Function(Uri server) _probeNtfy;
+  ({DateTime at, Uri server, bool ok})? _ntfyProbed;
   final AccountStore _accountStore;
 
   /// The accounts in display order; the first one answers the API paths
@@ -117,6 +120,7 @@ class AppServer implements ServerControl {
     this._config,
     this._update,
     this._onRestart,
+    this._probeNtfy,
     this._setupToken,
   ) : startedConfig = _config,
       _accountStore = AccountStore(_db);
@@ -165,6 +169,7 @@ class AppServer implements ServerControl {
     int? passwordIterations,
     Future<void> Function()? onUpdateReady,
     Future<void> Function()? onRestart,
+    Future<bool> Function(Uri server)? ntfyProbe,
     HttpGet? updateGet,
   }) async {
     void info(String m) => log('${DateTime.now().toIso8601String()} $m', false);
@@ -299,6 +304,7 @@ class AppServer implements ServerControl {
       config,
       update,
       onRestart,
+      ntfyProbe ?? probeNtfy,
       null,
     );
     api
@@ -469,6 +475,81 @@ class AppServer implements ServerControl {
 
   @override
   bool checkSetupToken(String? token) => _setupToken?.matches(token) ?? false;
+
+  @override
+  Future<Map<String, Object?>> healthStatus() async {
+    final now = DateTime.now();
+    final ntfy = _config.ntfy;
+    final pollers = [for (final a in _accounts.values) ?a.api.poller];
+    // The ntfy server is asked at most once a minute.
+    bool? reachable;
+    if (ntfy != null) {
+      final last = _ntfyProbed;
+      if (last != null &&
+          last.server == ntfy.server &&
+          now.difference(last.at) < const Duration(minutes: 1)) {
+        reachable = last.ok;
+      } else {
+        final ok = await _probeNtfy(ntfy.server);
+        _ntfyProbed = (at: now, server: ntfy.server, ok: ok);
+        reachable = ok;
+      }
+    }
+    return {
+      'checkedAt': now.toUtc().toIso8601String(),
+      'accounts': [
+        for (final a in _accounts.values)
+          {
+            'id': a.config.id,
+            'name': a.config.name,
+            'services': [
+              for (final h in [
+                healthOfTasks(
+                  key: 'schulportal',
+                  name: 'Schulportal',
+                  sync: a.sync,
+                  now: now,
+                  tasks: const [
+                    SyncTask.account,
+                    SyncTask.timetable,
+                    SyncTask.substitutions,
+                    SyncTask.homework,
+                    SyncTask.calendar,
+                    SyncTask.lessons,
+                  ],
+                ),
+                healthOfTasks(
+                  key: 'caseda',
+                  name: 'Schulessen (Caseda)',
+                  sync: a.sync,
+                  now: now,
+                  tasks: const [SyncTask.meals],
+                ),
+                healthOfTasks(
+                  key: 'untis',
+                  name: 'WebUntis',
+                  sync: a.sync,
+                  now: now,
+                  tasks: const [SyncTask.untis],
+                ),
+              ])
+                if (h != null) h.toJson(),
+            ],
+          },
+      ],
+      'services': [
+        ?healthOfNtfy(
+          configured: ntfy != null && _config.poller.kinds.isNotEmpty,
+          reachable: reachable,
+          statuses: [
+            for (final p in pollers)
+              for (final k in _config.poller.kinds) p.status(k),
+          ],
+        )?.toJson(),
+        ?healthOfUpdates(_update.status())?.toJson(),
+      ],
+    };
+  }
 
   @override
   bool get canRestart => _onRestart != null;

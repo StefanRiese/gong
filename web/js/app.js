@@ -23,6 +23,7 @@ import * as setup from './views/setup.js';
 import { initColors } from './colors.js';
 import { initScheme, isDark, toggleMode } from './scheme.js';
 import { updateHint, watchServerVersion } from './update.js';
+import { createStatus } from './status.js';
 import { setHomeworkReadOnly } from './views/common.js';
 
 initScheme();
@@ -73,6 +74,8 @@ let liveKeys = new Set();
 /** @type {EventSource | null} */
 let events = null;
 let liveTimer = null;
+/** Connection and health LEDs in the top bar. @type {ReturnType<typeof createStatus> | null} */
+let statusLeds = null;
 
 const ACCOUNT_KEY = 'lastAccount';
 const accountKey = () => `${ACCOUNT_KEY}:${currentAccount}`;
@@ -186,6 +189,7 @@ async function loadColors() {
 /** Server not set up yet: setup page instead of the login. */
 function showSetup() {
   stopLive();
+  statusLeds?.stop();
   account = null;
   shell = null;
   root.replaceChildren(setup.render({ token: setup.takeToken(), onDone: boot }));
@@ -193,6 +197,7 @@ function showSetup() {
 
 function showLogin() {
   stopLive();
+  statusLeds?.stop();
   account = null;
   shell = null;
   document.title = 'Anmelden – Lumo';
@@ -244,10 +249,13 @@ function showShell() {
   window.addEventListener('lumo:theme', showMode);
   const nav = buildNav();
   const switcher = accountSwitcher(switchAccount);
+  statusLeds?.stop();
+  statusLeds = createStatus();
   const header = h('header', { class: 'topbar' },
     h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Lumo'),
     switcher,
     status,
+    statusLeds.el,
     h('div', { class: 'topbar-actions' },
       refreshButton,
       modeButton,
@@ -261,6 +269,7 @@ function showShell() {
   root.replaceChildren(header, h('div', { class: 'layout' }, nav, main));
   renderRoute();
   startLive();
+  statusLeds.start();
 }
 
 /**
@@ -348,7 +357,10 @@ function startLive() {
   });
   events.addEventListener('sync', (e) => {
     const msg = parse(e);
-    if (msg) setSyncing(Boolean(msg.running));
+    if (msg) {
+      setSyncing(Boolean(msg.running));
+      if (!msg.running) statusLeds?.refresh(); // a finished sync may have changed a service's state
+    }
   });
 }
 

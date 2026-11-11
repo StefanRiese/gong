@@ -967,3 +967,60 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .tab:hover { color: var(--text); }
 .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-panel[hidden] { display: none; }
+
+/* ---------- connection / health LEDs ---------- */
+
+.status-leds { position: relative; display: flex; align-items: center; flex: none; }
+.leds {
+  display: flex;
+  align-items: center;
+  padding: .55rem .6rem;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+}
+.leds:hover { background: var(--surface-2); }
+.leds-row { display: flex; align-items: center; gap: .4rem; }
+.led {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 18%);
+}
+.led-ok { background: var(--ok); box-shadow: 0 0 6px var(--ok), inset 0 0 0 1px rgb(0 0 0 / 15%); }
+.led-warn { background: #f0a500; box-shadow: 0 0 6px #f0a500, inset 0 0 0 1px rgb(0 0 0 / 15%); }
+.led-error { background: var(--danger); box-shadow: 0 0 7px var(--danger), inset 0 0 0 1px rgb(0 0 0 / 15%); }
+.led-unknown { background: var(--muted); opacity: .55; box-shadow: none; }
+:root[data-scheme="lumo"] .topbar .leds:hover { background: rgb(255 255 255 / 16%); }
+:root[data-scheme="lumo"] .topbar .led-unknown { background: rgb(255 255 255 / 70%); }
+:root[data-scheme="lumo"] .topbar .led-ok { background: #4ddf85; box-shadow: 0 0 6px #4ddf85; }
+:root[data-scheme="lumo"] .topbar .led-error { background: #ff6b60; box-shadow: 0 0 7px #ff6b60; }
+
+.status-popover {
+  position: absolute;
+  top: calc(100% + .4rem);
+  right: 0;
+  z-index: 30;
+  width: min(23rem, calc(100vw - 2rem));
+  max-height: calc(100vh - var(--topbar-height) - 2rem);
+  overflow-y: auto;
+  padding: .4rem .8rem .6rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
+}
+.status-popover[hidden] { display: none; }
+.status-group h3 { margin: .7rem 0 .15rem; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.status-group ul { list-style: none; margin: 0; padding: 0; }
+.status-row { display: grid; grid-template-columns: auto 1fr; gap: 0 .65rem; padding: .35rem 0; font-size: .92rem; }
+.status-row .led { margin-top: .38rem; }
+.status-row .detail { color: var(--muted); font-size: .84rem; }
+@media (max-width: 720px) {
+  .leds { padding: .55rem .4rem; }
+  .leds-row { gap: .3rem; }
+}

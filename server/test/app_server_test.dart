@@ -51,6 +51,7 @@ void main() {
   Future<AppServer> start([
     Map<String, String> env = const {},
     Future<void> Function()? onRestart,
+    Future<bool> Function(Uri server)? ntfyProbe,
   ]) async => server = await AppServer.start(
     {
       'DATA_DIR': dir.path,
@@ -60,6 +61,7 @@ void main() {
     },
     log: (_, _) {},
     onRestart: onRestart,
+    ntfyProbe: ntfyProbe,
     gateway: (c) {
       logins.add(c);
       return gw;
@@ -452,6 +454,78 @@ void main() {
         expect(login.status, 200);
       },
     );
+  });
+
+  group('status LEDs', () {
+    test('needs a login', () async {
+      final s = await start();
+      await completeSetup(s);
+      expect((await call('GET', '/api/status')).status, 401);
+    });
+
+    test('services of the account and of the server', () async {
+      final s = await start();
+      final cookie = await completeSetup(
+        s,
+        account: {
+          'caseda': {'username': 'eltern@example.org', 'password': 'pw'},
+        },
+      );
+      final r = await call('GET', '/api/status', cookie: cookie);
+      expect(r.status, 200, reason: '${r.body}');
+      final account = (r.body['accounts'] as List).single as Map;
+      expect(account['name'], 'Max');
+      final byKey = <Object?, Map>{
+        for (final x in account['services'] as List) (x as Map)['key']: x,
+      };
+      expect(byKey.keys, ['schulportal', 'caseda']);
+      // SYNC=false in these tests: nothing is checked in the background.
+      expect(byKey['schulportal']!['state'], 'unknown');
+      expect(byKey['schulportal']!['detail'], contains('ausgeschaltet'));
+      expect((r.body['services'] as List).map((x) => (x as Map)['key']), [
+        'updates',
+      ]);
+      expect(jsonEncode(r.body), isNot(contains('geheim')));
+    });
+
+    test('ntfy: asked at most once a minute, red when not reachable', () async {
+      var asked = 0;
+      var up = false;
+      final s = await start({}, null, (server) async {
+        asked++;
+        return up;
+      });
+      final cookie = await completeSetup(s);
+      await call(
+        'PUT',
+        '/api/server-settings',
+        cookie: cookie,
+        json: {
+          'settings': {'NTFY_TOPIC': 'lumo-test-123'},
+        },
+      );
+      Future<Map> ntfy() async {
+        final r = await call('GET', '/api/status', cookie: cookie);
+        return (r.body['services'] as List).cast<Map>().firstWhere(
+          (x) => x['key'] == 'ntfy',
+        );
+      }
+
+      expect((await ntfy())['state'], 'error');
+      up = true;
+      expect((await ntfy())['state'], 'error', reason: 'cached for a minute');
+      expect(asked, 1);
+    });
+
+    test('no ntfy LED without notifications', () async {
+      final s = await start({}, null, (_) async => true);
+      final cookie = await completeSetup(s);
+      final r = await call('GET', '/api/status', cookie: cookie);
+      expect(
+        (r.body['services'] as List).cast<Map>().map((x) => x['key']),
+        isNot(contains('ntfy')),
+      );
+    });
   });
 
   group('restart', () {

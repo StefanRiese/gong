@@ -17,6 +17,7 @@ export 'src/config/config_file.dart';
 export 'src/config/env.dart';
 export 'src/config/migrate_accounts.dart';
 export 'src/config/server_settings.dart';
+export 'src/health/health.dart';
 export 'src/models/models.dart';
 export 'src/notify/change_detector.dart';
 export 'src/notify/notifier.dart';

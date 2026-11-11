@@ -42,6 +42,7 @@ server/                 Dart package (own pubspec)
   lib/src/caseda/       Caseda Schulmenü (school meals): client, parser, MealsGateway – read-only
   lib/src/untis/        WebUntis (second source for substitutions, REST interface of the web app):
                         client, mapper, merge into the plan (merge.dart) – read-only
+  lib/src/health/       service health for the status LEDs (GET /api/status)
   lib/src/update/       UpdateService: GitHub release check, install per platform (systemd
                         request file / Windows exe swap / macOS bundle via exit code 80)
   lib/src/config/       AppConfig, config.env, web UI settings (DB), setup token, school list;
@@ -63,6 +64,7 @@ web/                    web UI: index.html, css/app.css, js/ (ES modules, no bui
   js/accounts.js        children: list, selected account (drop-down in the top bar); api.js adds the
                         /api/accounts/<id>/ prefix to per-account paths
   js/colors.js          subject colors + course ↔ timetable-abbreviation matching
+  js/status.js          status LEDs in the top bar (connection + health of the services)
   js/update.js          update hint/install, watchServerVersion (reloads the installed app)
 dev/mock-server.mjs     Node mock API with invented data (password "demo"; MOCK_SETUP=1: setup page)
 deploy/                 systemd units (incl. -update.path/.service), install.sh, build-release.sh, guide

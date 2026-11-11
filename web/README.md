@@ -23,6 +23,7 @@ js/format.js            German date formatting
 js/colors.js            subject colors, course ↔ timetable-abbreviation matching
 js/substitution-filter.js  helpers for the substitution filters
 js/update.js            update hint and installation, reload of an installed app after an update
+js/status.js            the status LEDs in the top bar and their details (polls `GET /api/status`)
 js/views/*.js           one module per page (common.js: shared cards and helpers)
 js/views/settings*.js   the settings page: settings.js (page, tabs, save bar), settings-groups.js
                         (one function per group), settings-form.js (registry of the values)
@@ -143,6 +144,8 @@ MOCK_SETUP=1 node dev/mock-server.mjs   # not set up: /einrichtung?token=demo-to
 MOCK_UPDATE=1 node dev/mock-server.mjs  # update v0.7.0 available (install simulates a restart)
 MOCK_ABBREV=1 node dev/mock-server.mjs  # timetable with subject abbreviations (M, D, Geo …)
 MOCK_CHILDREN=1 node dev/mock-server.mjs # a second child ("Mia") for the switcher and the tabs
+MOCK_PARENT=1 node dev/mock-server.mjs   # the first account is a parent account (no Vertretungen, homework read-only)
+MOCK_STATUS=bad node dev/mock-server.mjs  # the Schulportal LED is red (default: one yellow LED)
 ```
 
 Edit files and reload the browser — there is nothing to build.

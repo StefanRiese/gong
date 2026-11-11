@@ -22,6 +22,10 @@ abstract interface class ServerControl {
 
   bool checkSetupToken(String? token);
 
+  /// How the services are doing (Schulportal, Caseda, WebUntis per account;
+  /// ntfy and the update check for the server): see `GET /api/status`.
+  Future<Map<String, Object?>> healthStatus();
+
   /// Whether the server can restart itself here (Windows / macOS app, systemd
   /// service); otherwise [restart] is not offered.
   bool get canRestart;

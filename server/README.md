@@ -148,6 +148,15 @@ time with short pauses:
 | `untis` | like `substitutions` (only with WebUntis) | `untis` – changed lessons of the class (`lib/src/untis/`), merged into `/api/substitutions` |
 | `account`, `timetable` | 6 h | `account`, `timetable` |
 
+### Status of the services (LEDs)
+
+`lib/src/health/health.dart` turns what the server already knows into LED states: the sync status of
+the tasks of each account (`healthOfTasks`: failed attempts in a row, rejected login, data older than
+three intervals), the delivery state of the notifications plus a check of the ntfy server
+(`probeNtfy`, `/v1/health`, at most once a minute) and the result of the update check.
+`AppServer.healthStatus()` collects it for `GET /api/status`; the web UI polls it every 30 s and
+adds its own LED for the connection to the server.
+
 ### Logging
 
 Everything goes to stdout / stderr (journald under systemd). `lib/src/util/failure.dart`

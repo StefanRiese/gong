@@ -81,6 +81,8 @@ const _eventPing = Duration(seconds: 25);
 ///   GET  /api/update        version, latest release, update state
 ///   POST /api/update/check  look for a new release now
 ///   POST /api/update/install  install the latest release (202, async)
+///   GET  /api/status        health of the services (Schulportal, Caseda, WebUntis,
+///                           ntfy, update check) for the LEDs
 ///   POST /api/restart       restart the server (202; 409 where it cannot)
 /// While the server is not set up, the settings endpoints need the setup
 /// token (header X-Setup-Token) instead of a login.
@@ -309,6 +311,7 @@ class Api {
       ..post('/api/notifications/test', _notificationTest)
       ..post('/api/notifications/check', _notificationCheck)
       ..get('/api/accounts', _accounts)
+      ..get('/api/status', _status)
       ..post('/api/restart', _restart)
       ..post('/api/accounts', _addAccount)
       ..post('/api/accounts/test', _testAccount)
@@ -1007,6 +1010,19 @@ class Api {
         'School list of Schulportal not reachable',
       );
     }
+  }
+
+  // --- status (LEDs) ------------------------------------------------------------
+
+  /// Connection and health of the services; the web UI shows them as LEDs.
+  Future<Response> _status(Request request) async {
+    if (control?.setupRequired ?? false) return _setupRequired();
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final c = control;
+    if (c == null) return _error(404, 'not_found', 'Not available');
+    return _json(200, await c.healthStatus());
   }
 
   // --- restart ----------------------------------------------------------------

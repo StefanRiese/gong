@@ -10,6 +10,7 @@
 //   MOCK_UPDATE=1 node dev/mock-server.mjs  → an update (v0.7.0) is available
 //   MOCK_ABBREV=1 node dev/mock-server.mjs  → timetable with subject abbreviations (M, D, Geo …)
 //   MOCK_CHILDREN=1 node dev/mock-server.mjs → a second account ("Mia") besides the first
+//   MOCK_STATUS=bad node dev/mock-server.mjs  → the Schulportal LED is red (default: one yellow LED)
 //   MOCK_PARENT=1 node dev/mock-server.mjs   → the first account is a parent account (no Vertretungen,
 //                                              homework cannot be marked as done)
 //
@@ -473,6 +474,29 @@ async function handleApi(req, res, url) {
       setTimeout(() => Object.assign(update, { current: update.latest, available: false, phase: 'idle' }), 3000);
     }, 1500);
     return json(res, 202, updateStatus());
+  }
+  if (path === '/api/status' && req.method === 'GET') {
+    // Health of the services: one yellow LED for WebUntis, MOCK_STATUS=bad makes the Schulportal red.
+    const ago = (min) => new Date(Date.now() - min * 60e3).toISOString();
+    const bad = process.env.MOCK_STATUS === 'bad';
+    return json(res, 200, {
+      checkedAt: new Date().toISOString(),
+      accounts: [...accountsMap.values()].map((a) => ({
+        id: a.id, name: a.name,
+        services: [
+          bad ? { key: 'schulportal', name: 'Schulportal', state: 'error', failures: 4,
+            detail: 'Anmeldung beim Schulportal fehlgeschlagen – bitte die Zugangsdaten prüfen', lastSuccess: ago(190) }
+            : { key: 'schulportal', name: 'Schulportal', state: 'ok', failures: 0, detail: 'Verbunden', lastSuccess: ago(4) },
+          ...(a.caseda ? [{ key: 'caseda', name: 'Schulessen (Caseda)', state: 'ok', failures: 0, detail: 'Verbunden', lastSuccess: ago(35) }] : []),
+          ...(a.untis ? [{ key: 'untis', name: 'WebUntis', state: 'warn', failures: 1,
+            detail: 'WebUntis nicht erreichbar – wird erneut versucht', lastSuccess: ago(48) }] : []),
+        ],
+      })),
+      services: [
+        ...(serverValues.NTFY_TOPIC ? [{ key: 'ntfy', name: 'Benachrichtigungen (ntfy)', state: 'ok', failures: 0, detail: 'Erreichbar' }] : []),
+        { key: 'updates', name: 'Update-Server (GitHub)', state: 'ok', failures: 0, detail: 'Verbunden', lastSuccess: ago(12) },
+      ],
+    });
   }
   if (req.method === 'POST' && path === '/api/restart') {
     // The "server" is away for a few seconds (all API calls answer 503 meanwhile).

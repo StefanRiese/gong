@@ -14,6 +14,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Sync and live updates](#sync-and-live-updates)
 - [Notifications](#notifications)
 - [Setup and server settings](#setup-and-server-settings)
+- [Status of the services](#status-of-the-services)
 - [Restart](#restart)
 - [App updates](#app-updates)
 - [School meals](#school-meals)
@@ -569,6 +570,43 @@ match), at most 20 results:
 
 The list is loaded from the portal on first use and kept for a day; `503 sph_unavailable` if it
 cannot be loaded.
+
+## Status of the services
+
+### `GET /api/status`
+
+Connection and health of the services, for the LEDs in the web UI. Needs a login.
+
+```json
+{
+  "checkedAt": "2026-11-11T17:56:01Z",
+  "accounts": [
+    {"id": "k3x9ab", "name": "Max", "services": [
+      {"key": "schulportal", "name": "Schulportal", "state": "ok", "detail": "Verbunden",
+       "lastSuccess": "2026-11-11T17:52:00Z", "failures": 0},
+      {"key": "untis", "name": "WebUntis", "state": "warn",
+       "detail": "WebUntis nicht erreichbar – wird erneut versucht", "lastSuccess": "…", "failures": 1}
+    ]}
+  ],
+  "services": [
+    {"key": "ntfy", "name": "Benachrichtigungen (ntfy)", "state": "ok", "detail": "Erreichbar", "lastSuccess": null, "failures": 0},
+    {"key": "updates", "name": "Update-Server (GitHub)", "state": "ok", "detail": "Verbunden", "lastSuccess": "…", "failures": 0}
+  ]
+}
+```
+
+| `state` | Meaning |
+|---|---|
+| `ok` | reachable and up to date |
+| `warn` | limited: a failed attempt that is retried, or data older than three sync intervals (at least 12 hours) |
+| `error` | does not work: login rejected, or three failed attempts in a row; ntfy not reachable or a notification could not be delivered |
+| `unknown` | not known yet (not asked so far) or the background sync is switched off |
+
+Per child: `schulportal` (the worst of the sync tasks account, timetable, substitutions, homework,
+calendar and lessons), `caseda` and `untis` (only if set up). For the server: `ntfy` (only with
+notifications; the server's `/v1/health` is asked at most once a minute, nothing is sent) and
+`updates` (only with the update check on). `detail` is a German one-liner for the user. The
+web UI adds its own LED for the connection to the server.
 
 ## Restart
 
