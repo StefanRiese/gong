@@ -1,4 +1,5 @@
 ## Open
+- [ ] offline mode: the installed app does not open while the Lumo server is down (no service worker). Browsers only allow service workers over HTTPS or on localhost, and Lumo is used as `http://<ip>:8080`, so decide first how to reach it over HTTPS (reverse proxy with a real certificate, e.g. Caddy, or Tailscale HTTPS; later maybe HTTPS in Lumo itself). Then build the service worker: cache the app shell and the last data per page, show „Server nicht erreichbar – Stand vor …“, clear the cached data at logout and per child, and mention it next to the Server status LED
 - [ ] macOS menu bar app: exit code 81 („restart“ from the web UI) starts the server again (cannot be tested on Linux; the release workflow only builds it)
 - [ ] Windows app: the restart button of the web UI restarts like the tray item „Neu starten“
 - [ ] parent accounts: several children in one parent account – only the first pupil is shown (the page has one block per pupil); show all of them, e.g. as one Lumo account per pupil
