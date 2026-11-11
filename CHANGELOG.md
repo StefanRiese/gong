@@ -6,6 +6,8 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.19.2] – 2026-11-11
+
 ### Changed
 - The settings page always opens on the tab *Allgemein* (links to a section such as
   `#vertretungsplan` still open the tab that has it).
@@ -476,7 +478,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/StefanRiese/lumo/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/StefanRiese/lumo/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/StefanRiese/lumo/compare/v0.18.2...v0.19.0
 [0.18.2]: https://github.com/StefanRiese/lumo/compare/v0.18.1...v0.18.2
