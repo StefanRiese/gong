@@ -23,6 +23,7 @@ import * as setup from './views/setup.js';
 import { initColors } from './colors.js';
 import { initScheme, isDark, toggleMode } from './scheme.js';
 import { updateHint, watchServerVersion } from './update.js';
+import { setHomeworkReadOnly } from './views/common.js';
 
 initScheme();
 
@@ -89,7 +90,9 @@ function rememberedAccount() {
 
 function rememberAccount(acc) {
   try {
-    localStorage.setItem(accountKey(), JSON.stringify({ features: acc.features, username: acc.username }));
+    localStorage.setItem(accountKey(), JSON.stringify({
+      features: acc.features, username: acc.username, accountType: acc.accountType,
+    }));
   } catch {
     // storage unavailable
   }
@@ -109,15 +112,19 @@ async function boot() {
     try {
       const acc = await api('/api/account');
       rememberAccount(acc.data);
-      account = { features: new Set(acc.data.features), username: acc.data.username };
+      account = { features: new Set(acc.data.features), username: acc.data.username, accountType: acc.data.accountType };
     } catch (err) {
       if (err instanceof ApiError && err.isUnauthorized) throw err;
       // Portal down or disturbed: start anyway with what we knew last time;
       // pages show cached data or their own error.
       const saved = rememberedAccount();
-      account = { features: new Set(saved?.features ?? ALL_FEATURES), username: saved?.username ?? '' };
+      account = {
+        features: new Set(saved?.features ?? ALL_FEATURES), username: saved?.username ?? '',
+        accountType: saved?.accountType,
+      };
       portalProblem = err;
     }
+    setHomeworkReadOnly(account.accountType === 'parent');
     const [, withMeals] = await Promise.all([loadColors(), mealsEnabled()]);
     if (withMeals) account.features.add('meals');
     showShell();

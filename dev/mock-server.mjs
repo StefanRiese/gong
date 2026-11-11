@@ -10,6 +10,8 @@
 //   MOCK_UPDATE=1 node dev/mock-server.mjs  → an update (v0.7.0) is available
 //   MOCK_ABBREV=1 node dev/mock-server.mjs  → timetable with subject abbreviations (M, D, Geo …)
 //   MOCK_CHILDREN=1 node dev/mock-server.mjs → a second account ("Mia") besides the first
+//   MOCK_PARENT=1 node dev/mock-server.mjs   → the first account is a parent account (no Vertretungen,
+//                                              homework cannot be marked as done)
 //
 // "Neu laden" (POST /api/refresh) simulates a 2.5 s sync: /api/events pushes
 // sync start/end and an update for every data key the UI has loaded.
@@ -58,13 +60,13 @@ if (!setupRequired) {
   accountsMap.set('max001', { id: 'max001', name: 'max.muster', schoolId: 9999, username: 'max.muster',
     caseda: { url: 'https://www.caseda-schulmenue.de', username: 'eltern@example.org' },
     untis: { server: 'musterschule.webuntis.com', school: 'musterschule', username: 'klasse7b' },
-    settings: newSettings(), slim: false });
+    settings: newSettings(), slim: false, parent: process.env.MOCK_PARENT === '1' });
 }
 if (process.env.MOCK_CHILDREN === '1') {
   accountsMap.set('mia001', { id: 'mia001', name: 'Mia', schoolId: 9999, username: 'mia.muster',
     caseda: null, untis: null, settings: newSettings(), slim: true });
 }
-const publicAccount = ({ settings: _s, slim: _l, ...a }) => a;
+const publicAccount = ({ settings: _s, slim: _l, parent: _p, ...a }) => a;
 const accountList = () => [...accountsMap.values()].map(publicAccount);
 const updateSetup = () => {
   setupRequired = !(passwordSet && accountsMap.size > 0);
@@ -502,9 +504,11 @@ async function handleApi(req, res, url) {
   }
   switch (path) {
     case '/api/account':
-      return data(res, 'account', { schoolId: child.schoolId, username: child.username, accountType: 'student',
-        features: child.slim ? ['timetable', 'substitutions', 'lessons']
-          : ['timetable', 'substitutions', 'calendar', 'lessons'] });
+      return data(res, 'account', { schoolId: child.schoolId, username: child.username,
+        accountType: child.parent ? 'parent' : 'student',
+        features: child.parent ? ['timetable', 'calendar', 'lessons']
+          : child.slim ? ['timetable', 'substitutions', 'lessons']
+            : ['timetable', 'substitutions', 'calendar', 'lessons'] });
     case '/api/timetable': return data(res, 'timetable', timetable, child.untis ? {
       differences: [
         { weekday: 1, start: '14:00', text: 'Mo 14:00: WebUntis hat LRS, im Schulportal-Stundenplan fehlt sie' },

@@ -63,8 +63,11 @@ class FakeGateway implements SphGateway {
   @override
   Set<String> get enabledApplets => _loggedIn ? applets : const {};
 
+  /// "student", "parent" or "teacher" once logged in.
+  String accountTypeValue = 'student';
+
   @override
-  String? get accountType => _loggedIn ? 'student' : null;
+  String? get accountType => _loggedIn ? accountTypeValue : null;
 
   Future<T> _data<T>(T value) async {
     if (!_loggedIn) throw lanis.UnauthorizedException('not logged in');
@@ -91,7 +94,8 @@ class FakeGateway implements SphGateway {
   @override
   Future<lanis.DetailedLesson> lessonDetails(Uri courseUrl) {
     lessonDetailCalls++;
-    final id = courseUrl.queryParameters['id']!;
+    // Like liblanis: everything after "id=" (parent accounts: "100&p=9").
+    final id = courseUrl.toString().split('id=')[1];
     final lesson = lessonsData.firstWhere((l) => l.courseID == id);
     return _data(sampleDetails(lesson));
   }

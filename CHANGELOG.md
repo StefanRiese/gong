@@ -6,6 +6,17 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.19.4] – 2026-11-11
+
+### Added
+- **Parent accounts** now show what the portal offers them: Stundenplan (liblanis only counted it for
+  students, the portal shows it to parents too), Mein Unterricht with all courses, their entries,
+  Hausaufgaben, Noten and Klausuren, and Kalender. Vertretungen stays off because the portal does
+  not offer it to this account type. Homework is read-only (marking it as done is a pupil's action
+  in the portal; the checkbox is replaced by „erledigt“). With several children in one parent
+  account the first one is shown.
+- Mock server: `MOCK_PARENT=1` makes the first account a parent account.
+
 ### Changed
 - Stundenplan: the warning „Achtung: Schulportal und WebUntis zeigen einen unterschiedlichen
   Stundenplan“ is shown below the timetable instead of above it.
@@ -489,7 +500,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.3...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.4...HEAD
+[0.19.4]: https://github.com/StefanRiese/lumo/compare/v0.19.3...v0.19.4
 [0.19.3]: https://github.com/StefanRiese/lumo/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/StefanRiese/lumo/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/StefanRiese/lumo/compare/v0.19.0...v0.19.1

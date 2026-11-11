@@ -133,8 +133,15 @@ List<String> _teachers(List<lanis.LessonTeacher> teachers) => [
   for (final t in teachers) ?(_text(t.teacher) ?? _text(t.teacherKuerzel)),
 ];
 
+/// Id of a course as Lumo uses it (paths, cache keys, settings): letters,
+/// digits, `_` and `-`. Student accounts have plain numbers; the course links
+/// of a parent account also carry the pupil (`123&p=456`), which becomes
+/// `123-p-456`.
+String courseKey(String portalId) =>
+    portalId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '-');
+
 Course mapCourse(lanis.Lesson l) => Course(
-  id: l.courseID,
+  id: courseKey(l.courseID),
   name: _name(l.name),
   teachers: _teachers(l.teachers),
 );
@@ -146,7 +153,7 @@ List<Homework> mapCurrentHomework(lanis.Lessons lessons) => [
       if (entry.homework case final hw?)
         if (_clean(hw.description) case final text?)
           Homework(
-            courseId: l.courseID,
+            courseId: courseKey(l.courseID),
             courseName: _name(l.name),
             entryId: entry.entryID,
             date: entry.topicDate,
@@ -163,7 +170,7 @@ List<Homework> mapHomeworkHistory(lanis.Lesson l, lanis.DetailedLesson d) {
       if (e.homework case final hw?)
         if (_clean(hw.description) case final text?)
           Homework(
-            courseId: l.courseID,
+            courseId: courseKey(l.courseID),
             courseName: _name(l.name),
             entryId: e.entryID,
             date: e.topicDate,
@@ -205,7 +212,7 @@ List<Exam> _exams(lanis.DetailedLesson d) => [
 
 CourseDetails mapCourseDetails(lanis.DetailedLesson d) => CourseDetails(
   course: Course(
-    id: d.courseID,
+    id: courseKey(d.courseID),
     name: _name(d.name),
     teachers: _teachers(d.teachers),
   ),

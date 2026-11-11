@@ -4,6 +4,20 @@ import 'package:liblanis/easy_client.dart' as lanis;
 import 'portal_fixes.dart';
 import 'sph_gateway.dart';
 
+/// Applets Lumo offers for an account. liblanis only counts the timetable
+/// (`stundenplan.php`) for students, but the portal also shows it to parent
+/// accounts, and liblanis' timetable parser reads that page: it is added for
+/// a parent account whose portal menu has it.
+Set<String> appletsOfAccount({
+  required Set<String> supported,
+  required Iterable<String?> menuLinks,
+  required String? accountType,
+}) => {
+  ...supported,
+  if (accountType == 'parent' && menuLinks.contains('stundenplan.php'))
+    'stundenplan.php',
+};
+
 /// [SphGateway] backed by liblanis' [lanis.EasyLanisClient].
 class LiblanisGateway implements SphGateway {
   @override
@@ -50,7 +64,14 @@ class LiblanisGateway implements SphGateway {
   Future<void> logout() => _client.logout();
 
   @override
-  Set<String> get enabledApplets => _client.supportedApplets;
+  Set<String> get enabledApplets => appletsOfAccount(
+    supported: _client.supportedApplets,
+    menuLinks: [
+      for (final e in _client.session?.travelMenu ?? const <Map>[])
+        e['link']?.toString(),
+    ],
+    accountType: accountType,
+  );
 
   @override
   String? get accountType => _client.session?.accountTypeOrNull?.name;

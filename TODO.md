@@ -2,8 +2,9 @@
 - [ ] real server: update to 0.19.x and watch `journalctl -u lumo` after the first start (log line „Account "…" taken over from the old settings“, then `Account [main]: …`); test the new restart button there (exit code 81, `Restart=on-failure`)
 - [ ] macOS menu bar app: exit code 81 („restart“ from the web UI) starts the server again (cannot be tested on Linux; the release workflow only builds it)
 - [ ] Windows app: the restart button of the web UI restarts like the tray item „Neu starten“
-- [ ] parent accounts: Hausaufgaben / Noten / Fächer are empty because the portal shows no course folders for them; the entries on their „Mein Unterricht“ page are not shown – decide whether to show them
-- [ ] report the `LessonsStudentParser.getHome` crash on pages without `#mappen` (parent accounts) to liblanis next to issue #3; `portal_fixes.dart` repairs the page until then
+- [ ] parent accounts: several children in one parent account – only the first pupil is shown (the page has one block per pupil); show all of them, e.g. as one Lumo account per pupil
+- [ ] parent accounts: check Noten, Klausuren and Kalender of a parent account on the real portal with a few more courses (marks were found for one of ten courses)
+- [ ] report to liblanis next to issue #3: parent accounts (the timetable is student-only in `Applets`, the course overview has per-pupil ids `mappen<id>`, links carry `&p=<pupil>`); `portal_fixes.dart` and `appletsOfAccount` work around it until then
 - [ ] 0.19 update function: back up `lumo.db` on the real server first, then update and check that the account, data, filter, colors and notifications are as before (the old SPH_* keys in `config.env` are ignored)
 - [ ] several children: try with two real accounts on the real server (sync stagger, notifications with names, switching on the phone)
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly

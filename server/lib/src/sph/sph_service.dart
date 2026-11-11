@@ -141,6 +141,12 @@ class SphService {
       throw ArgumentError('Invalid course or entry id');
     }
     return _run(SphFeature.lessons, () async {
+      if (_gateway.accountType == 'parent') {
+        // Marking homework as done is a pupil's action in the portal.
+        throw const SphFeatureDisabledException(
+          'Homework cannot be marked as done with a parent account',
+        );
+      }
       final answer = await _gateway.setHomeworkDone(courseId, entryId, done);
       if (answer != '1') {
         throw SphDataException(
@@ -192,7 +198,7 @@ class SphService {
 
   Future<lanis.Lessons> _loadLessons() async {
     final lessons = await _gateway.lessons();
-    _lessonIndex = {for (final l in lessons) l.courseID: l};
+    _lessonIndex = {for (final l in lessons) courseKey(l.courseID): l};
     return lessons;
   }
 

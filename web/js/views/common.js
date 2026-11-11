@@ -61,6 +61,13 @@ export function saveHomeworkDone(courseId, entryId, done) {
   );
 }
 
+let homeworkReadOnly = false;
+
+/** Parent accounts only see whether homework is done; they cannot change it. */
+export function setHomeworkReadOnly(value) {
+  homeworkReadOnly = value;
+}
+
 /**
  * "erledigt" checkbox for a homework entry. Saves to the portal immediately;
  * on failure the checkbox flips back and an error is shown below it.
@@ -70,6 +77,11 @@ export function saveHomeworkDone(courseId, entryId, done) {
  *   onSaved: called after the portal confirmed the change
  */
 export function homeworkToggle({ courseId, entryId, done, card, onSaved }) {
+  if (homeworkReadOnly) {
+    // Parent account: marking homework as done is a pupil's action in the portal.
+    card?.classList.toggle('done', done);
+    return h('span', { class: 'hw-toggle-wrap' }, done ? h('span', { class: 'muted' }, 'erledigt') : null);
+  }
   const id = `hw-${++toggleCounter}`;
   const message = h('span', { class: 'hw-error', role: 'alert' });
   const input = h('input', { type: 'checkbox', id, checked: done });

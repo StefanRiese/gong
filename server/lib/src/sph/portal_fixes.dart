@@ -46,6 +46,22 @@ String fixCourseOverview(String page) {
   final doc = html.parse(page);
   var changed = false;
 
+  // A parent account's page has one block per pupil, with the pupil in the
+  // ids (`mappen123456`). liblanis looks for `mappen` / `anwesend`: the first
+  // pupil's blocks get these ids (the entries of other pupils do not belong to
+  // any of these courses and are not used).
+  for (final base in const ['aktuell', 'mappen', 'anwesend']) {
+    if (doc.getElementById(base) != null) continue;
+    final pattern = RegExp('^$base\\d+\$');
+    for (final e in doc.querySelectorAll('[id^="$base"]')) {
+      if (pattern.hasMatch(e.id)) {
+        e.id = base;
+        changed = true;
+        break;
+      }
+    }
+  }
+
   var mappen = doc.getElementById('mappen');
   if (mappen == null) {
     mappen = Element.tag('div')..id = 'mappen';
