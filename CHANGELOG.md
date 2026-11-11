@@ -6,6 +6,12 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.20.1] – 2026-11-11
+
+### Fixed
+- Phone: the details of the status LEDs opened partly outside the screen on the left. On small
+  screens the panel now spans the screen width below the top bar.
+
 ## [0.20.0] – 2026-11-11
 
 ### Added
@@ -517,7 +523,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/StefanRiese/lumo/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/StefanRiese/lumo/compare/v0.19.5...v0.20.0
 [0.19.5]: https://github.com/StefanRiese/lumo/compare/v0.19.4...v0.19.5
 [0.19.4]: https://github.com/StefanRiese/lumo/compare/v0.19.3...v0.19.4

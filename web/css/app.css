@@ -1023,4 +1023,13 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 @media (max-width: 720px) {
   .leds { padding: .55rem .4rem; }
   .leds-row { gap: .3rem; }
+  /* On a phone the LEDs sit in the middle of the bar: pin the details to the screen, below the bar. */
+  .status-popover {
+    position: fixed;
+    top: calc(var(--topbar-height) + .4rem);
+    left: .75rem;
+    right: .75rem;
+    width: auto;
+    max-height: calc(100vh - var(--topbar-height) - var(--tabbar-height) - env(safe-area-inset-bottom) - 1.5rem);
+  }
 }
