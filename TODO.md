@@ -3,7 +3,6 @@
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
 - [ ] WebUntis: after the Schulportal adds an entry that WebUntis had supplied, one extra notification is possible
-- [ ] WebUntis: test with a personal student account (may show more than the class account)
 
 ## Done
 - [x] WebUntis timetable warning checked on the real server (works)
