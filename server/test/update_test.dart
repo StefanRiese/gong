@@ -16,6 +16,9 @@ class FakeGitHub {
   final requested = <Uri>[];
   String tag = 'v0.7.0';
 
+  /// More entries of the release list (GitHub lists newest published first).
+  final List<Map<String, Object?>> others = [];
+
   FakeGitHub() {
     final exe = utf8.encode('new exe');
     files[Uri.parse('$_base/lumo-windows-x64.exe')] = exe;
@@ -26,18 +29,21 @@ class FakeGitHub {
 
   Future<List<int>> get(Uri url) async {
     requested.add(url);
-    if (url == UpdateService.latestUrl) {
+    if (url == UpdateService.releasesUrl) {
       return utf8.encode(
-        jsonEncode({
-          'tag_name': tag,
-          'body': '### Added\n- Neu',
-          'html_url': 'https://github.com/StefanRiese/lumo/releases/tag/$tag',
-          'published_at': '2026-11-10T08:00:00Z',
-          'assets': [
-            for (final u in files.keys)
-              {'name': u.pathSegments.last, 'browser_download_url': '$u'},
-          ],
-        }),
+        jsonEncode([
+          ...others,
+          {
+            'tag_name': tag,
+            'body': '### Added\n- Neu',
+            'html_url': 'https://github.com/StefanRiese/lumo/releases/tag/$tag',
+            'published_at': '2026-11-10T08:00:00Z',
+            'assets': [
+              for (final u in files.keys)
+                {'name': u.pathSegments.last, 'browser_download_url': '$u'},
+            ],
+          },
+        ]),
       );
     }
     final body = files[url];
@@ -242,6 +248,57 @@ void main() {
       expect(r.statusCode, 202);
       await settle(u);
       expect(File('${dir.path}/update-request').existsSync(), isTrue);
+    });
+  });
+
+  group('release list', () {
+    Map<String, Object?> entry(
+      String tag, {
+      bool draft = false,
+      bool pre = false,
+    }) => {
+      'tag_name': tag,
+      'draft': draft,
+      'prerelease': pre,
+      'body': '',
+      'html_url': 'https://github.com/StefanRiese/lumo/releases/tag/$tag',
+      'published_at': '2026-11-11T17:00:00Z',
+      'assets': <Object?>[],
+    };
+
+    test('the highest version wins, not the one published last', () {
+      // 0.19.1 was published after 0.19.2 (builds finished out of order).
+      final r = UpdateService.newestRelease([
+        entry('v0.19.1'),
+        entry('v0.19.2'),
+        entry('v0.19.0'),
+        entry('v0.18.2'),
+      ]);
+      expect(r?.tag, 'v0.19.2');
+    });
+
+    test('drafts, pre-releases and odd tags are ignored', () {
+      final r = UpdateService.newestRelease([
+        entry('v1.0.0', draft: true),
+        entry('v0.20.0', pre: true),
+        entry('nightly'),
+        entry('v0.19.2'),
+      ]);
+      expect(r?.tag, 'v0.19.2');
+      expect(UpdateService.newestRelease([]), isNull);
+      expect(
+        UpdateService.newestRelease([entry('v1.0.0', draft: true)]),
+        isNull,
+      );
+    });
+
+    test('check offers the highest version of the list', () async {
+      gh.tag = 'v0.7.0';
+      gh.others.addAll([entry('v0.7.1'), entry('v0.7.2', pre: true)]);
+      final u = service(UpdateMode.manual, version: 'v0.6.0');
+      await u.check();
+      expect(u.status()['latest'], 'v0.7.1');
+      expect(u.status()['available'], isTrue);
     });
   });
 }

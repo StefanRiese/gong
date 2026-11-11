@@ -99,8 +99,12 @@ typedef HttpGet = Future<List<int>> Function(Uri url);
 /// Checks GitHub for new releases and installs them (see [UpdateMode]).
 class UpdateService {
   static const repo = 'StefanRiese/lumo';
-  static final latestUrl = Uri.parse(
-    'https://api.github.com/repos/$repo/releases/latest',
+
+  /// The release list, not `/releases/latest`: GitHub's „latest“ is the
+  /// release that was published last, which is not the highest version when
+  /// builds finish out of order.
+  static final releasesUrl = Uri.parse(
+    'https://api.github.com/repos/$repo/releases?per_page=30',
   );
 
   /// Running version (`git describe` of the release build), null in dev.
@@ -203,13 +207,31 @@ class UpdateService {
     _firstCheck = null;
   }
 
-  /// Asks GitHub for the latest release.
+  /// The release with the highest version in a GitHub release list (drafts
+  /// and pre-releases are ignored); null if there is none.
+  static Release? newestRelease(List<Object?> releases) {
+    Map<String, Object?>? best;
+    Version? bestVersion;
+    for (final r in releases.whereType<Map>()) {
+      final j = r.cast<String, Object?>();
+      if (j['draft'] == true || j['prerelease'] == true) continue;
+      final v = Version.tryParse('${j['tag_name']}');
+      if (v == null) continue;
+      if (bestVersion == null || v > bestVersion) {
+        best = j;
+        bestVersion = v;
+      }
+    }
+    return best == null ? null : Release.fromGitHub(best);
+  }
+
+  /// Asks GitHub for the release with the highest version.
   Future<Release?> check() => _checking ??= () async {
     try {
-      final body = await _get(latestUrl);
-      _latest = Release.fromGitHub(
-        (jsonDecode(utf8.decode(body)) as Map).cast<String, Object?>(),
-      );
+      final body = await _get(releasesUrl);
+      final newest = newestRelease(jsonDecode(utf8.decode(body)) as List);
+      if (newest == null) throw const FormatException('no release found');
+      _latest = newest;
       _checkError = null;
       if (updateAvailable) log('Update available: ${_latest!.tag}');
       return _latest;

@@ -6,6 +6,13 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.19.3] – 2026-11-11
+
+### Fixed
+- The update check offered the wrong release when releases were published out of order (GitHub's
+  „latest release“ is the one published last, not the highest version). The server now reads the
+  release list and takes the highest version; drafts and pre-releases are ignored.
+
 ## [0.19.2] – 2026-11-11
 
 ### Changed
@@ -478,7 +485,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.2...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.3...HEAD
+[0.19.3]: https://github.com/StefanRiese/lumo/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/StefanRiese/lumo/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/StefanRiese/lumo/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/StefanRiese/lumo/compare/v0.18.2...v0.19.0
