@@ -357,8 +357,23 @@ class SphService {
       ),
       lanis.NoConnectionException() || lanis.NetworkException() =>
         SphUnavailableException('Schulportal is not reachable', e),
-      _ => SphDataException('Unexpected response from Schulportal: $e', e),
+      _ => SphDataException(
+        'Unexpected response from Schulportal: $e${_where(e)}',
+        e,
+      ),
     };
+  }
+
+  /// " (at package:liblanis/….dart:38)": the first frame of the parser that
+  /// failed, so a log line is enough to find the broken portal markup.
+  static String _where(Object e) {
+    final trace = e is Error ? e.stackTrace : null;
+    if (trace == null) return '';
+    for (final line in trace.toString().split('\n')) {
+      final m = RegExp(r'package:liblanis/\S+:\d+').firstMatch(line);
+      if (m != null) return ' (at ${m.group(0)})';
+    }
+    return '';
   }
 }
 

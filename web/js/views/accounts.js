@@ -5,7 +5,7 @@
 
 import { api, ApiError } from '../api.js';
 import { h } from '../dom.js';
-import { accounts, current, loadAccounts } from '../accounts.js';
+import { loadAccounts } from '../accounts.js';
 import { checkbox, field, input, messageArea, schoolPicker } from './forms.js';
 import { group } from './settings-groups.js';
 
@@ -118,43 +118,27 @@ function runAction(button, msg, busy, action) {
   };
 }
 
-/** All children, and adding one. */
-export function accountsGroup({ defaultSchool }) {
-  const list = h('ul', { class: 'account-list' });
-  const render = () => list.replaceChildren(...accounts.map((a) => h('li', { class: 'account-row' },
-    h('div', null,
-      h('strong', null, a.name),
-      a.id === current ? h('span', { class: 'badge badge-info' }, 'Angezeigt') : null,
-      h('div', { class: 'muted' }, a.primary ? 'Erstes Konto' : `Schulportal: ${a.username}`)),
-    a.id === current ? null : h('button', {
-      type: 'button', class: 'button small',
-      onclick: () => window.dispatchEvent(new CustomEvent('lumo:switch-account', { detail: a.id })),
-    }, 'Anzeigen'))));
-  render();
-
-  const addMsg = messageArea();
+/** Adding a child (own tab on the settings page). */
+export function addChildGroup({ defaultSchool }) {
+  const msg = messageArea();
   const form = accountFields({ defaultSchool });
   const add = h('button', { type: 'button', class: 'button primary' }, 'Kind hinzufügen');
-  add.addEventListener('click', runAction(add, addMsg, 'Anmeldung wird geprüft …', async () => {
+  add.addEventListener('click', runAction(add, msg, 'Anmeldung wird geprüft …', async () => {
     const problem = form.problem();
     if (problem) throw new ApiError(400, 'bad_request', problem);
     const created = await api('/api/accounts', { method: 'POST', body: form.body() });
     await loadAccounts();
-    render();
+    // Show the new child's own tab, not this one, after the reload.
+    const url = new URL(location.href);
+    url.searchParams.delete('tab');
+    history.replaceState(null, '', `${url.pathname}${url.search}`);
     changed({ switchTo: created.id });
   }));
-  const addBox = h('div', { class: 'account-add', hidden: true }, form.el, h('div', { class: 'button-row' }, add), addMsg.el);
-  const open = h('button', { type: 'button', class: 'button' }, 'Weiteres Kind hinzufügen');
-  open.addEventListener('click', () => {
-    addBox.hidden = !addBox.hidden;
-    open.textContent = addBox.hidden ? 'Weiteres Kind hinzufügen' : 'Abbrechen';
-  });
-
-  return group('kinder', 'Kinder',
-    'Mehrere Kinder an einem Server: Oben in der Leiste wird zwischen ihnen gewechselt. Jedes Kind hat eigene Zugangsdaten, eigene Daten, Filter und Farben; Benachrichtigungen kommen im selben ntfy-Thema mit dem Namen davor.',
-    list,
-    h('div', { class: 'button-row' }, open),
-    addBox);
+  return group('kinder', 'Kind hinzufügen',
+    'Jedes Kind hat eigene Zugangsdaten, eigene Daten, Filter und Farben. Oben in der Leiste wird zwischen den Kindern gewechselt. Benachrichtigungen kommen im selben ntfy-Thema mit dem Namen davor.',
+    form.el,
+    h('div', { class: 'button-row' }, add),
+    msg.el);
 }
 
 /** Login and removal of the child that is selected (not the first account). */

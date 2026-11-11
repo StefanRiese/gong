@@ -943,10 +943,26 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
   .topbar { gap: .5rem; }
   .account-switch { max-width: 6.5rem; }
 }
-.account-list { list-style: none; margin: 0 0 .75rem; padding: 0; display: grid; gap: .5rem; }
-.account-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-.account-row .badge { margin-left: .5rem; }
-.account-add { display: grid; gap: .75rem; margin-top: .5rem; }
-.account-add[hidden] { display: none; }
 .button.danger { color: var(--danger); border-color: var(--danger); }
 .button.danger:hover { background: var(--danger-soft); }
+
+/* ---------- settings tabs ---------- */
+
+.tabs { display: flex; gap: .25rem; margin: 1rem 0 .5rem; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none;
+  padding: .6rem .9rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel[hidden] { display: none; }

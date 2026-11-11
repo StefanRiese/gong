@@ -30,14 +30,67 @@ String fixTeacherDropdowns(String page) {
   return changed ? doc.outerHtml : page;
 }
 
-/// Applies [fixTeacherDropdowns] to course pages loaded through liblanis.
+/// The course overview ("Mein Unterricht") as liblanis 0.1.4 reads it
+/// (`LessonsStudentParser.getHome`) assumes a list of courses
+/// (`#mappen .row`), a link and heading in every course card, and a
+/// `data-entry` / `.realHomework` in every entry row, each with `!`. An
+/// account whose page lacks one of them (no courses yet, another account
+/// type, odd entries) made homework, courses and grades fail with „Null check
+/// operator used on a null value“. Makes the page complete: no course list →
+/// an empty one, incomplete course cards and entries are dropped.
+/// Returns [page] unchanged when nothing needs fixing.
+String fixCourseOverview(String page) {
+  final doc = html.parse(page);
+  var changed = false;
+
+  var mappen = doc.getElementById('mappen');
+  if (mappen == null) {
+    mappen = Element.tag('div')..id = 'mappen';
+    doc.body?.append(mappen);
+    changed = true;
+  }
+  if (mappen.getElementsByClassName('row').isEmpty) {
+    mappen.append(Element.tag('div')..classes.add('row'));
+    changed = true;
+  }
+  for (final card in mappen.getElementsByClassName('row').first.children) {
+    if (card.querySelector('a.btn.btn-primary')?.attributes['href'] == null ||
+        card.getElementsByTagName('h2').isEmpty) {
+      card.remove();
+      changed = true;
+    }
+  }
+
+  for (final row in doc.querySelectorAll('tr.printable')) {
+    if (row.querySelector('.datum') == null) continue;
+    if (!row.attributes.containsKey('data-entry')) {
+      row.remove();
+      changed = true;
+    } else if (row.querySelector('.homework') != null &&
+        row.querySelector('.realHomework') == null) {
+      for (final e in row.querySelectorAll('.homework')) {
+        e.classes.remove('homework');
+      }
+      changed = true;
+    }
+  }
+  return changed ? doc.outerHtml : page;
+}
+
+/// Applies the fixes above to course pages loaded through liblanis.
 class PortalFixInterceptor extends Interceptor {
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final data = response.data;
-    if (data is String &&
-        response.requestOptions.uri.path.endsWith('/meinunterricht.php')) {
-      response.data = fixTeacherDropdowns(data);
+    final uri = response.requestOptions.uri;
+    if (data is String && uri.path.endsWith('/meinunterricht.php')) {
+      var page = fixTeacherDropdowns(data);
+      // The overview has no action / course id in its address.
+      if (!uri.queryParameters.containsKey('a') &&
+          !uri.queryParameters.containsKey('id')) {
+        page = fixCourseOverview(page);
+      }
+      response.data = page;
     }
     handler.next(response);
   }

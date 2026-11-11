@@ -6,6 +6,22 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.18.2] – 2026-11-11
+
+### Changed
+- Settings are split into tabs: *Allgemein* (notifications, sync, web UI, update), one tab per
+  child (login, substitution filter, school meals, colors) and *+ Kind*. Choosing a child's tab
+  also switches the child shown in the top bar. Links like `/einstellungen#vertretungsplan`
+  open the right tab.
+
+### Fixed
+- Parent accounts (and any account whose „Mein Unterricht“ page has no course list) no longer
+  fail with „Das Schulportal hat unerwartete Daten geliefert“: Hausaufgaben, Noten and Fächer
+  are empty instead of an error. Incomplete course cards and entries on that page are skipped.
+- The settings page opens even when the portal data of the shown account cannot be loaded, so
+  such an account can still be changed or removed.
+- Errors about unexpected portal data name the failing liblanis line in the server log.
+
 ## [0.18.1] – 2026-11-11
 
 ### Fixed
@@ -403,7 +419,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.18.2...HEAD
+[0.18.2]: https://github.com/StefanRiese/lumo/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/StefanRiese/lumo/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/StefanRiese/lumo/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/StefanRiese/lumo/compare/v0.16.4...v0.17.0

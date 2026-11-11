@@ -8,7 +8,7 @@ import { h, errorBox } from '../dom.js';
 import { initColors } from '../colors.js';
 import { accounts, current } from '../accounts.js';
 import { pageHeader } from './common.js';
-import { accountsGroup, childGroup } from './accounts.js';
+import { addChildGroup, childGroup } from './accounts.js';
 import { messageArea } from './forms.js';
 import { createForm } from './settings-form.js';
 import {
@@ -34,14 +34,16 @@ export async function render(ctx) {
     api('/api/settings'),
     api('/api/sync').catch(() => null),
     api('/api/update').catch(() => null),
-    ctx.features.has('timetable') ? ctx.get('/api/timetable') : Promise.resolve(null),
-    ctx.features.has('lessons') ? ctx.get('/api/courses') : Promise.resolve([]),
+    // Portal problems of the shown account must not lock the settings page
+    // (the account may be the very thing to fix or remove here).
+    ctx.features.has('timetable') ? ctx.get('/api/timetable').catch(() => null) : Promise.resolve(null),
+    ctx.features.has('lessons') ? ctx.get('/api/courses').catch(() => []) : Promise.resolve([]),
     // The full plan (all classes) to choose the own class from.
     ctx.features.has('substitutions')
       ? api('/api/substitutions?alle=1').then((r) => r.data, () => [])
       : Promise.resolve(null),
   ]);
-  initColors({ settings: personal, subjects: timetable?.lessons.map((l) => l.subject) ?? [], courses });
+  initColors({ settings: personal, subjects: timetable?.lessons?.map((l) => l.subject) ?? [], courses });
 
   const v = server.values;
   const secrets = server.secrets;
@@ -61,24 +63,80 @@ export async function render(ctx) {
   showRestart(server.restartRequired ?? []);
 
   // --- groups ---
-  const updateFirst = update?.available ? updateGroup({ ...base, status: update }) : null;
-  // The server settings for Schulportal, Caseda and WebUntis belong to the first
-  // account; another child has its own login form (and its own Caseda / WebUntis).
+  // Tabs: Allgemein (server, notifications, access, update), one tab per child, and
+  // "+ Kind". The server settings for Schulportal, Caseda and WebUntis belong to the
+  // first account; another child has its own login form (and its own Caseda / WebUntis).
   const child = accounts.find((a) => a.id === current && !a.primary) ?? null;
-  const groups = [
-    updateFirst,
-    child ? childGroup({ account: child }) : portalGroup(base),
-    accountsGroup({ defaultSchool: v.SPH_SCHOOL_ID }),
-    ctx.features.has('substitutions')
-      ? substitutionsGroup({ ...base, saved: personal.substitutionFilter, plan, withUntis: !child })
-      : null,
-    child ? null : mealsGroup(base),
-    ctx.features.has('lessons') || ctx.features.has('timetable') ? colorsGroup(base) : null,
-    notifyGroup(base),
-    syncGroup({ ...base, sync }),
-    accessGroup({ ...base, desktop: server.desktop }),
-    update && !update.available ? updateGroup({ ...base, status: update }) : null,
+  const panelOf = (id, groups) => h('div', { class: 'tab-panel', id: `panel-${id}`, role: 'tabpanel', hidden: true }, groups);
+  const panels = {
+    allgemein: panelOf('allgemein', [
+      update?.available ? updateGroup({ ...base, status: update }) : null,
+      notifyGroup(base),
+      syncGroup({ ...base, sync }),
+      accessGroup({ ...base, desktop: server.desktop }),
+      update && !update.available ? updateGroup({ ...base, status: update }) : null,
+    ]),
+    konto: panelOf('konto', [
+      child ? childGroup({ account: child }) : portalGroup(base),
+      ctx.features.has('substitutions')
+        ? substitutionsGroup({ ...base, saved: personal.substitutionFilter, plan, withUntis: !child })
+        : null,
+      child ? null : mealsGroup(base),
+      ctx.features.has('lessons') || ctx.features.has('timetable') ? colorsGroup(base) : null,
+    ]),
+    neu: panelOf('neu', [addChildGroup({ defaultSchool: v.SPH_SCHOOL_ID })]),
+  };
+
+  const tabList = [
+    { key: 'allgemein', label: 'Allgemein' },
+    ...accounts.map((a) => ({ key: a.id === current ? 'konto' : `konto:${a.id}`, label: a.name, account: a.id })),
+    { key: 'neu', label: '+ Kind' },
   ];
+  const tabButtons = new Map();
+  const setUrl = (key) => {
+    const url = new URL(location.href);
+    if (key === 'allgemein' || key === 'neu') url.searchParams.set('tab', key); else url.searchParams.delete('tab');
+    history.replaceState(null, '', `${url.pathname}${url.search}`);
+  };
+  const show = (key, { remember = true } = {}) => {
+    for (const [k, panel] of Object.entries(panels)) panel.hidden = k !== key;
+    for (const [k, button] of tabButtons) {
+      button.setAttribute('aria-selected', String(k === key));
+      button.tabIndex = k === key ? 0 : -1;
+    }
+    if (remember) setUrl(key);
+  };
+  const tabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Einstellungen' },
+    tabList.map((t) => {
+      const button = h('button', {
+        type: 'button', class: 'tab', role: 'tab',
+        'aria-controls': t.key === 'konto' || t.account ? 'panel-konto' : `panel-${t.key}`,
+      }, t.label);
+      tabButtons.set(t.key, button);
+      button.addEventListener('click', () => {
+        if (!t.account || t.key === 'konto') return show(t.key === 'konto' ? 'konto' : t.key);
+        // Another child: its page is loaded anew (own filter, colors, login).
+        if (form.dirty() && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
+        setUrl('konto');
+        window.dispatchEvent(new CustomEvent('lumo:switch-account', { detail: t.account }));
+      });
+      return button;
+    }));
+  tabs.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const buttons = [...tabs.children];
+    const i = buttons.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    buttons[(i + (e.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length].focus();
+  });
+  // Links like /einstellungen#vertretungsplan open the tab that has the section.
+  const hashId = location.hash.slice(1);
+  const byHash = hashId
+    ? Object.entries(panels).find(([, panel]) => [...panel.querySelectorAll('[id]')].some((el) => el.id === hashId))?.[0]
+    : null;
+  const param = ctx.query.get('tab');
+  show(byHash ?? (param === 'allgemein' || param === 'neu' ? param : 'konto'), { remember: false });
 
   // --- floating save entry: appears at the top while there is something to save or to say ---
   const message = messageArea();
@@ -92,12 +150,9 @@ export async function render(ctx) {
   const root = h('form', { class: 'settings-page' },
     pageHeader('Einstellungen'),
     h('p', { class: 'hint' }, 'Alles auf einer Seite. Gilt für alle Geräte und wird auf dem Server gespeichert.'),
-    accounts.length > 1
-      ? h('p', { class: 'hint' }, 'Vertretungsfilter und Farben gelten für ', h('strong', null, accounts.find((a) => a.id === current)?.name),
-        ' (Auswahl oben). Server, Benachrichtigungen und Zugang gelten für alle.')
-      : null,
+    tabs,
     restartNotice,
-    groups,
+    panels.allgemein, panels.konto, panels.neu,
     float);
 
   let saving = false;
