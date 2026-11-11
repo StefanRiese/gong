@@ -40,6 +40,9 @@ String fixTeacherDropdowns(String page) {
 /// an empty one, incomplete course cards and entries are dropped.
 /// Returns [page] unchanged when nothing needs fixing.
 String fixCourseOverview(String page) {
+  // Answers of the portal that are no page (the „1“ after marking homework
+  // as done) must stay as they are.
+  if (!page.contains('<')) return page;
   final doc = html.parse(page);
   var changed = false;
 
@@ -77,20 +80,33 @@ String fixCourseOverview(String page) {
   return changed ? doc.outerHtml : page;
 }
 
-/// Applies the fixes above to course pages loaded through liblanis.
+/// Applies the fixes above to a response of `meinunterricht.php`: only pages
+/// that were loaded (GET), never the answers to changes (POST).
+String fixCoursePage(String method, Uri uri, String data) {
+  if (method.toUpperCase() != 'GET' ||
+      !uri.path.endsWith('/meinunterricht.php')) {
+    return data;
+  }
+  var page = fixTeacherDropdowns(data);
+  // The overview has no action / course id in its address.
+  if (!uri.queryParameters.containsKey('a') &&
+      !uri.queryParameters.containsKey('id')) {
+    page = fixCourseOverview(page);
+  }
+  return page;
+}
+
+/// Applies [fixCoursePage] to course pages loaded through liblanis.
 class PortalFixInterceptor extends Interceptor {
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     final data = response.data;
-    final uri = response.requestOptions.uri;
-    if (data is String && uri.path.endsWith('/meinunterricht.php')) {
-      var page = fixTeacherDropdowns(data);
-      // The overview has no action / course id in its address.
-      if (!uri.queryParameters.containsKey('a') &&
-          !uri.queryParameters.containsKey('id')) {
-        page = fixCourseOverview(page);
-      }
-      response.data = page;
+    if (data is String) {
+      response.data = fixCoursePage(
+        response.requestOptions.method,
+        response.requestOptions.uri,
+        data,
+      );
     }
     handler.next(response);
   }

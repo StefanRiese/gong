@@ -85,4 +85,39 @@ void main() {
       expect(rows.single.querySelector('.homework'), isNull);
     });
   });
+
+  group('responses of meinunterricht.php', () {
+    final uri = Uri.parse(
+      'https://start.schulportal.hessen.de/meinunterricht.php',
+    );
+
+    test('the answer to marking homework as done stays „1“', () {
+      // A POST; the body of the request carries the action, not the address.
+      expect(fixCoursePage('POST', uri, '1'), '1');
+      expect(fixCourseOverview('1'), '1');
+      expect(fixCoursePage('GET', uri, '1'), '1');
+    });
+
+    test('the overview page (GET without action) is repaired', () {
+      final fixed = fixCoursePage(
+        'GET',
+        uri,
+        '<html><body><p>x</p></body></html>',
+      );
+      expect(html.parse(fixed).getElementById('mappen'), isNotNull);
+    });
+
+    test('course detail pages only get the teacher fix', () {
+      final detail = uri.replace(queryParameters: {'a': 'sus_view', 'id': '5'});
+      const page = '<html><body><p>x</p></body></html>';
+      expect(fixCoursePage('GET', detail, page), page);
+    });
+
+    test('other addresses stay unchanged', () {
+      final other = Uri.parse(
+        'https://start.schulportal.hessen.de/stundenplan.php',
+      );
+      expect(fixCoursePage('GET', other, '<p>x</p>'), '<p>x</p>');
+    });
+  });
 }

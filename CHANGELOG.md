@@ -8,6 +8,11 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [0.19.0] – 2026-11-11
 
+### Fixed
+- Marking homework as done failed with „Das Schulportal hat unerwartete Daten geliefert“ since
+  0.18.2: the repair of the course overview page also changed the portal's short answer „1“ to
+  the change. It is now only applied to pages that are loaded, never to answers.
+
 ### Changed
 - **All accounts are equal.** The first account is no longer special: the settings `SPH_SCHOOL_ID`,
   `SPH_USERNAME`, `SPH_PASSWORD`, `ACCOUNT_NAME`, `CASEDA_ENABLED`, `CASEDA_URL`,
