@@ -30,6 +30,11 @@ String fixTeacherDropdowns(String page) {
   return changed ? doc.outerHtml : page;
 }
 
+/// The status label of a homework that is still open (parent accounts).
+bool _isOpenMarker(Element e) =>
+    e.classes.contains('label-warning') ||
+    e.text.trim().toLowerCase() == 'offen';
+
 /// The course overview ("Mein Unterricht") as liblanis 0.1.4 reads it
 /// (`LessonsStudentParser.getHome`) assumes a list of courses
 /// (`#mappen .row`), a link and heading in every course card, and a
@@ -90,6 +95,17 @@ String fixCourseOverview(String page) {
       for (final e in row.querySelectorAll('.homework')) {
         e.classes.remove('homework');
       }
+      changed = true;
+    } else if (row.querySelector('.homework') != null &&
+        row.querySelector('.undone') == null &&
+        row.querySelectorAll('.homework span.done').any(_isOpenMarker)) {
+      // Parent accounts have no checkbox (`.undone`, which liblanis reads as
+      // „not done“) but a status label on every homework: `done label-default`
+      // „erledigt“ or `done label-warning` „offen“. Without this every
+      // homework counted as done.
+      row
+          .querySelector('.homework')!
+          .append(Element.tag('span')..classes.add('undone'));
       changed = true;
     }
   }

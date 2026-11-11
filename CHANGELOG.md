@@ -6,6 +6,13 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.19.5] – 2026-11-11
+
+### Fixed
+- Parent accounts: open homework showed as done, so only closed homework was listed. A parent's
+  page has no checkbox but a status label on every homework („erledigt“ / „offen“); „offen" is
+  now read as not done.
+
 ## [0.19.4] – 2026-11-11
 
 ### Added
@@ -500,7 +507,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.4...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.5...HEAD
+[0.19.5]: https://github.com/StefanRiese/lumo/compare/v0.19.4...v0.19.5
 [0.19.4]: https://github.com/StefanRiese/lumo/compare/v0.19.3...v0.19.4
 [0.19.3]: https://github.com/StefanRiese/lumo/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/StefanRiese/lumo/compare/v0.19.1...v0.19.2

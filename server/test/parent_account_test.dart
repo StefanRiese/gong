@@ -63,6 +63,38 @@ void main() {
     });
   });
 
+  group('homework status on a parent page', () {
+    String row(String entry, String label) =>
+        '''
+<tr class="printable" data-entry="$entry"><td><h3><a href="meinunterricht.php?a=sus_view&id=5&p=9">Mathe</a></h3></td>
+ <td><b class="thema">T</b><small><span class="datum">10.11.2026</span></small></td>
+ <td><div class="homework"><span class="label label-success title"><i class="fa fa-home"></i></span>
+   $label<div class="markup text realHomework">S. 5</div></div></td></tr>''';
+    const done =
+        '<span class="done label label-default"><i class="fa fa-check-square-o"></i> erledigt</span>';
+    const open =
+        '<span class="done label label-warning"><i class="fa fa-check-o"></i> offen</span>';
+
+    test('an open homework gets the marker liblanis reads as „not done“', () {
+      final doc = html.parse(
+        fixCourseOverview('<table>${row('1', done)}${row('2', open)}</table>'),
+      );
+      final rows = {
+        for (final r in doc.querySelectorAll('tr.printable'))
+          r.attributes['data-entry']!: r.querySelector('.undone') != null,
+      };
+      expect(rows, {'1': false, '2': true});
+    });
+
+    test('a student page (with the checkbox marker) is not changed', () {
+      final student =
+          '<div id="mappen"><div class="row"></div></div>'
+          '<table>${row('3', '<span class="undone"></span>')}</table>';
+      final doc = html.parse(fixCourseOverview(student));
+      expect(doc.querySelectorAll('.undone'), hasLength(1));
+    });
+  });
+
   group('course ids', () {
     test(
       'plain numbers stay, the pupil of a parent link becomes part of it',

@@ -57,7 +57,9 @@ only counts the timetable for students (`appletsOfAccount` adds `stundenplan.php
 menu has it); the course overview has one block per pupil with the pupil in the ids
 (`mappen123456`; `fixCourseOverview` gives the first pupil's blocks the ids liblanis expects); and
 course links carry the pupil (`id=5&p=9`; `courseKey` turns it into `5-p-9` for paths, cache keys
-and settings). Homework cannot be marked as done (`SphFeatureDisabledException`).
+and settings). Homework cannot be marked as done (`SphFeatureDisabledException`), and its status is read from the
+label on each homework (`done label-default` „erledigt“ / `done label-warning` „offen“) instead of
+the pupil's checkbox, which `fixCourseOverview` turns into the `.undone` marker liblanis reads.
 
 Session policy of `SphService`:
 
