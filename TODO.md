@@ -1,12 +1,20 @@
 ## Open
-- [ ] 0.19 update function: back up `lumo.db` on the real server, update, check that the account, data, filter, colors and notifications are as before (and that `config.env` still has the old SPH_* keys: they are ignored)
-- [ ] several children: try with two real accounts on the real server (sync stagger, notifications with names, switching on the phone); run the release workflow before tagging
+- [ ] real server: update to 0.19.x and watch `journalctl -u lumo` after the first start (log line „Account "…" taken over from the old settings“, then `Account [main]: …`); test the new restart button there (exit code 81, `Restart=on-failure`)
+- [ ] macOS menu bar app: exit code 81 („restart“ from the web UI) starts the server again (cannot be tested on Linux; the release workflow only builds it)
+- [ ] Windows app: the restart button of the web UI restarts like the tray item „Neu starten“
+- [ ] parent accounts: Hausaufgaben / Noten / Fächer are empty because the portal shows no course folders for them; the entries on their „Mein Unterricht“ page are not shown – decide whether to show them
+- [ ] report the `LessonsStudentParser.getHome` crash on pages without `#mappen` (parent accounts) to liblanis next to issue #3; `portal_fixes.dart` repairs the page until then
+- [ ] 0.19 update function: back up `lumo.db` on the real server first, then update and check that the account, data, filter, colors and notifications are as before (the old SPH_* keys in `config.env` are ignored)
+- [ ] several children: try with two real accounts on the real server (sync stagger, notifications with names, switching on the phone)
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)
 - [ ] WebUntis: after the Schulportal adds an entry that WebUntis had supplied, one extra notification is possible
 
 ## Done
+- [x] several children on one server with a switcher, tabs on the settings page, all accounts equal with an update function for the old settings (0.18 – 0.19)
+- [x] login test button per account, restart button, more detail in the log when something fails (0.19.1)
+- [x] fix: parent accounts (no course list) and marking homework as done (0.18.2 / 0.19.0)
 - [x] WebUntis timetable warning checked on the real server (works)
 - [x] `lumo.local` via avahi-daemon in the container (works from Windows and the iPhone); own mDNS responder removed
 - [x] phone tab bar: „Hausaufgaben“ is shown as „HA“ (was cut off with 8 entries)

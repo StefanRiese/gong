@@ -35,17 +35,20 @@ The script
 5. installs and starts the systemd service `lumo` and checks that it answers,
 6. prints the **setup link** `http://<container-ip>:8080/einrichtung?token=…`.
 
-Open the setup link in a browser: choose the school, enter the Schulportal login (it is
-tested right away) and a password for the web UI. The web UI then opens, logged in. Later
-changes: *Einstellungen* in the web UI.
+Open the setup link in a browser: choose the school, enter the Schulportal login („Anmeldung
+prüfen“ tests it) and a password for the web UI. The web UI then opens, logged in. Later
+changes and more children: *Einstellungen* in the web UI (tab *+ Kind*).
 
 The setup link only works until the setup is done; it is also in the log
 (`journalctl -u lumo`) and in `/var/lib/lumo/setup-token`.
 Without the token nobody else in the network can take over the unconfigured server.
 
 Alternatively, `install.sh` asks in the terminal whether to enter the credentials there; they
-are written to `/etc/lumo/config.env` (readable by root only).
-`bash /opt/lumo/deploy/install.sh --configure` does that again later.
+are written to `/etc/lumo/config.env` (readable by root only). On a new installation the
+Schulportal login in `config.env` becomes the first account on the first start (read once, then
+ignored); the accounts are managed in the web UI. `bash /opt/lumo/deploy/install.sh --configure`
+does that again later (for the web password and ntfy; it no longer asks for the Schulportal login of
+an installation that is set up).
 
 **Where settings live:** settings made in the web UI are stored in the database
 (`/var/lib/lumo/lumo.db`) and take precedence over `config.env`.
@@ -73,7 +76,7 @@ Privacy: on the public ntfy.sh server anyone who knows the topic name can read t
 Keep the random name secret, or use your own ntfy server / an access token (`NTFY_TOKEN`).
 All settings: see `config.env.example` (`NOTIFY`, `SYNC`, `POLL_INTERVAL_MINUTES`,
 `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, …). Change them in the web UI (*Einstellungen →
-Server*), with `install.sh --configure`, or by editing `config.env` and restarting the service
+Allgemein*), with `install.sh --configure`, or by editing `config.env` and restarting the service
 (values set in the web UI take precedence over `config.env`).
 
 Without internet access on the container, copy a release archive over and use
@@ -89,7 +92,7 @@ Both are read-only and set up per child in the web UI under *Einstellungen* (tab
   completes the Schulportal substitutions with what WebUntis knows and adds changes the
   Schulportal plan does not have yet. „Anmeldung prüfen“ tests the logins.
 
-The logins are tested before they are saved and can be switched off without losing them.
+The logins are tested before they are saved; removing a login switches the source off.
 
 ## Day-to-day
 
@@ -98,15 +101,21 @@ The logins are tested before they are saved and can be switched off without losi
 | Update to the latest release | web UI: *Einstellungen → Update*, or `bash /opt/lumo/deploy/install.sh` |
 | Install a specific version | `bash /opt/lumo/deploy/install.sh --version v0.1.0` |
 | Back to the previous version | `bash /opt/lumo/deploy/install.sh --rollback` |
-| Change credentials / web password / ntfy / sync | web UI: *Einstellungen* (or `install.sh --configure`) |
+| Change logins / web password / ntfy / sync | web UI: *Einstellungen* (web password and ntfy also `install.sh --configure`) |
 | Status | `systemctl status lumo` |
 | Logs | `journalctl -u lumo -f` (failures with account `[id]`, cause and code location) |
-| Restart (after editing config.env) | `systemctl restart lumo` |
+| Restart | web UI: *Einstellungen → Allgemein → Neustart*, or `systemctl restart lumo` (after editing config.env) |
 | Remove (keep config + data) | `bash /opt/lumo/deploy/install.sh --uninstall` |
 | Remove everything | `bash /opt/lumo/deploy/install.sh --uninstall --purge` |
 
 Updates keep `config.env`. The previous version stays in `/opt/lumo.old` for
 `--rollback`.
+
+**Updating from before 0.19:** on the first start the server turns the old single-account
+settings (`SPH_*`, `CASEDA_*`, `UNTIS_*`, `ACCOUNT_NAME` from the web UI or `config.env`) into the
+first account and moves its data along (update function, once). The old keys in `config.env` stay
+in the file but are ignored afterwards. Going back to 0.18 afterwards needs a backup of
+`/var/lib/lumo/lumo.db` – make one before updating (`cp /var/lib/lumo/lumo.db ~/lumo.db.bak`).
 
 **Updates from the web UI:** the server checks GitHub for new releases every 12 hours
 (`UPDATE_CHECK`) and shows a notice. „Jetzt aktualisieren“ in *Einstellungen → Update*
@@ -121,8 +130,8 @@ version for `--rollback` and restarts the service. Log: `journalctl -u lumo-upda
 | Path | Content |
 |---|---|
 | `/opt/lumo/` | program (`bin/`, `lib/`), web UI (`web/`), `deploy/`, `VERSION` |
-| `/etc/lumo/config.env` | configuration and credentials (mode 600, root) |
-| `/var/lib/lumo/` | database `lumo.db`: settings from the web UI (incl. credentials), cached portal data, web logins (hashed), notification state; `setup-token` until set up |
+| `/etc/lumo/config.env` | configuration (mode 600, root) |
+| `/var/lib/lumo/` | database `lumo.db`: settings from the web UI, the accounts with their logins, cached portal data, web logins (hashed), notification state; `setup-token` until set up |
 | `/etc/systemd/system/lumo.service` | systemd unit |
 | `/etc/systemd/system/lumo-update.{path,service}` | updates requested in the web UI (root) |
 

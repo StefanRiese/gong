@@ -42,7 +42,11 @@ lib/
   src/untis/untis.dart         WebUntis: client (REST), mapper, UntisGateway (read-only)
   src/untis/merge.dart         combines the WebUntis changes with the Schulportal plan
   src/untis/compare.dart       compares the WebUntis lessons with the Schulportal timetable
-  src/config/env.dart          .env loader, credentials
+  src/config/env.dart          .env loader, credentials (debug tools, first start)
+  src/config/accounts.dart     the accounts (children) with their logins, AccountStore
+  src/config/migrate_accounts.dart  update function: old single-account settings → first account
+  src/storage/portal_state.dart     per-account key prefix (`@<id>/`) in the database
+  src/util/failure.dart        describeFailure: one log line for an error
 ```
 
 `SphService.lessonsSnapshot()` loads every course page once and returns course details,
@@ -71,7 +75,8 @@ dart run bin/sph.dart grades
 ```
 
 `bin/caseda.dart` prints the Caseda balance and own orders (`--summary`: counts only;
-credentials `CASEDA_USERNAME` / `CASEDA_PASSWORD` in `.env`).
+credentials `CASEDA_USERNAME` / `CASEDA_PASSWORD` in `.env`; like the other `bin/` tools it reads
+the environment itself, not the accounts of the server).
 
 `bin/untis.dart` prints the WebUntis changes and compares them with the Schulportal plan
 (`--summary`: counts only; `UNTIS_SERVER`, `UNTIS_USERNAME`, `UNTIS_PASSWORD` in `.env`).
@@ -101,13 +106,15 @@ Settings come from three layers (later ones win):
 3. settings made in the web UI (setup page, *Einstellungen*), stored in the database
    (`meta` key `server-config`).
 
-Without Schulportal credentials or web UI password the server starts in **setup mode**: data
+Without an account or web UI password the server starts in **setup mode**: data
 endpoints answer `503 setup_required`, the web UI shows the setup page, and the settings
 endpoints only accept the one-time setup token (header `X-Setup-Token`). The token is logged as
 link `…/einrichtung?token=…` and written to `DATA_DIR/setup-token`; it is discarded when the
 setup is done. Settings changes apply at runtime (`AppServer` implements `ServerControl`);
-`HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE` and `TRUST_PROXY` need a restart. A different
-school or user clears cached data and notification state. `DATA_DIR/reset-web-settings` (one
+`HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE` and `TRUST_PROXY` need a restart (the web UI
+offers a restart button where the server can restart itself: Windows / macOS app, systemd
+service; `POST /api/restart`). A different school or user of an account clears its cached data
+and notification state. `DATA_DIR/reset-web-settings` (one
 key per line, written by `install.sh --configure`) drops web UI values on the next start so the
 config file applies again.
 
@@ -229,12 +236,14 @@ All responses are JSON. Data endpoints need the session cookie from the login.
 | POST | `/api/notifications/check` | sync + check now → `{"sent": n}` |
 | GET | `/api/setup` | `{"setupRequired": bool}`, no login |
 | GET | `/api/server-settings` | settings (secrets only as set/unset), sources, pending restart |
-| PUT | `/api/server-settings` | `{"settings": {KEY: value}, "appPassword"?, "currentPassword"?}`; new Schulportal credentials are tested first; finishing the setup logs in |
-| POST | `/api/server-settings/test-login` | `{"schoolId", "username", "password"?}`; max. 5 per 5 min |
+| PUT | `/api/server-settings` | `{"settings": {KEY: value}, "appPassword"?, "currentPassword"?}`; finishing the setup logs in |
+| GET / POST | `/api/accounts` | the accounts (children) / add one (login tested first; with the setup token it creates the first) |
+| POST | `/api/accounts/test` | try the logins of an account body, store nothing; max. 5 per 5 min |
+| PUT / DELETE | `/api/accounts/{id}` | change an account / remove it (not the last) |
+| ANY | `/api/accounts/{id}/…` | the per-account endpoints above for one child (without the prefix: the first account) |
+| POST | `/api/restart` | restart the server (`202`; `409` where it cannot) |
 | GET | `/api/schools?q=…` | school search in the public school list of Schulportal Hessen |
 | GET | `/api/meals` | school meals (Caseda): balance and own orders (read-only) |
-| POST | `/api/server-settings/test-caseda` | test a Caseda login |
-| POST | `/api/server-settings/test-untis` | test a WebUntis login (answers with the class) |
 | GET | `/api/update` | version (`current`), latest release, update state; the web UI also compares `current` to reload an installed app after an update |
 | POST | `/api/update/check` | look for a new release now |
 | POST | `/api/update/install` | install the latest release (202, async; see docs/API.md) |
@@ -252,10 +261,12 @@ Errors: `{"error": {"code": "…", "message": "…"}}`
 |---|---|---|
 | 400 | `bad_request` | invalid parameters |
 | 400 | `invalid_settings` | settings rejected; `problems` lists them |
-| 400 | `sph_login_failed` | new Schulportal credentials do not work |
+| 400 | `sph_login_failed` | the Schulportal login of a new or changed account does not work |
 | 401 | `unauthorized` / `invalid_password` | not logged in / wrong web UI password |
 | 403 | `setup_token_invalid` / `invalid_password` | setup token missing or wrong / wrong current password |
-| 400 | `meals_login_failed` / `untis_login_failed` | new or tested Caseda / WebUntis login does not work |
+| 400 | `meals_login_failed` / `untis_login_failed` | the Caseda / WebUntis login of an account does not work |
+| 404 | `unknown_account` | no account with that id |
+| 409 | `restart_unsupported` | the server cannot restart itself here |
 | 404 | `feature_disabled` / `not_found` | applet not enabled / unknown course or path |
 | 404 | `meals_disabled` | school meals not set up or switched off |
 | 415 | `unsupported_media_type` | request without JSON content type |

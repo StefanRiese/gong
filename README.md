@@ -55,11 +55,13 @@ light or dark mode of the device.
 - Push notifications (ntfy) about new substitutions, homework and grades – from the server,
   so they also arrive while the phone is off
 - Setup and all settings in the web UI (school search, login test, password, sync,
-  notifications, WebUntis, school meals, network); responsive, dark mode, installable as an app
-  that reloads itself after a server update
+  notifications, one tab per child with Schulportal / WebUntis / school meals login, network,
+  restart of the server); responsive, dark mode, installable as an app that reloads itself after
+  a server update
 - Updates from the web UI: the server checks GitHub for new releases and installs them
 - REST API with live updates (Server-Sent Events) for own scripts and Home Assistant
-  ([docs/API.md](docs/API.md))
+  ([docs/API.md](docs/API.md)); when something fails, the log (`journalctl -u lumo`) says what and
+  where
 - Linux server (systemd service in a Proxmox LXC container) and desktop apps for Windows
   (single exe, tray icon) and macOS (universal app, menu bar icon)
 
@@ -82,7 +84,7 @@ bash install.sh
 ```
 
 Then open the setup link that `install.sh` prints and set up school, Schulportal login and the
-web UI password in the browser. Full guide: [deploy/README.md](deploy/README.md).
+web UI password in the browser. More children are added later under *Einstellungen → + Kind*. Full guide: [deploy/README.md](deploy/README.md).
 
 ## Updating
 
@@ -104,7 +106,7 @@ cd server
 WEB_DIR=../web dart run bin/server.dart
 ```
 
-Without credentials the server starts in setup mode and logs a setup link
+Without an account the server starts in setup mode and logs a setup link
 (`http://127.0.0.1:8080/einrichtung?token=…`); the settings are stored in the database next to it.
 Alternatively, put `SPH_USERNAME`, `SPH_PASSWORD` and `APP_PASSWORD` into `server/.env`
 (see `server/.env.example`; the account is taken over once on the first start, after that
@@ -112,7 +114,8 @@ accounts are managed in the web UI). Details: [server/README.md](server/README.m
 [web/README.md](web/README.md), REST API: [docs/API.md](docs/API.md).
 
 UI development without Schulportal: `node dev/mock-server.mjs` (password `demo`;
-`MOCK_SETUP=1` shows the setup page, `MOCK_UPDATE=1` an available update).
+`MOCK_SETUP=1` shows the setup page, `MOCK_UPDATE=1` an available update, `MOCK_CHILDREN=1` a
+second child).
 
 Debugging against the real services prints counts only: `dart run bin/sph.dart …`,
 `bin/caseda.dart --summary`, `bin/untis.dart --summary` (credentials in `server/.env`).

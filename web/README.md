@@ -14,37 +14,45 @@ js/app.js               shell: setup/login gate, navigation, view rendering, liv
                         refresh, logout (triggered from the settings page)
 js/scheme.js            color scheme (blue / Lumo indigo) and light/dark switch, per device
 js/router.js            history-based router
-js/api.js               fetch wrapper, German error messages
+js/api.js               fetch wrapper, German error messages; adds `/api/accounts/<id>/` to the
+                        paths of the shown child (see accounts.js)
+js/accounts.js          the children: list, shown child (remembered per browser, `?konto=<id>`
+                        from notification links), drop-down in the top bar
 js/dom.js               h() element builder, htmlToText(), icons
 js/format.js            German date formatting
 js/colors.js            subject colors, course ↔ timetable-abbreviation matching
 js/substitution-filter.js  helpers for the substitution filters
 js/update.js            update hint and installation, reload of an installed app after an update
 js/views/*.js           one module per page (common.js: shared cards and helpers)
-js/views/settings*.js   the settings page: settings.js (page, save bar), settings-groups.js
+js/views/settings*.js   the settings page: settings.js (page, tabs, save bar), settings-groups.js
                         (one function per group), settings-form.js (registry of the values)
+js/views/accounts.js    the account form (name, Schulportal, Caseda, WebUntis) and adding a child
 js/views/forms.js       form helpers for setup and settings (fields, school search)
 ```
 
 Pages: `/` (Heute), `/stundenplan` (week table; compact on phones), `/vertretungen`, `/hausaufgaben`, `/noten`,
 `/faecher` (all courses as cards → `/kurse/{id}`), `/kurse/{id}`,
-`/kalender`, `/schulessen` (only with Caseda), `/einstellungen` (gear icon; everything on one
-page, see „Settings page“; `/einstellungen/server` redirects there),
+`/kalender`, `/schulessen` (only with Caseda), `/einstellungen` (gear icon; tabs, see „Settings page“;
+`/einstellungen/server` redirects there),
 `/benachrichtigungen` (ntfy status, test message, check now), and `/einrichtung` (setup page,
 shown instead of the login while the server is not set up; the token from the setup link is
 kept in `sessionStorage` and removed from the address bar).
 
-**Settings page** (`/einstellungen`): one form, one „Speichern“ button in a small floating entry
-at the top that only appears while something is unsaved (or a message is shown: „Gespeichert.“
-fades after a moment, errors stay), eight flat groups (Schulportal, Vertretungen incl. WebUntis, Schulessen, Fächer & Farben,
-Benachrichtigungen, Abgleich, Web-Oberfläche, Update; no nested headings or sub-pages). Every
-control registers with `createForm()`; a save sends only what changed – the server settings
+**Settings page** (`/einstellungen`): tabs *Allgemein*, one tab per child and *+ Kind*. The tab of the
+shown child has its account form (name, Schulportal login, Caseda, WebUntis, „Anmeldung
+prüfen“), Vertretungen (filter) and Fächer & Farben; clicking another child's tab switches to
+that child (the page is loaded anew). *Allgemein* has the balance warning for school meals,
+Benachrichtigungen, Abgleich, Web-Oberfläche, Neustart and Update; *+ Kind* adds a child. One
+form, one „Speichern“ button in a small floating entry at the top that only appears while
+something is unsaved (or a message is shown: „Gespeichert.“ fades after a moment, errors stay).
+Every control registers with `createForm()`; a save sends only what changed – the child's
+logins (`PUT /api/accounts/{id}`, logins are tried first), the server settings
 (`PUT /api/server-settings`, checked first) and the personal ones (`PUT /api/settings`: filter,
 colors) – so values that come from `config.env` are not pinned into the database. The entry
 shows „Ungespeicherte Änderungen“ with „Verwerfen“; leaving by a link or closing asks first. Buttons
-inside the groups only run actions („Anmeldung prüfen“, update). Old anchors still work
-(`#schulportal`, `#vertretungsplan`, `#webuntis`, `#schulessen`, `#farben`, `#benachrichtigungen`,
-`#abgleich`, `#passwort`, `#netzwerk`, `#update`).
+inside the groups only run actions („Anmeldung prüfen“, remove a child, restart, update). The
+tab is in the address (`?tab=allgemein` / `?tab=neu`); anchors like `#vertretungsplan` or
+`#update` open the tab that has the section.
 
 **Live updates and refresh:** pages answer from the server's cache right away. `app.js` follows
 `/api/events` (Server-Sent Events): when a cache key used by the current page changes, the page
@@ -88,10 +96,10 @@ settings (event `lumo:meals-changed`) and shows the menu item accordingly.
 
 WebUntis (second source): entries with `source` get a badge on Vertretungen and Heute („laut
 WebUntis“, or „Schulportal + WebUntis“ for completed Schulportal entries); a replaced teacher is
-struck through (`teacherChange` in `views/common.js`); set up in *Einstellungen → Vertretungen*.
+struck through (`teacherChange` in `views/common.js`); set up in the tab of the child (WebUntis).
 
 App updates (`js/update.js`): a hint bar below the top bar when a new release is available
-(dismissable per version, `localStorage` key `updateDismissed`); *Einstellungen → Server →
+(dismissable per version, `localStorage` key `updateDismissed`); *Einstellungen → Allgemein →
 Update* (`#update`) shows versions and release notes and installs the update, then waits for
 the restarted server and reloads the page. Mock: `MOCK_UPDATE=1 node dev/mock-server.mjs`.
 
@@ -117,7 +125,7 @@ remembered per browser in `localStorage` (key `calendarFilter`).
 
 ## Development
 
-With the real server (without credentials it shows the setup page, see `server/README.md`):
+With the real server (without an account it shows the setup page, see `server/README.md`):
 
 ```sh
 cd server
@@ -133,6 +141,7 @@ MOCK_STALE=1 node dev/mock-server.mjs   # simulate "portal down, cached data"
 MOCK_SETUP=1 node dev/mock-server.mjs   # not set up: /einrichtung?token=demo-token
 MOCK_UPDATE=1 node dev/mock-server.mjs  # update v0.7.0 available (install simulates a restart)
 MOCK_ABBREV=1 node dev/mock-server.mjs  # timetable with subject abbreviations (M, D, Geo …)
+MOCK_CHILDREN=1 node dev/mock-server.mjs # a second child ("Mia") for the switcher and the tabs
 ```
 
 Edit files and reload the browser — there is nothing to build.

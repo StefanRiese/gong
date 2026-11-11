@@ -21,7 +21,8 @@ it opens in the default browser.
    (the app is signed ad hoc, not notarized; a double click is blocked the first time).
 2. The browser opens the **setup page** („Lumo einrichten“):
    - choose the school (search by name, town or school number),
-   - enter the Schulportal username and password („Anmeldung prüfen“ tests them),
+   - enter the Schulportal username and password („Anmeldung prüfen“ tests them; more children
+     are added later under *Einstellungen → + Kind*),
    - choose a password for the web UI (min. 8 characters).
 3. „Einrichtung abschließen“ – the web UI opens, already logged in.
 
@@ -33,17 +34,18 @@ from the tray / menu bar menu). Settings are stored in the database; a text edit
 Right click on the icon (macOS: click):
 
 - **Lumo öffnen** – web UI in the browser (Windows: also double click on the icon)
-- **Einstellungen** – server settings in the web UI (Schulportal login, password, sync,
-  notifications, WebUntis, school meals, network)
+- **Einstellungen** – settings in the web UI (children with Schulportal / WebUntis / school meals
+  login, password, sync, notifications, network)
 - **Protokoll anzeigen** – log file
-- **Neu starten**, **Beenden**
+- **Neu starten**, **Beenden** (the web UI has a restart button too: *Einstellungen → Allgemein →
+  Neustart*)
 
 Starting the app a second time opens the web UI instead of a second server.
 
 ## Notes
 
 - By default the web UI is only reachable on this computer. *Einstellungen →
-  Netzwerk → „Auch von anderen Geräten im Netzwerk“* (then *Neu starten*) lets phones in the
+  Allgemein → Web-Oberfläche → „Auch von anderen Geräten im Netzwerk“* (then *Neu starten*) lets phones in the
   same network use it too (Windows asks to allow it in the firewall): `http://<computer-ip>:8080`.
 - If port 8080 is taken by another program, the app offers to open `config.env`: enter e.g.
   `PORT=8090` and start again. `config.env` is optional and only needed for such cases; values
