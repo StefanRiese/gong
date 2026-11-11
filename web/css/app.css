@@ -123,7 +123,7 @@
 
 [hidden] { display: none !important; }
 
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; }
 
 body {
   margin: 0;
@@ -250,6 +250,11 @@ main:focus { outline: none; }
     padding: 0 0 env(safe-area-inset-bottom);
     background: var(--surface);
     border-top: 1px solid var(--border);
+    /* Own compositing layer: on phones the bar otherwise lags behind or
+       scrolls away while the browser's toolbars collapse during long lists. */
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
   }
   .nav-link {
     flex: 1;
