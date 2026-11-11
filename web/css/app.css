@@ -345,6 +345,7 @@ main:focus { outline: none; }
   background: var(--warn-soft);
 }
 .notice ul { margin: .3rem 0 .3rem 1.1rem; padding: 0; }
+.tt-scroll + .notice { margin-top: 1rem; } /* warning below the timetable */
 
 .badge {
   display: inline-block;

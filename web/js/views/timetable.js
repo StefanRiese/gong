@@ -39,8 +39,9 @@ export async function render(ctx) {
   return h('div', null,
     pageHeader('Stundenplan', tt.currentWeek ? badge(`Aktuell Woche ${tt.currentWeek}`, 'info') : null, toggle),
     // Week table on all screens; compact on phones (see .tt-grid in app.css).
-    differences(res.differences),
     h('div', { class: 'tt-scroll' }, grid(tt, week, today)),
+    // Below the table: the timetable is what matters, the warning is about it.
+    differences(res.differences),
   );
 }
 

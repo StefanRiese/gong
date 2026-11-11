@@ -6,6 +6,10 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Changed
+- Stundenplan: the warning „Achtung: Schulportal und WebUntis zeigen einen unterschiedlichen
+  Stundenplan“ is shown below the timetable instead of above it.
+
 ## [0.19.3] – 2026-11-11
 
 ### Fixed
