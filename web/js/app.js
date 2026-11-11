@@ -1,6 +1,9 @@
 // App shell: login gate, navigation, view rendering.
 
-import { api, ApiError, errorMessage } from './api.js';
+import { api, ApiError, errorMessage, scoped } from './api.js';
+import {
+  accountSwitcher, accounts, current as currentAccount, loadAccounts, pickAccount, switchTo,
+} from './accounts.js';
 import { h, icon, errorBox } from './dom.js';
 import { age } from './format.js';
 import { route, match, navigate, startRouter } from './router.js';
@@ -71,12 +74,13 @@ let events = null;
 let liveTimer = null;
 
 const ACCOUNT_KEY = 'lastAccount';
+const accountKey = () => `${ACCOUNT_KEY}:${currentAccount}`;
 const ALL_FEATURES = ['timetable', 'substitutions', 'calendar', 'lessons'];
 
 /** Last successfully loaded account (per browser), for starting while the portal is down. */
 function rememberedAccount() {
   try {
-    const saved = JSON.parse(localStorage.getItem(ACCOUNT_KEY) ?? 'null');
+    const saved = JSON.parse(localStorage.getItem(accountKey()) ?? 'null');
     return Array.isArray(saved?.features) ? saved : null;
   } catch {
     return null;
@@ -85,7 +89,7 @@ function rememberedAccount() {
 
 function rememberAccount(acc) {
   try {
-    localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ features: acc.features, username: acc.username }));
+    localStorage.setItem(accountKey(), JSON.stringify({ features: acc.features, username: acc.username }));
   } catch {
     // storage unavailable
   }
@@ -99,6 +103,8 @@ async function boot() {
     if (location.pathname === '/einrichtung') history.replaceState(null, '', '/');
     const me = await api('/api/auth/me');
     if (!me.authenticated) return showLogin();
+    await loadAccounts();
+    pickAccount();
     let portalProblem = null;
     try {
       const acc = await api('/api/account');
@@ -230,8 +236,10 @@ function showShell() {
   showMode();
   window.addEventListener('lumo:theme', showMode);
   const nav = buildNav();
+  const switcher = accountSwitcher(switchAccount);
   const header = h('header', { class: 'topbar' },
     h('a', { href: '/', class: 'brand' }, h('img', { src: '/icon.svg', alt: '' }), 'Lumo'),
+    switcher,
     status,
     h('div', { class: 'topbar-actions' },
       refreshButton,
@@ -242,7 +250,7 @@ function showShell() {
       }, icon('settings')),
     ),
   );
-  shell = { main, status, nav, refreshButton };
+  shell = { main, status, nav, refreshButton, switcher, header };
   root.replaceChildren(header, h('div', { class: 'layout' }, nav, main));
   renderRoute();
   startLive();
@@ -319,7 +327,7 @@ async function renderRoute({ focus = true, quiet = false } = {}) {
 function startLive() {
   stopLive();
   if (typeof EventSource === 'undefined') return;
-  events = new EventSource('/api/events');
+  events = new EventSource(scoped('/api/events'));
   const parse = (e) => {
     try {
       return JSON.parse(e.data);
@@ -444,6 +452,36 @@ async function waitForSync() {
     if (!s.running) return;
   }
 }
+
+/** Shows the data of another child: everything is loaded anew for that account. */
+function switchAccount(id) {
+  if (id === currentAccount) return;
+  switchTo(id);
+  // Course pages and the like belong to one account.
+  if (/^\/kurse\//.test(location.pathname)) history.replaceState(null, '', '/');
+  stopLive();
+  boot();
+}
+
+window.addEventListener('lumo:switch-account', (e) => switchAccount(e.detail));
+
+/** Accounts were added, changed or removed (the list in `accounts` is current). */
+window.addEventListener('lumo:accounts-changed', (e) => {
+  if (!shell) return;
+  const target = e.detail?.switchTo;
+  if (target && target !== currentAccount) return switchAccount(target);
+  if (!accounts.some((a) => a.id === currentAccount)) {
+    switchTo('main');
+    stopLive();
+    return boot();
+  }
+  const next = accountSwitcher(switchAccount);
+  const old = shell.switcher;
+  if (old && next) old.replaceWith(next);
+  else if (old) old.remove();
+  else if (next) shell.header.querySelector('.brand')?.after(next);
+  shell.switcher = next;
+});
 
 /** The logout button is on the settings page (it fires this event). */
 window.addEventListener('lumo:logout', () => logout());

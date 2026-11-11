@@ -6,6 +6,19 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.18.0] – 2026-11-11
+
+### Added
+- **Several children on one server.** *Einstellungen → Kinder* adds further Schulportal accounts
+  (name, school, login, optionally Caseda and WebUntis); a drop-down in the top bar switches
+  between them. Every child has its own cached data, background sync, substitution filter,
+  subject colors and notification status; the web password, sync schedule and ntfy are shared.
+  Notifications start with the child's name once there are several, and their links open that
+  child. The first account is configured as before (new setting `ACCOUNT_NAME` for its name).
+  Nothing changes for a server with one account, and existing databases are used as they are.
+- API: `GET/POST /api/accounts`, `PUT/DELETE /api/accounts/{id}`, and every per-account endpoint
+  below `/api/accounts/{id}/…` (without the prefix the first account answers).
+
 ## [0.17.0] – 2026-11-10
 
 ### Changed
@@ -385,7 +398,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/StefanRiese/lumo/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/StefanRiese/lumo/compare/v0.16.4...v0.17.0
 [0.16.4]: https://github.com/StefanRiese/lumo/compare/v0.16.3...v0.16.4
 [0.16.3]: https://github.com/StefanRiese/lumo/compare/v0.16.2...v0.16.3

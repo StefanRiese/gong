@@ -35,6 +35,37 @@ abstract interface class Notifier {
   Future<void> send(AppNotification notification);
 }
 
+/// Tells which child a notification is about when the server has several
+/// accounts: the name goes in front of the title and the link opens that
+/// account. [label] returns null while there is only one account.
+class LabeledNotifier implements Notifier {
+  final Notifier inner;
+  final ({String name, String id})? Function() label;
+
+  LabeledNotifier(this.inner, this.label);
+
+  @override
+  String get description => inner.description;
+
+  @override
+  Future<void> send(AppNotification notification) {
+    final l = label();
+    if (l == null) return inner.send(notification);
+    final path = notification.clickPath;
+    return inner.send(
+      AppNotification(
+        title: '${l.name}: ${notification.title}',
+        message: notification.message,
+        tags: notification.tags,
+        priority: notification.priority,
+        clickPath: path == null
+            ? null
+            : '$path${path.contains('?') ? '&' : '?'}konto=${l.id}',
+      ),
+    );
+  }
+}
+
 class NotifyException implements Exception {
   final String message;
 

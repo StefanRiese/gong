@@ -203,12 +203,14 @@ class AppSettings {
 }
 
 /// Loads/saves [AppSettings]; in memory when no database is given (tests).
+/// Each account has its own settings: [prefix] is its scope prefix
+/// ('' = the first account).
 class SettingsStore {
-  static const _key = 'settings';
+  final String _key;
   final AppDatabase? _db;
   AppSettings _memory = const AppSettings();
 
-  SettingsStore([this._db]);
+  SettingsStore([this._db, String prefix = '']) : _key = '${prefix}settings';
 
   AppSettings load() {
     final db = _db;

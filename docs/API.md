@@ -10,6 +10,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Basics](#basics)
 - [Authentication](#authentication)
 - [Data endpoints](#data-endpoints)
+- [Several children (accounts)](#several-children-accounts)
 - [Sync and live updates](#sync-and-live-updates)
 - [Notifications](#notifications)
 - [Setup and server settings](#setup-and-server-settings)
@@ -258,6 +259,64 @@ UI's Heute page only shows entries of the own classes in the lessons.
 `PUT` changes the fields that are sent – fields not sent keep their value – and answers with the
 stored version. Invalid values → `400 bad_request`.
 
+## Several children (accounts)
+
+One server can show several Schulportal accounts, e.g. for siblings. The first account is the one
+set up on the setup page (`SPH_*` settings); it has the id `main`. Further accounts are added
+over the API or in *Einstellungen → Kinder*; their ids are 6 random letters and digits. Every
+account has its own portal session, cache, sync, user settings and notification status. The web
+password, the sync schedule, ntfy and the other server settings are shared.
+
+**Per-account endpoints.** The endpoints `account`, `timetable`, `substitutions`, `calendar`,
+`courses`, `homework`, `grades`, `meals`, `settings`, `refresh`, `sync`, `events` and
+`notifications` (with everything below them) also exist below `/api/accounts/{id}/`, e.g.
+`GET /api/accounts/k3x9ab/substitutions` or `PUT /api/accounts/k3x9ab/courses/5/entries/7/homework`.
+Without the prefix the first account answers, so existing clients keep working. Server-wide
+endpoints (`auth`, `setup`, `server-settings`, `schools`, `update`) have no per-account form.
+Unknown ids answer `404 unknown_account`.
+
+### `GET /api/accounts`
+
+```json
+{"accounts": [
+  {"id": "main", "name": "Max", "primary": true, "schoolId": 6128, "username": "max.muster"},
+  {"id": "k3x9ab", "name": "Anna", "primary": false, "schoolId": 6128, "username": "anna.muster",
+   "caseda": {"url": "https://www.caseda-schulmenue.de", "username": "eltern@example.org"},
+   "untis": null}
+]}
+```
+
+The first account is always first; `name` of the first account is `ACCOUNT_NAME` (default: the
+Schulportal user name). Passwords are never sent.
+
+### `POST /api/accounts`
+
+Adds an account after a test login: `201` with the description of the new account.
+
+```json
+{"name": "Anna", "schoolId": 6128, "username": "anna.muster", "password": "…",
+ "caseda": {"username": "eltern@example.org", "password": "…", "url": "https://…"},
+ "untis": {"server": "meineschule.webuntis.com", "school": "…", "username": "…", "password": "…"}}
+```
+
+`name` (max. 40 characters), `username` and `password` are required; `schoolId` defaults to 6128;
+`caseda` and `untis` are optional (same meaning as `CASEDA_*` / `UNTIS_*`, `url` and `school` are
+optional). At most 8 further accounts; the same school and user name twice is refused. Errors:
+`400 invalid_settings` (`problems`), `400 sph_login_failed` / `meals_login_failed` /
+`untis_login_failed`, `429 too_many_attempts` (shares the limit of the test logins).
+
+### `PUT /api/accounts/{id}`
+
+Changes an account; fields that are not sent are kept, an empty `password` keeps the stored one,
+`"caseda": null` / `"untis": null` switch the login off. Logins that changed are tried first.
+Another school or user name discards the cached data and user settings of that account. For
+`main` only `{"name": …}` is accepted (the login is part of the server settings).
+
+### `DELETE /api/accounts/{id}`
+
+`204`. Removes the account with its cached data and user settings; `main` cannot be removed
+(`400`).
+
 ## Sync and live updates
 
 ### `POST /api/refresh`
@@ -411,6 +470,7 @@ login answer `503 setup_required`.
 {
   "setupRequired": false,
   "values": {
+    "ACCOUNT_NAME": "",
     "SPH_SCHOOL_ID": 6128,
     "SPH_USERNAME": "max.muster",
     "SYNC": true,
@@ -781,6 +841,7 @@ Errors have a status code and a JSON body:
 | 403 | `setup_token_invalid` | setup token missing or wrong (setup mode) |
 | 404 | `not_found` | unknown path or course |
 | 404 | `feature_disabled` | portal area not enabled for the account |
+| 404 | `unknown_account` | no account with that id (`/api/accounts/{id}/…`) |
 | 409 | `notifications_disabled` | ntfy is not set up |
 | 409 | `no_update` | no update can be installed |
 | 400 | `meals_login_failed` | new or tested Caseda login does not work |

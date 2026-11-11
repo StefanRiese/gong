@@ -916,3 +916,32 @@ code { font-size: .88em; padding: .1rem .3rem; border-radius: 4px; background: v
 .meal-body .muted { font-size: .85rem; }
 .meal-week-info { margin: -.3rem 0 .5rem; font-size: .9rem; }
 .section-link { font-size: .9rem; font-weight: 500; }
+
+/* ---------- several children ---------- */
+
+.account-switch {
+  min-width: 0;
+  max-width: 10rem;
+  height: 36px;
+  padding: 0 .6rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+:root[data-scheme="lumo"] .account-switch { background: rgb(255 255 255 / 14%); border-color: rgb(255 255 255 / 30%); color: #ffffff; }
+:root[data-scheme="lumo"] .account-switch option { color: #111111; }
+@media (max-width: 720px) {
+  .topbar { gap: .5rem; }
+  .account-switch { max-width: 6.5rem; }
+}
+.account-list { list-style: none; margin: 0 0 .75rem; padding: 0; display: grid; gap: .5rem; }
+.account-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.account-row .badge { margin-left: .5rem; }
+.account-add { display: grid; gap: .75rem; margin-top: .5rem; }
+.account-add[hidden] { display: none; }
+.button.danger { color: var(--danger); border-color: var(--danger); }
+.button.danger:hover { background: var(--danger-soft); }

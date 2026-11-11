@@ -193,14 +193,25 @@ LXC container.
    x64/arm64, Windows, macOS archives). Guide: `deploy/README.md`. Tested without root via
    test overrides; sandboxed run checked with user systemd. Not yet run in a real LXC container
    or on GitHub Actions.
-7. **Extras** – multiple accounts (siblings), Dateispeicher, dark mode, offline view.
+7. **Extras** – multiple accounts (siblings; done, see below), Dateispeicher, dark mode, offline view.
    *Done since (2026-11-09):* dark mode; desktop apps (Windows tray exe, universal macOS app);
    background sync with SQLite cache and live updates; setup and server settings in the web UI;
    substitution filter (own classes, types, notices); updates from the web UI; REST API
    reference (`docs/API.md`); rename to **Gong** (0.8.0, now Lumo; „Ranzen“ is taken by an App Store app
    for Schulportal Hessen).
+   *Several children (Unreleased):* the first account stays configured as before (`SPH_*`,
+   `CASEDA_*`, `UNTIS_*`, `ACCOUNT_NAME`); further accounts live in the database (`accounts`,
+   `lib/src/config/accounts.dart`, managed in the web UI / `/api/accounts`). Each further account
+   has its own `SphService`, `ResponseCache`, `SyncService`, `Poller` and `Api` instance
+   (`AppServer._Child`); their rows in `cache`, `seen`, `meta` carry the prefix `@<id>/`
+   (`lib/src/storage/portal_state.dart`), the first account's rows have none, so existing
+   databases need no migration. The primary `Api` forwards `/api/accounts/<id>/<endpoint>` to the
+   instance of that account. Web password, sync schedule, ntfy and update are shared; the
+   web UI picks the account in a top bar drop-down (`web/js/accounts.js`, remembered per browser,
+   `?konto=<id>` from notification links) and `api.js` adds the prefix. Notifications get the
+   child's name in the title once there are several accounts (`LabeledNotifier`).
    *Ideas from comparing with native apps (Lanis Mobile, Ranzen):* messages (read and reply),
-   several children / accounts per server, Dateispeicher, iCal feed for timetable and calendar,
+   Dateispeicher, iCal feed for timetable and calendar,
    holidays and countdowns on Heute, attendance overview across courses, grade calculator.
    WebUntis as an optional second substitution source (0.10.0): the old JSON-RPC interface
    shows no teachers for class accounts, but the REST interface of the web app does, so changed

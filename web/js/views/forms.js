@@ -50,6 +50,17 @@ export function errorView(err) {
 }
 
 const PROBLEMS = [
+  [/A name is required/, 'Bitte einen Namen eingeben.'],
+  [/at most 40 characters/, 'Der Name darf höchstens 40 Zeichen haben.'],
+  [/A username is required/, 'Der Benutzername fehlt.'],
+  [/A password is required/, 'Das Passwort fehlt.'],
+  [/already set up/, 'Dieses Schulportal-Konto ist bereits eingerichtet.'],
+  [/At most \d+ further accounts/, 'Es können nicht noch mehr Kinder eingerichtet werden.'],
+  [/Caseda: username and password/, 'Für das Schulessen werden E-Mail und Passwort des Caseda-Kontos gebraucht.'],
+  [/Caseda: the address/, 'Die Adresse des Bestellsystems muss mit https:// beginnen.'],
+  [/WebUntis: address, username/, 'Für WebUntis werden Adresse, Benutzername und Passwort gebraucht.'],
+  [/WebUntis: the address/, 'Die Adresse von WebUntis muss ein Rechnername wie meineschule.webuntis.com sein.'],
+  [/Only the name of the first account/, 'Beim ersten Konto lässt sich hier nur der Name ändern.'],
   [/SPH_USERNAME and SPH_PASSWORD/, 'Benutzername und Passwort für das Schulportal fehlen.'],
   [/APP_PASSWORD must have/, 'Das Passwort muss mindestens 8 Zeichen haben.'],
   [/APP_PASSWORD or APP_PASSWORD_HASH/, 'Ein Passwort für die Web-Oberfläche fehlt.'],

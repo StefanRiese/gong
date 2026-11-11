@@ -8,7 +8,7 @@ import '../sph/errors.dart';
 import '../untis/merge.dart';
 import '../untis/untis.dart';
 import '../sph/sph_service.dart';
-import '../storage/app_database.dart';
+import '../storage/portal_state.dart';
 import 'cache_keys.dart';
 
 /// Kinds of data kept in sync with Schulportal.
@@ -133,7 +133,7 @@ typedef SyncFailureListener = void Function(SyncTask task, Object error);
 class SyncService {
   final SphService service;
   final ResponseCache cache;
-  final AppDatabase db;
+  final PortalState db;
   final SyncConfig config;
   final void Function(String message) log;
   final DateTime Function() _now;
@@ -178,11 +178,12 @@ class SyncService {
   bool get running => _running != null;
   Stream<bool> get runningChanges => _runningChanges.stream;
 
-  /// Starts the schedule (no-op if background sync is disabled).
-  void start() {
+  /// Starts the schedule (no-op if background sync is disabled). The first
+  /// run is after [firstDelay]; the accounts of a server start staggered.
+  void start({Duration firstDelay = const Duration(seconds: 5)}) {
     if (!config.enabled || _timer != null) return;
     _timer = Timer.periodic(const Duration(minutes: 1), (_) => _tick());
-    Timer(const Duration(seconds: 5), _tick);
+    Timer(firstDelay, _tick);
   }
 
   Future<void> stop() async {

@@ -14,6 +14,11 @@ class ApplyResult {
   });
 }
 
+/// No account with that id.
+class AccountNotFound implements Exception {
+  const AccountNotFound();
+}
+
 /// What the API needs from the running server to show and change its
 /// settings (setup page, „Einstellungen“). Implemented by AppServer.
 abstract interface class ServerControl {
@@ -57,4 +62,24 @@ abstract interface class ServerControl {
   Future<ApplyResult> apply(Map<String, String> changes);
 
   Future<List<School>> searchSchools(String query);
+
+  /// The accounts (children), the first one first; no passwords.
+  List<Map<String, Object?>> listAccounts();
+
+  /// Adds an account after a test login; returns its description. Throws
+  /// ConfigException for invalid values, SphException / CasedaException /
+  /// UntisException if a login does not work.
+  Future<Map<String, Object?>> addAccount(Map<String, Object?> data);
+
+  /// Changes name or logins of an account (fields not sent are kept; the
+  /// first account only takes a `name`). Throws [AccountNotFound] and the
+  /// exceptions of [addAccount].
+  Future<Map<String, Object?>> updateAccount(
+    String id,
+    Map<String, Object?> data,
+  );
+
+  /// Removes an account with all its cached data. The first account cannot
+  /// be removed (ArgumentError); throws [AccountNotFound].
+  Future<void> removeAccount(String id);
 }

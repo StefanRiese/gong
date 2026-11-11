@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../models/models.dart';
 import '../sph/sph_service.dart';
-import '../storage/app_database.dart';
+import '../storage/portal_state.dart';
 import '../storage/settings_store.dart';
 import '../sync/sync_service.dart';
 import 'change_detector.dart';
@@ -83,7 +83,7 @@ class PollStatus {
 ///   failed deliveries are retried on the next run
 class Poller {
   final SyncService sync;
-  final AppDatabase db;
+  final PortalState db;
   final Notifier notifier;
   final PollerConfig config;
   final void Function(String message) log;

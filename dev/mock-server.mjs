@@ -9,6 +9,7 @@
 //                                             /einrichtung?token=demo-token
 //   MOCK_UPDATE=1 node dev/mock-server.mjs  → an update (v0.7.0) is available
 //   MOCK_ABBREV=1 node dev/mock-server.mjs  → timetable with subject abbreviations (M, D, Geo …)
+//   MOCK_CHILDREN=1 node dev/mock-server.mjs → a second account ("Mia") besides the first
 //
 // "Neu laden" (POST /api/refresh) simulates a 2.5 s sync: /api/events pushes
 // sync start/end and an update for every data key the UI has loaded.
@@ -25,7 +26,7 @@ let setupRequired = process.env.MOCK_SETUP === '1';
 const SETUP_TOKEN = 'demo-token';
 let appPassword = 'demo';
 const serverValues = {
-  SPH_SCHOOL_ID: 9999, SPH_USERNAME: 'max.muster', SYNC: true, POLL_INTERVAL_MINUTES: 15,
+  ACCOUNT_NAME: '', SPH_SCHOOL_ID: 9999, SPH_USERNAME: 'max.muster', SYNC: true, POLL_INTERVAL_MINUTES: 15,
   GRADES_INTERVAL_MINUTES: 120, ACTIVE_HOURS: '6-22', NTFY_URL: 'https://ntfy.sh', NTFY_TOPIC: '',
   NOTIFY: 'substitutions,homework,grades', NOTIFY_GRADE_VALUES: false, APP_URL: '', HOST: '0.0.0.0',
   PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false, UPDATE_CHECK: true,
@@ -48,6 +49,20 @@ const doneOverrides = new Map(); // "course/entry" → done
 const fetched = new Map(); // cache key → fetchedAt (ISO)
 const eventClients = new Set();
 let syncRunning = false;
+// Further accounts (children): id → {id, name, schoolId, username, caseda, untis, settings}.
+// MOCK_CHILDREN=1 starts with one ("Mia").
+const children = new Map();
+const newSettings = () => ({ subjectColors: {}, courseSubjects: {},
+  substitutionFilter: { classes: [], showUnassigned: false, hiddenTypes: [], hiddenNotices: [] } });
+if (process.env.MOCK_CHILDREN === '1') {
+  children.set('mia001', { id: 'mia001', name: 'Mia', schoolId: 9999, username: 'mia.muster',
+    caseda: null, untis: null, settings: newSettings() });
+}
+const accountList = () => [
+  { id: 'main', name: serverValues.ACCOUNT_NAME || serverValues.SPH_USERNAME, primary: true,
+    schoolId: serverValues.SPH_SCHOOL_ID, username: serverValues.SPH_USERNAME },
+  ...[...children.values()].map(({ settings: _s, ...c }) => ({ ...c, primary: false })),
+];
 // Simulated app update (Einstellungen → Server → Update).
 const update = {
   current: 'v0.6.0', latest: null, available: false, notes: null, mode: 'systemd',
@@ -286,7 +301,8 @@ async function readBody(req) {
 }
 
 async function handleApi(req, res, url) {
-  const path = url.pathname;
+  let path = url.pathname;
+  let acct = 'main'; // account the request is for
   if (path === '/api/setup') return json(res, 200, { setupRequired });
   // During the simulated update the "server" is away for a moment.
   if (Date.now() < restartingUntil) return error(res, 503, 'restarting', 'Restarting');
@@ -314,6 +330,60 @@ async function handleApi(req, res, url) {
   if (path === '/api/auth/me') return json(res, 200, { authenticated: sessions.has(token(req)) });
   if (!sessions.has(token(req))) return error(res, 401, 'unauthorized', 'Login required');
 
+  // --- accounts (children) ---
+  if (path === '/api/accounts' && req.method === 'GET') return json(res, 200, { accounts: accountList() });
+  if (path === '/api/accounts' && req.method === 'POST') {
+    const b = JSON.parse((await readBody(req)) || '{}');
+    const problems = [];
+    if (!String(b.name ?? '').trim()) problems.push('A name is required');
+    if (!String(b.username ?? '').trim()) problems.push('A username is required');
+    if (!String(b.password ?? '').trim()) problems.push('A password is required');
+    if (problems.length) {
+      return json(res, 400, { error: { code: 'invalid_settings', message: 'Invalid settings', problems } });
+    }
+    if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
+    const id = Math.random().toString(36).slice(2, 8).padEnd(6, '0');
+    const c = { id, name: String(b.name).trim(), schoolId: Number(b.schoolId) || 9999, username: String(b.username).trim(),
+      caseda: b.caseda ? { url: b.caseda.url ?? 'https://www.caseda-schulmenue.de', username: b.caseda.username } : null,
+      untis: b.untis ? { server: b.untis.server, school: b.untis.school ?? '', username: b.untis.username } : null,
+      settings: newSettings() };
+    children.set(id, c);
+    const { settings: _s, ...pub } = c;
+    return json(res, 201, { ...pub, primary: false });
+  }
+  const am = /^\/api\/accounts\/([a-z0-9]+)(?:\/(.*))?$/.exec(path);
+  if (am) {
+    const [, id, rest] = am;
+    if (id !== 'main' && !children.has(id)) return error(res, 404, 'unknown_account', 'No such account');
+    if (rest === undefined) {
+      if (req.method === 'DELETE') {
+        if (id === 'main') return error(res, 400, 'bad_request', 'The first account cannot be removed');
+        children.delete(id);
+        res.writeHead(204);
+        return res.end();
+      }
+      if (req.method === 'PUT') {
+        const b = JSON.parse((await readBody(req)) || '{}');
+        if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
+        if (id === 'main') {
+          serverValues.ACCOUNT_NAME = String(b.name ?? '').trim();
+          return json(res, 200, accountList()[0]);
+        }
+        const c = children.get(id);
+        for (const k of ['name', 'username']) if (b[k]) c[k] = String(b[k]).trim();
+        if (b.schoolId) c.schoolId = Number(b.schoolId);
+        if ('caseda' in b) c.caseda = b.caseda && { url: b.caseda.url ?? 'https://www.caseda-schulmenue.de', username: b.caseda.username ?? c.caseda?.username };
+        if ('untis' in b) c.untis = b.untis && { server: b.untis.server ?? c.untis?.server, school: b.untis.school ?? '', username: b.untis.username ?? c.untis?.username };
+        const { settings: _s, ...pub } = c;
+        return json(res, 200, { ...pub, primary: false });
+      }
+      return error(res, 404, 'not_found', 'No such endpoint');
+    }
+    acct = id;
+    path = `/api/${rest}`;
+  }
+  const child = children.get(acct) ?? null;
+
   const hw = /^\/api\/courses\/([^/]+)\/entries\/([^/]+)\/homework$/.exec(path);
   if (hw && req.method === 'PUT') {
     const { done } = JSON.parse((await readBody(req)) || '{}');
@@ -323,30 +393,32 @@ async function handleApi(req, res, url) {
     doneOverrides.set(`${hw[1]}/${hw[2]}`, done);
     return json(res, 200, { done });
   }
-  if (path === '/api/settings' && req.method === 'GET') return json(res, 200, settings);
+  if (path === '/api/settings' && req.method === 'GET') return json(res, 200, child ? child.settings : settings);
   if (path === '/api/settings' && req.method === 'PUT') {
     // Fields not sent keep their value (like the real server).
     const body = JSON.parse((await readBody(req)) || '{}');
+    const current = child ? child.settings : settings;
     const colors = {};
-    for (const [k, v] of Object.entries(body.subjectColors ?? settings.subjectColors)) {
+    for (const [k, v] of Object.entries(body.subjectColors ?? current.subjectColors)) {
       if (!/^#[0-9a-f]{6}$/i.test(v) || !k.trim()) return error(res, 400, 'bad_request', `Invalid color for ${k}`);
       colors[k.trim()] = v.toLowerCase();
     }
     const courseSubjects = {};
-    for (const [k, v] of Object.entries(body.courseSubjects ?? settings.courseSubjects)) {
+    for (const [k, v] of Object.entries(body.courseSubjects ?? current.courseSubjects)) {
       if (!/^[A-Za-z0-9_-]{1,64}$/.test(k) || typeof v !== 'string') return error(res, 400, 'bad_request', `Invalid course ${k}`);
       courseSubjects[k] = v.trim();
     }
-    const f = body.substitutionFilter ?? settings.substitutionFilter;
+    const f = body.substitutionFilter ?? current.substitutionFilter;
     const list = (v) => [...new Set((Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter(Boolean))];
-    settings = {
+    const next = {
       subjectColors: colors, courseSubjects,
       substitutionFilter: {
         classes: list(f.classes), showUnassigned: f.showUnassigned === true,
         hiddenTypes: list(f.hiddenTypes), hiddenNotices: list(f.hiddenNotices),
       },
     };
-    return json(res, 200, settings);
+    if (child) child.settings = next; else settings = next;
+    return json(res, 200, next);
   }
   if (path === '/api/notifications' && req.method === 'GET') {
     const ago = (min) => new Date(Date.now() - min * 60e3).toISOString();
@@ -409,8 +481,11 @@ async function handleApi(req, res, url) {
   }
   switch (path) {
     case '/api/account':
-      return data(res, 'account', { schoolId: 9999, username: 'max.muster', accountType: 'student',
-        features: ['timetable', 'substitutions', 'calendar', 'lessons'] });
+      return data(res, 'account', child
+        ? { schoolId: child.schoolId, username: child.username, accountType: 'student',
+          features: ['timetable', 'substitutions', 'lessons'] }
+        : { schoolId: 9999, username: 'max.muster', accountType: 'student',
+          features: ['timetable', 'substitutions', 'calendar', 'lessons'] });
     case '/api/timetable': return data(res, 'timetable', timetable, serverValues.UNTIS_ENABLED ? {
       differences: [
         { weekday: 1, start: '14:00', text: 'Mo 14:00: WebUntis hat LRS, im Schulportal-Stundenplan fehlt sie' },
@@ -419,7 +494,7 @@ async function handleApi(req, res, url) {
     } : {});
     case '/api/substitutions': {
       // Permanent filter from the settings, like the real server.
-      const f = settings.substitutionFilter;
+      const f = (child ? child.settings : settings).substitutionFilter;
       const active = f.classes.length > 0 || f.hiddenTypes.length > 0 || f.hiddenNotices.length > 0;
       if (!active || url.searchParams.get('alle') === '1') {
         return data(res, 'substitutions', allSubstitutions(), { filter: { active: false, hidden: 0 } });
@@ -445,6 +520,7 @@ async function handleApi(req, res, url) {
     case '/api/courses': return data(res, 'courses', courses);
     case '/api/homework': {
       const withDone = (h) => ({ ...h, done: doneOverrides.get(`${h.courseId}/${h.entryId}`) ?? h.done });
+      if (child) return data(res, url.searchParams.get('alle') === '1' ? 'homework:all' : 'homework', homework.slice(0, 2).map(withDone));
       if (url.searchParams.get('alle') !== '1') return data(res, 'homework', homework.map(withDone));
       // All homework: current entries plus older ones from the course histories.
       const all = [...homework.map(withDone)];
@@ -460,7 +536,9 @@ async function handleApi(req, res, url) {
     case '/api/grades': return data(res, 'grades', grades);
     case '/api/meals': {
       // School meals (Caseda): own orders and balance; off in the settings → 404.
-      if (!serverValues.CASEDA_ENABLED) return error(res, 404, 'meals_disabled', 'School meals are not set up');
+      if (child ? !child.caseda : !serverValues.CASEDA_ENABLED) {
+        return error(res, 404, 'meals_disabled', 'School meals are not set up');
+      }
       const order = (date, line, name, allergens = [], priceCents = 390, ordered = 1) =>
         ({ date: ymd(date), line, name, allergens, priceCents, ordered, deadlinePassed: date < today });
       const monday = addDays(today, -((today.getDay() + 6) % 7));

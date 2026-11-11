@@ -61,6 +61,10 @@ class NtfyConfig {
 class AppConfig {
   final SphCredentials sph;
 
+  /// Name of the first account in the account switcher (ACCOUNT_NAME);
+  /// empty = the Schulportal user name.
+  final String accountName;
+
   /// PBKDF2 hash of the web UI password (see bin/hash_password.dart).
   final String appPasswordHash;
   final String host;
@@ -106,6 +110,7 @@ class AppConfig {
 
   const AppConfig({
     required this.sph,
+    this.accountName = '',
     required this.appPasswordHash,
     this.host = '127.0.0.1',
     this.port = 8080,
@@ -131,6 +136,9 @@ class AppConfig {
   final List<String> missing;
 
   bool get needsSetup => missing.isNotEmpty;
+
+  /// Name of the first account as shown in the web UI.
+  String get displayName => accountName.isNotEmpty ? accountName : sph.username;
 
   String get databasePath => '$dataDir/lumo.db';
 
@@ -346,10 +354,16 @@ class AppConfig {
       }
     }
 
+    final accountName = get('ACCOUNT_NAME') ?? '';
+    if (accountName.length > 40) {
+      problems.add('ACCOUNT_NAME may have at most 40 characters');
+    }
+
     if (problems.isNotEmpty) throw ConfigException(problems);
 
     return AppConfig(
       sph: sph,
+      accountName: accountName,
       appPasswordHash: hash,
       host: get('HOST') ?? '127.0.0.1',
       port: port!,

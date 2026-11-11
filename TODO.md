@@ -1,4 +1,5 @@
 ## Open
+- [ ] several children: try with two real accounts on the real server (sync stagger, notifications with names, switching on the phone); run the release workflow before tagging
 - [ ] test the tray menu (Windows) and the menu bar item (macOS) „Einstellungen“: they now open `/einstellungen` directly
 - [ ] remove `server/lib/src/sph/portal_fixes.dart` once liblanis is fixed (issue #3, still open, no reply yet; liblanis 0.1.4 is still the latest, last commit 27 Oct)
 - [ ] WebUntis: lessons without a period of the time grid have no period and are not merged into the lessons on Heute (check how often this happens)

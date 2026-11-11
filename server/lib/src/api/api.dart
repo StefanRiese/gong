@@ -10,6 +10,7 @@ import 'package:shelf_static/shelf_static.dart';
 import '../auth/password.dart';
 import '../caseda/caseda.dart';
 import '../auth/sessions.dart';
+import '../config/accounts.dart';
 import '../config/app_config.dart';
 import '../config/server_settings.dart';
 import '../notify/notifier.dart';
@@ -90,11 +91,26 @@ const _eventPing = Duration(seconds: 25);
 ///   GET  /api/notifications          notification settings + poll status
 ///   POST /api/notifications/test     send a test notification
 ///   POST /api/notifications/check    check for changes now
+/// Several children (accounts): every data endpoint above (account …
+/// notifications, `settings`, `refresh`, `sync`, `events`, `meals`) is also
+/// available as /api/accounts/{id}/… (`main` = the first account; without
+/// the prefix the first account answers).
+///   GET    /api/accounts      the accounts: id, name, primary, …
+///   POST   /api/accounts      add an account (login is tested first)
+///   PUT    /api/accounts/{id}  change name / login of an account
+///   DELETE /api/accounts/{id}  remove an account (not the first one)
 /// Data endpoints answer from the cache right away (expired entries are
 /// refreshed in the background) with `{"data": …, "key": …, "fetchedAt": …,
 /// "cached": bool, "stale": bool, "refreshing": bool}`; `?refresh=1` waits
 /// for fresh data instead.
 class Api {
+  /// Id of the account this instance serves (see [AccountConfig.mainId]).
+  final String accountId;
+
+  /// Instances of the further accounts by id; set up by the server. They
+  /// share sessions, login limit, update and server control with this one.
+  final Map<String, Api> children = {};
+
   /// Replaced when the Schulportal credentials change (see [ServerControl]).
   SphService service;
   String passwordHash;
@@ -146,6 +162,7 @@ class Api {
   final DateTime Function() _now;
 
   Api({
+    this.accountId = AccountConfig.mainId,
     required this.service,
     required this.passwordHash,
     SessionStore? sessions,
@@ -186,7 +203,16 @@ class Api {
         e is UntisException,
   );
 
-  Handler get handler {
+  Handler get handler =>
+      const Pipeline().addMiddleware(_securityHeaders).addHandler(routes);
+
+  Handler? _routes;
+
+  /// The endpoints without the security headers (those of the further
+  /// accounts are served through the first account's [handler]).
+  Handler get routes => _routes ??= _buildRoutes();
+
+  Handler _buildRoutes() {
     final router = Router(notFoundHandler: _notFound)
       ..get(
         '/healthz',
@@ -268,11 +294,178 @@ class Api {
       ..put('/api/settings', _putSettings)
       ..get('/api/notifications', _notifications)
       ..post('/api/notifications/test', _notificationTest)
-      ..post('/api/notifications/check', _notificationCheck);
+      ..post('/api/notifications/check', _notificationCheck)
+      ..get('/api/accounts', _accounts)
+      ..post('/api/accounts', _addAccount)
+      ..put('/api/accounts/<id>', _updateAccount)
+      ..delete('/api/accounts/<id>', _removeAccount)
+      ..all('/api/accounts/<id>/<rest|.*>', _accountScoped);
 
-    return const Pipeline()
-        .addMiddleware(_securityHeaders)
-        .addHandler(router.call);
+    return router.call;
+  }
+
+  // --- accounts (children) -----------------------------------------------------
+
+  /// Endpoints that exist per account.
+  static const _scopedEndpoints = {
+    'account',
+    'timetable',
+    'substitutions',
+    'calendar',
+    'courses',
+    'homework',
+    'grades',
+    'refresh',
+    'sync',
+    'events',
+    'meals',
+    'settings',
+    'notifications',
+  };
+
+  /// `/api/accounts/<id>/<endpoint…>`: the request goes to the instance of
+  /// that account as `/api/<endpoint…>`.
+  Future<Response> _accountScoped(Request request, String id, String rest) {
+    if (control?.setupRequired ?? false) return Future.value(_setupRequired());
+    if (!_authorized(request)) {
+      return Future.value(_error(401, 'unauthorized', 'Login required'));
+    }
+    final target = id == accountId ? this : children[id];
+    if (target == null) {
+      return Future.value(_error(404, 'unknown_account', 'No such account'));
+    }
+    if (!_scopedEndpoints.contains(rest.split('/').first)) {
+      return Future.value(_error(404, 'not_found', 'No such endpoint'));
+    }
+    final forwarded = Request(
+      request.method,
+      request.requestedUri.replace(path: '/api/$rest'),
+      headers: request.headers,
+      body: request.read(),
+      context: request.context,
+    );
+    return Future.value(target.routes(forwarded));
+  }
+
+  Response _accounts(Request request) {
+    if (control?.setupRequired ?? false) return _setupRequired();
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final c = control;
+    return _json(200, {
+      'accounts': c != null
+          ? c.listAccounts()
+          : [
+              {'id': accountId, 'name': '', 'primary': true},
+            ],
+    });
+  }
+
+  /// Reads the JSON object of an account request; null = error [response].
+  Future<(Map<String, Object?>?, Response?)> _accountBody(
+    Request request,
+  ) async {
+    if (!_isJson(request)) {
+      return (
+        null,
+        _error(415, 'unsupported_media_type', 'Use application/json'),
+      );
+    }
+    try {
+      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
+      if (body is! Map) throw const FormatException();
+      return (body.cast<String, Object?>(), null);
+    } on Object {
+      return (null, _error(400, 'bad_request', 'Expected a JSON object'));
+    }
+  }
+
+  /// Logins of accounts are tried before they are saved: the same limit as
+  /// the test logins of the settings page protects the Schulportal accounts.
+  Response? _loginBudget() {
+    final now = _now();
+    _testLogins.removeWhere(
+      (t) => now.difference(t) > const Duration(minutes: 5),
+    );
+    if (_testLogins.length >= 5) {
+      return _error(
+        429,
+        'too_many_attempts',
+        'Too many test logins, try again later',
+        headers: {'retry-after': '300'},
+      );
+    }
+    _testLogins.add(now);
+    return null;
+  }
+
+  Future<Response> _changeAccount(
+    Request request,
+    Future<Map<String, Object?>> Function(
+      ServerControl control,
+      Map<String, Object?> body,
+    )
+    change, {
+    int status = 200,
+  }) async {
+    final c = control;
+    if (c == null) return _error(404, 'not_found', 'Not available');
+    if (c.setupRequired) return _setupRequired();
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    final (body, bad) = await _accountBody(request);
+    if (bad != null) return bad;
+    final limited = _loginBudget();
+    if (limited != null) return limited;
+    try {
+      return _json(status, await change(c, body!));
+    } on ConfigException catch (e) {
+      return _error(
+        400,
+        'invalid_settings',
+        'Invalid settings',
+        extra: {'problems': e.problems},
+      );
+    } on AccountNotFound {
+      return _error(404, 'unknown_account', 'No such account');
+    } on SphAuthException catch (e) {
+      return _error(400, 'sph_login_failed', e.message);
+    } on SphException catch (e) {
+      return _sphError(e);
+    } on CasedaException catch (e) {
+      return e.isAuth
+          ? _error(400, 'meals_login_failed', e.message)
+          : _error(503, 'meals_unavailable', e.message);
+    } on UntisException catch (e) {
+      return e.isAuth
+          ? _error(400, 'untis_login_failed', e.message)
+          : _error(503, 'untis_unavailable', e.message);
+    }
+  }
+
+  Future<Response> _addAccount(Request request) =>
+      _changeAccount(request, (c, body) => c.addAccount(body), status: 201);
+
+  Future<Response> _updateAccount(Request request, String id) =>
+      _changeAccount(request, (c, body) => c.updateAccount(id, body));
+
+  Future<Response> _removeAccount(Request request, String id) async {
+    final c = control;
+    if (c == null) return _error(404, 'not_found', 'Not available');
+    if (c.setupRequired) return _setupRequired();
+    if (!_authorized(request)) {
+      return _error(401, 'unauthorized', 'Login required');
+    }
+    try {
+      await c.removeAccount(id);
+      return Response(204);
+    } on AccountNotFound {
+      return _error(404, 'unknown_account', 'No such account');
+    } on ArgumentError catch (e) {
+      return _error(400, 'bad_request', '${e.message}');
+    }
   }
 
   // --- auth ------------------------------------------------------------------

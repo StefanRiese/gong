@@ -6,7 +6,9 @@
 import { api, ApiError, errorMessage } from '../api.js';
 import { h, errorBox } from '../dom.js';
 import { initColors } from '../colors.js';
+import { accounts, current } from '../accounts.js';
 import { pageHeader } from './common.js';
+import { accountsGroup, childGroup } from './accounts.js';
 import { messageArea } from './forms.js';
 import { createForm } from './settings-form.js';
 import {
@@ -60,13 +62,17 @@ export async function render(ctx) {
 
   // --- groups ---
   const updateFirst = update?.available ? updateGroup({ ...base, status: update }) : null;
+  // The server settings for Schulportal, Caseda and WebUntis belong to the first
+  // account; another child has its own login form (and its own Caseda / WebUntis).
+  const child = accounts.find((a) => a.id === current && !a.primary) ?? null;
   const groups = [
     updateFirst,
-    portalGroup(base),
+    child ? childGroup({ account: child }) : portalGroup(base),
+    accountsGroup({ defaultSchool: v.SPH_SCHOOL_ID }),
     ctx.features.has('substitutions')
-      ? substitutionsGroup({ ...base, saved: personal.substitutionFilter, plan })
+      ? substitutionsGroup({ ...base, saved: personal.substitutionFilter, plan, withUntis: !child })
       : null,
-    mealsGroup(base),
+    child ? null : mealsGroup(base),
     ctx.features.has('lessons') || ctx.features.has('timetable') ? colorsGroup(base) : null,
     notifyGroup(base),
     syncGroup({ ...base, sync }),
@@ -86,6 +92,10 @@ export async function render(ctx) {
   const root = h('form', { class: 'settings-page' },
     pageHeader('Einstellungen'),
     h('p', { class: 'hint' }, 'Alles auf einer Seite. Gilt für alle Geräte und wird auf dem Server gespeichert.'),
+    accounts.length > 1
+      ? h('p', { class: 'hint' }, 'Vertretungsfilter und Farben gelten für ', h('strong', null, accounts.find((a) => a.id === current)?.name),
+        ' (Auswahl oben). Server, Benachrichtigungen und Zugang gelten für alle.')
+      : null,
     restartNotice,
     groups,
     float);

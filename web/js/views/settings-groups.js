@@ -60,12 +60,14 @@ function showWhenOn(enabled, fields) {
 export function portalGroup({ form, v, secrets }) {
   const school = schoolPicker({ value: v.SPH_SCHOOL_ID, onChange: () => form.touch() });
   form.add('server', 'SPH_SCHOOL_ID', () => (school.value == null ? '' : String(school.value)));
+  const name = bindText(form, 'ACCOUNT_NAME', input({ value: v.ACCOUNT_NAME ?? '', maxlength: 40, placeholder: v.SPH_USERNAME ?? '' }));
   const username = bindText(form, 'SPH_USERNAME', input({ value: v.SPH_USERNAME ?? '', required: true }));
   const password = bindText(form, 'SPH_PASSWORD', input({
     type: 'password', autocomplete: 'off', placeholder: secrets.SPH_PASSWORD ? 'unverändert' : '',
   }), { secret: true });
   return group('schulportal', 'Schulportal',
     'Mit diesen Daten meldet sich der Server beim Schulportal an. Bei einem anderen Konto werden die gespeicherten Daten verworfen.',
+    field('Name', name, 'Wird in der Auswahl der Kinder angezeigt (Standard: der Benutzername).'),
     field('Schule', school.el),
     field('Benutzername', username),
     field('Passwort', password, secrets.SPH_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
@@ -80,7 +82,7 @@ export function portalGroup({ form, v, secrets }) {
  * The permanent filter of the substitution plan (stored on the server; applies to
  * Vertretungen, Heute and notifications) and WebUntis as a second source.
  */
-export function substitutionsGroup({ form, v, secrets, saved, plan }) {
+export function substitutionsGroup({ form, v, secrets, saved, plan, withUntis = true }) {
   const parts = [];
 
   if (plan) {
@@ -158,7 +160,7 @@ export function substitutionsGroup({ form, v, secrets, saved, plan }) {
     );
   }
 
-  parts.push(...untisPart({ form, v, secrets }));
+  if (withUntis) parts.push(...untisPart({ form, v, secrets }));
   return group('vertretungsplan', 'Vertretungen',
     'Gilt auf allen Geräten.', parts);
 }

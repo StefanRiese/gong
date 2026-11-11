@@ -8,6 +8,7 @@ import '../storage/app_database.dart';
 /// „Einstellungen“). Names are the config.env keys.
 abstract final class ServerSettingKeys {
   static const editable = {
+    'ACCOUNT_NAME',
     'SPH_SCHOOL_ID',
     'SPH_USERNAME',
     'SPH_PASSWORD',

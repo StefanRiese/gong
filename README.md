@@ -38,6 +38,9 @@ light or dark mode of the device.
   homework every 15 min, grades and course pages every 2 h, during active hours)
 - Pages open right away from the stored data – also after a restart and while the portal is
   down; open pages update themselves when new data arrives
+- **Several children** on one server: add more Schulportal accounts under *Einstellungen →
+  Kinder* and switch between them in the top bar; every child has own data, filters, colors
+  and (optional) Caseda / WebUntis login; notifications name the child
 - Heute, Stundenplan (A/B weeks), Vertretungen, Hausaufgaben (mark as done in the portal),
   Noten, Fächer / course pages, Kalender with filters; consistent subject colors
 - Substitution plan of the whole school with a permanent filter for the own classes (also

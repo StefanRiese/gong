@@ -4,10 +4,11 @@ import 'package:crypto/crypto.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import '../api/cache.dart';
+import 'portal_state.dart';
 
 /// App state in SQLite: seen items for change detection, poll status,
 /// web UI sessions, cached portal data.
-class AppDatabase implements CacheStore {
+class AppDatabase implements CacheStore, PortalState {
   final Database _db;
 
   AppDatabase._(this._db) {
@@ -95,6 +96,7 @@ class AppDatabase implements CacheStore {
   // --- change detection ------------------------------------------------------
 
   /// Fingerprints already seen for [kind].
+  @override
   Set<String> seen(String kind) => {
     for (final row in _db.select(
       'SELECT fingerprint FROM seen WHERE kind = ?',
@@ -103,6 +105,7 @@ class AppDatabase implements CacheStore {
       row['fingerprint'] as String,
   };
 
+  @override
   void markSeen(String kind, Iterable<String> fingerprints, DateTime now) {
     final stmt = _db.prepare(
       'INSERT OR IGNORE INTO seen (kind, fingerprint, first_seen) VALUES (?, ?, ?)',
@@ -123,6 +126,7 @@ class AppDatabase implements CacheStore {
 
   /// Removes fingerprints first seen before [cutoff] that are no longer
   /// present (keeps current ones so they are not reported again).
+  @override
   void pruneSeen(String kind, Set<String> current, DateTime cutoff) {
     final old = _db.select(
       'SELECT fingerprint FROM seen WHERE kind = ? AND first_seen < ?',
@@ -154,6 +158,7 @@ class AppDatabase implements CacheStore {
     [key, value],
   );
 
+  @override
   Map<String, Object?>? getJson(String key) {
     final raw = getMeta(key);
     if (raw == null) return null;
@@ -164,6 +169,7 @@ class AppDatabase implements CacheStore {
     }
   }
 
+  @override
   void setJson(String key, Map<String, Object?> value) =>
       setMeta(key, jsonEncode(value));
 
@@ -185,15 +191,23 @@ class AppDatabase implements CacheStore {
           hashToken(keep),
         ]);
 
-  /// Forgets everything derived from the Schulportal account (seen items,
-  /// notification and sync status, cached data), e.g. after switching to
-  /// another account.
-  void resetPortalState() {
-    _db.execute('DELETE FROM seen');
-    _db.execute(
-      "DELETE FROM meta WHERE key LIKE 'poll:%' OR key LIKE 'sync:%'",
-    );
-    _db.execute('DELETE FROM cache');
+  /// Forgets everything derived from the Schulportal account whose keys
+  /// start with [prefix] (see [scopePrefix]; '' = the first account): seen
+  /// items, notification and sync status, cached data, settings. Used after
+  /// switching an account to other credentials or removing it.
+  void resetPortalState([String prefix = '']) {
+    if (prefix.isEmpty) {
+      _db.execute("DELETE FROM seen WHERE kind NOT LIKE '@%'");
+      _db.execute(
+        "DELETE FROM meta WHERE key LIKE 'poll:%' OR key LIKE 'sync:%'",
+      );
+      _db.execute("DELETE FROM cache WHERE key NOT LIKE '@%'");
+    } else {
+      // Ids consist of letters and digits only: no LIKE wildcards.
+      _db.execute('DELETE FROM seen WHERE kind LIKE ?', ['$prefix%']);
+      _db.execute('DELETE FROM meta WHERE key LIKE ?', ['$prefix%']);
+      _db.execute('DELETE FROM cache WHERE key LIKE ?', ['$prefix%']);
+    }
   }
 
   /// Expiry of the session, or null if unknown.

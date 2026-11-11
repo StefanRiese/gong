@@ -11,6 +11,7 @@ import '../api/server_control.dart';
 import '../auth/sessions.dart';
 import '../caseda/caseda.dart';
 import '../untis/untis.dart';
+import '../config/accounts.dart';
 import '../config/app_config.dart';
 import '../config/env.dart';
 import '../config/server_settings.dart';
@@ -22,6 +23,7 @@ import '../sph/liblanis_gateway.dart';
 import '../sph/sph_gateway.dart';
 import '../sph/sph_service.dart';
 import '../storage/app_database.dart';
+import '../storage/portal_state.dart';
 import '../storage/settings_store.dart';
 import '../sync/cache_keys.dart';
 import '../sync/sync_service.dart';
@@ -48,6 +50,20 @@ class AppServerException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// A further account (child): its own portal session, cache, sync and
+/// notifications, served by its own [Api].
+class _Child {
+  AccountConfig config;
+  SphService service;
+  final ResponseCache cache;
+  final Api api;
+  late SyncService sync;
+
+  _Child(this.config, this.service, this.cache, this.api);
+
+  String get prefix => scopePrefix(config.id);
 }
 
 /// The running HTTP server with database, portal session and sync.
@@ -77,6 +93,8 @@ class AppServer implements ServerControl {
   SphService _service;
   SyncService _sync;
   final UpdateService _update;
+  final AccountStore _accountStore;
+  final _children = <String, _Child>{};
   SetupToken? _setupToken;
   Future<void> _applying = Future.value();
   Future<void>? _stopping;
@@ -98,7 +116,8 @@ class AppServer implements ServerControl {
     this._sync,
     this._update,
     this._setupToken,
-  ) : startedConfig = _config;
+  ) : startedConfig = _config,
+      _accountStore = AccountStore(_db);
 
   AppConfig get config => _config;
 
@@ -217,10 +236,13 @@ class AppServer implements ServerControl {
       cache,
       db,
       config,
+      config.caseda,
+      config.untis,
       info,
       makeMeals,
       makeUntis,
     );
+    late final AppServer server;
     final api = Api(
       service: service,
       passwordHash: config.appPasswordHash,
@@ -230,7 +252,14 @@ class AppServer implements ServerControl {
       trustProxy: config.trustProxy,
       webDir: webDir,
       embeddedWeb: embedded,
-      poller: _createPoller(sync, db, settings, config, info),
+      poller: _createPoller(
+        sync,
+        db,
+        settings,
+        config,
+        info,
+        () => server._label(AccountConfig.mainId),
+      ),
       sync: sync,
       settings: settings,
       passwordIterations: passwordIterations,
@@ -270,7 +299,7 @@ class AppServer implements ServerControl {
       ..mealsBalanceWarningCents = config.mealsBalanceWarningCents
       ..untisEnabled = config.untis != null;
 
-    final server = AppServer._(
+    server = AppServer._(
       http,
       db,
       cache,
@@ -289,6 +318,7 @@ class AppServer implements ServerControl {
       config.needsSetup ? SetupToken.create(dataDir: config.dataDir) : null,
     );
     api.control = server;
+    server._startChildren();
 
     final webSource = webDir != null
         ? ', web UI from $webDir'
@@ -352,38 +382,44 @@ class AppServer implements ServerControl {
   static SyncService _createSync(
     SphService service,
     ResponseCache cache,
-    AppDatabase db,
+    PortalState state,
     AppConfig config,
+    CasedaConfig? caseda,
+    UntisConfig? untis,
     void Function(String) info,
     MealsGatewayFactory makeMeals,
     UntisGatewayFactory makeUntis,
   ) => SyncService(
     service: service,
     cache: cache,
-    db: db,
+    db: state,
     config: config.sync,
-    meals: config.caseda == null ? null : makeMeals(config.caseda!),
-    untis: config.untis == null ? null : makeUntis(config.untis!),
+    meals: caseda == null ? null : makeMeals(caseda),
+    untis: untis == null ? null : makeUntis(untis),
     log: info,
   );
 
   static Poller? _createPoller(
     SyncService sync,
-    AppDatabase db,
+    PortalState state,
     SettingsStore settings,
     AppConfig config,
     void Function(String) info,
+    ({String name, String id})? Function() label,
   ) {
     final ntfy = config.ntfy;
     if (ntfy == null || config.poller.kinds.isEmpty) return null;
     return Poller(
       sync: sync,
-      db: db,
-      notifier: NtfyNotifier(
-        server: ntfy.server,
-        topic: ntfy.topic,
-        token: ntfy.token,
-        appUrl: config.appUrl,
+      db: state,
+      notifier: LabeledNotifier(
+        NtfyNotifier(
+          server: ntfy.server,
+          topic: ntfy.topic,
+          token: ntfy.token,
+          appUrl: config.appUrl,
+        ),
+        label,
       ),
       config: config.poller,
       substitutionFilter: () => settings.load().substitutionFilter,
@@ -391,11 +427,24 @@ class AppServer implements ServerControl {
     );
   }
 
+  /// Name and id of an account for notifications; null while there is only
+  /// one account (nothing to tell apart).
+  ({String name, String id})? _label(String id) {
+    if (_children.isEmpty) return null;
+    final name = id == AccountConfig.mainId
+        ? _config.displayName
+        : _children[id]?.config.name ?? '';
+    return (name: name, id: id);
+  }
+
   void _info(String m) => _log('${DateTime.now().toIso8601String()} $m', false);
 
   void _logStatus() {
     final c = _config;
     _info('Schulportal: school ${c.sph.schoolId}, user ${c.sph.username}');
+    if (_children.isNotEmpty) {
+      _info('Further accounts: ${_children.length}');
+    }
     final sc = c.sync;
     if (sc.enabled) {
       _info(
@@ -438,6 +487,7 @@ class AppServer implements ServerControl {
     }
 
     final values = <String, Object?>{
+      'ACCOUNT_NAME': c.accountName,
       'SPH_SCHOOL_ID': c.sph.schoolId,
       'SPH_USERNAME': c.sph.username,
       'SYNC': c.sync.enabled,
@@ -569,9 +619,12 @@ class AppServer implements ServerControl {
   }
 
   @override
-  Future<ApplyResult> apply(Map<String, String> changes) {
-    // One change at a time.
-    final result = _applying.then((_) => _apply(changes));
+  Future<ApplyResult> apply(Map<String, String> changes) =>
+      _exclusive(() => _apply(changes));
+
+  /// Runs [action] after the changes before it (one change at a time).
+  Future<T> _exclusive<T>(Future<T> Function() action) {
+    final result = _applying.then((_) => action());
     _applying = result.then<void>((_) {}, onError: (Object _) {});
     return result;
   }
@@ -664,6 +717,8 @@ class AppServer implements ServerControl {
       _cache,
       _db,
       next,
+      next.caseda,
+      next.untis,
       _info,
       _mealsGateway,
       _untisGateway,
@@ -671,18 +726,270 @@ class AppServer implements ServerControl {
     _api
       ..service = _service
       ..sync = _sync
-      ..poller = _createPoller(_sync, _db, _api.settings, next, _info)
+      ..poller = _createPoller(
+        _sync,
+        _db,
+        _api.settings,
+        next,
+        _info,
+        () => _label(AccountConfig.mainId),
+      )
       ..meals = next.caseda == null ? null : _mealsGateway(next.caseda!)
       ..mealsBalanceWarningCents = next.mealsBalanceWarningCents
       ..untisEnabled = next.untis != null
       ..passwordHash = next.appPasswordHash;
     _update.checkEnabled = next.updateCheck;
     _config = next;
+    for (final child in _children.values) {
+      await _rebuildChild(child);
+    }
     if (!next.needsSetup) {
       _logStatus();
       _sync.start();
+      _startChildSyncs();
     }
   }
+
+  // --- further accounts (children) -----------------------------------------------
+
+  /// Sets up the stored further accounts (no login yet) and starts their
+  /// sync, spread over time so the portal does not get all requests at once.
+  void _startChildren() {
+    for (final c in _accountStore.load()) {
+      _children[c.id] = _createChild(c);
+    }
+    if (!_config.needsSetup) _startChildSyncs();
+  }
+
+  void _startChildSyncs() {
+    var i = 1;
+    for (final child in _children.values) {
+      child.sync.start(firstDelay: Duration(seconds: 5 + 20 * i++));
+    }
+  }
+
+  _Child _createChild(AccountConfig c) {
+    final service = SphService(_gateway(c.sph));
+    final cache = Api.createCache(
+      store: ScopedCacheStore(_db, scopePrefix(c.id)),
+    );
+    final api =
+        Api(
+            accountId: c.id,
+            service: service,
+            passwordHash: _config.appPasswordHash,
+            sessions: _api.sessions,
+            limiter: _api.limiter,
+            cache: cache,
+            settings: SettingsStore(_db, scopePrefix(c.id)),
+          )
+          ..control = this
+          ..update = _update;
+    _api.children[c.id] = api;
+    return _wireChild(_Child(c, service, cache, api));
+  }
+
+  /// (Re)creates sync and notifications of [child] from the current
+  /// configuration; the old sync must be stopped before.
+  _Child _wireChild(_Child child) {
+    final c = child.config;
+    final state = ScopedState(_db, child.prefix);
+    child.sync = _createSync(
+      child.service,
+      child.cache,
+      state,
+      _config,
+      c.caseda,
+      c.untis,
+      _info,
+      _mealsGateway,
+      _untisGateway,
+    );
+    child.api
+      ..service = child.service
+      ..sync = child.sync
+      ..poller = _createPoller(
+        child.sync,
+        state,
+        child.api.settings,
+        _config,
+        _info,
+        () => _label(c.id),
+      )
+      ..meals = c.caseda == null ? null : _mealsGateway(c.caseda!)
+      ..mealsBalanceWarningCents = _config.mealsBalanceWarningCents
+      ..untisEnabled = c.untis != null;
+    return child;
+  }
+
+  Future<void> _rebuildChild(_Child child) async {
+    await child.sync.stop();
+    _wireChild(child);
+  }
+
+  @override
+  List<Map<String, Object?>> listAccounts() => [
+    {
+      'id': AccountConfig.mainId,
+      'name': _config.displayName,
+      'primary': true,
+      'schoolId': _config.sph.schoolId,
+      'username': _config.sph.username,
+    },
+    for (final c in _children.values) c.config.describe(),
+  ];
+
+  static bool _sameLogin(SphCredentials a, SphCredentials b) =>
+      a.schoolId == b.schoolId &&
+      a.username.toLowerCase() == b.username.toLowerCase();
+
+  /// Tries the logins of [next] that are new or changed against [previous].
+  Future<void> _verifyLogins(
+    AccountConfig next,
+    AccountConfig? previous,
+  ) async {
+    final p = previous?.sph, n = next.sph;
+    if (p == null ||
+        p.schoolId != n.schoolId ||
+        p.username != n.username ||
+        p.password != n.password) {
+      await testLogin(
+        schoolId: n.schoolId,
+        username: n.username,
+        password: n.password,
+      );
+    }
+    final pc = previous?.caseda, nc = next.caseda;
+    if (nc != null &&
+        (pc?.url != nc.url ||
+            pc?.username != nc.username ||
+            pc?.password != nc.password)) {
+      await _mealsGateway(nc).load(DateTime.now());
+    }
+    final pu = previous?.untis, nu = next.untis;
+    if (nu != null &&
+        (pu?.server != nu.server ||
+            pu?.school != nu.school ||
+            pu?.username != nu.username ||
+            pu?.password != nu.password)) {
+      await _untisGateway(nu).load(DateTime.now());
+    }
+  }
+
+  void _checkNotDuplicate(AccountConfig next) {
+    final others = [
+      if (next.id != AccountConfig.mainId) _config.sph,
+      for (final c in _children.values)
+        if (c.config.id != next.id) c.config.sph,
+    ];
+    if (others.any((o) => _sameLogin(o, next.sph))) {
+      throw const ConfigException([
+        'This Schulportal account is already set up',
+      ]);
+    }
+  }
+
+  @override
+  Future<Map<String, Object?>> addAccount(Map<String, Object?> data) =>
+      _exclusive(() async {
+        final list = _accountStore.load();
+        if (list.length >= AccountConfig.maxAccounts) {
+          throw const ConfigException([
+            'At most ${AccountConfig.maxAccounts} further accounts',
+          ]);
+        }
+        final cfg = AccountConfig.parse(
+          data,
+          id: AccountConfig.newId({for (final a in list) a.id}),
+        );
+        _checkNotDuplicate(cfg);
+        await _verifyLogins(cfg, null);
+        _accountStore.save([...list, cfg]);
+        final child = _children[cfg.id] = _createChild(cfg);
+        if (!_config.needsSetup) child.sync.start();
+        _info('Account added: ${cfg.name}');
+        return cfg.describe();
+      });
+
+  @override
+  Future<Map<String, Object?>> updateAccount(
+    String id,
+    Map<String, Object?> data,
+  ) => _exclusive(() async {
+    if (id == AccountConfig.mainId) {
+      if (data.keys.any((k) => k != 'name')) {
+        throw const ConfigException([
+          'Only the name of the first account can be changed here '
+              '(settings page)',
+        ]);
+      }
+      final name = '${data['name'] ?? ''}'.trim();
+      await _apply({'ACCOUNT_NAME': name});
+      return listAccounts().first;
+    }
+    final child = _children[id];
+    if (child == null) throw const AccountNotFound();
+    final previous = child.config;
+    final next = AccountConfig.parse(data, id: id, base: previous);
+    _checkNotDuplicate(next);
+    await _verifyLogins(next, previous);
+
+    final p = previous.sph, n = next.sph;
+    final newService =
+        p.schoolId != n.schoolId ||
+        p.username != n.username ||
+        p.password != n.password;
+    await child.sync.stop();
+    if (!_sameLogin(p, n)) {
+      // Another person: nothing of the old account may show up.
+      child.cache.clear();
+      _db.resetPortalState(child.prefix);
+    }
+    if (previous.caseda?.url != next.caseda?.url ||
+        previous.caseda?.username.toLowerCase() !=
+            next.caseda?.username.toLowerCase()) {
+      child.cache.remove(CacheKeys.meals);
+    }
+    if (previous.untis?.server != next.untis?.server ||
+        previous.untis?.school != next.untis?.school ||
+        previous.untis?.username.toLowerCase() !=
+            next.untis?.username.toLowerCase()) {
+      child.cache.remove(CacheKeys.untis);
+    }
+    if (newService) {
+      await child.service.dispose();
+      child.service = SphService(_gateway(n));
+    }
+    child.config = next;
+    _accountStore.save([
+      for (final a in _accountStore.load()) a.id == id ? next : a,
+    ]);
+    _wireChild(child);
+    if (!_config.needsSetup) child.sync.start();
+    _info('Account changed: ${next.name}');
+    return next.describe();
+  });
+
+  @override
+  Future<void> removeAccount(String id) => _exclusive(() async {
+    if (id == AccountConfig.mainId) {
+      throw ArgumentError('The first account cannot be removed');
+    }
+    final child = _children[id];
+    if (child == null) throw const AccountNotFound();
+    await child.sync.stop();
+    await child.api.close();
+    await child.service.dispose();
+    await child.cache.close();
+    _db.resetPortalState(child.prefix);
+    _children.remove(id);
+    _api.children.remove(id);
+    _accountStore.save([
+      for (final a in _accountStore.load())
+        if (a.id != id) a,
+    ]);
+    _info('Account removed: ${child.config.name}');
+  });
 
   @override
   Future<List<School>> searchSchools(String query) => _schools.search(query);
@@ -710,6 +1017,9 @@ class AppServer implements ServerControl {
     await _applying;
     _update.stop();
     await _api.close(); // open event streams would keep the server open
+    for (final child in _children.values) {
+      await child.api.close();
+    }
     await _http
         .close()
         .then<void>((_) {})
@@ -720,6 +1030,11 @@ class AppServer implements ServerControl {
     await _sync.stop();
     await _service.dispose();
     await _cache.close();
+    for (final child in _children.values) {
+      await child.sync.stop();
+      await child.service.dispose();
+      await child.cache.close();
+    }
     _db.close();
   }();
 }

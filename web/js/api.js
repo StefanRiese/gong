@@ -19,6 +19,27 @@ export class ApiError extends Error {
   }
 }
 
+// Several children: the data endpoints of the selected account live below
+// /api/accounts/<id>/ (the first account, "main", is served without prefix).
+let currentAccount = 'main';
+
+const PER_ACCOUNT = /^\/api\/(account|timetable|substitutions|calendar|courses|homework|grades|refresh|sync|events|meals|settings|notifications)(?=[/?]|$)/;
+
+/** Selects the account whose data the following calls load. */
+export function setAccount(id) {
+  currentAccount = id;
+}
+
+export function currentAccountId() {
+  return currentAccount;
+}
+
+/** API path of the selected account for [path] (server-wide paths stay as they are). */
+export function scoped(path) {
+  if (currentAccount === 'main' || !PER_ACCOUNT.test(path)) return path;
+  return path.replace(/^\/api\//, `/api/accounts/${currentAccount}/`);
+}
+
 /**
  * Calls the API and returns the parsed JSON body (null for 204).
  * @param {string} path
@@ -27,7 +48,7 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   let res;
   try {
-    res = await fetch(path, {
+    res = await fetch(scoped(path), {
       method,
       credentials: 'same-origin',
       headers: body === undefined ? headers : { 'content-type': 'application/json', ...headers },
@@ -76,6 +97,8 @@ export function errorMessage(err) {
       return 'Dieser Bereich ist für das Konto nicht freigeschaltet.';
     case 'not_found':
       return 'Nicht gefunden.';
+    case 'unknown_account':
+      return 'Dieses Konto gibt es nicht mehr.';
     case 'sph_login_failed':
       return 'Die Anmeldung beim Schulportal ist fehlgeschlagen. Bitte Schule, Benutzername und Passwort prüfen.';
     case 'setup_token_invalid':
