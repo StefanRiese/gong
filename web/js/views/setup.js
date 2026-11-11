@@ -48,34 +48,12 @@ export function render({ token, onDone }) {
   const school = schoolPicker({ headers });
   const username = input({ name: 'username', autocomplete: 'off', required: true, placeholder: 'vorname.nachname' });
   const sphPassword = input({ type: 'password', name: 'sph-password', autocomplete: 'off', required: true });
-  const checkMsg = messageArea();
-  const check = h('button', { type: 'button', class: 'button small' }, 'Anmeldung prüfen');
 
   const appPassword = input({ type: 'password', autocomplete: 'new-password', required: true, minlength: '8' });
   const appPassword2 = input({ type: 'password', autocomplete: 'new-password', required: true, minlength: '8' });
 
   const message = messageArea();
   const submit = h('button', { type: 'submit', class: 'button primary' }, 'Einrichtung abschließen');
-
-  check.addEventListener('click', async () => {
-    if (school.value == null || !username.value.trim() || !sphPassword.value) {
-      checkMsg.error(new ApiError(400, 'bad_request', 'Bitte Schule, Benutzername und Passwort angeben.'));
-      return;
-    }
-    check.disabled = true;
-    checkMsg.ok('Anmeldung wird geprüft …');
-    try {
-      await api('/api/server-settings/test-login', {
-        method: 'POST', headers,
-        body: { schoolId: school.value, username: username.value.trim(), password: sphPassword.value },
-      });
-      checkMsg.ok('Anmeldung beim Schulportal erfolgreich.');
-    } catch (err) {
-      checkMsg.error(err);
-    } finally {
-      check.disabled = false;
-    }
-  });
 
   const form = h('form', { class: 'setup-card card' },
     h('img', { src: '/icon.svg', alt: '', class: 'login-logo' }),
@@ -91,9 +69,7 @@ export function render({ token, onDone }) {
     h('fieldset', null,
       h('legend', null, '2. Zugang zum Schulportal'),
       field('Benutzername', username),
-      field('Passwort', sphPassword),
-      h('div', { class: 'button-row' }, check),
-      checkMsg.el),
+      field('Passwort', sphPassword, 'Die Anmeldung wird beim Abschließen geprüft. Weitere Kinder lassen sich später unter Einstellungen hinzufügen.')),
 
     h('fieldset', null,
       h('legend', null, '3. Passwort für diese Web-Oberfläche'),
@@ -120,16 +96,14 @@ export function render({ token, onDone }) {
     submit.disabled = true;
     submit.textContent = 'Wird eingerichtet …';
     try {
+      // First the web password, then the account: the account ends the setup (and
+      // logs us in). A failed login can be corrected and sent again.
       await api('/api/server-settings', {
-        method: 'PUT', headers,
-        body: {
-          settings: {
-            SPH_SCHOOL_ID: String(school.value),
-            SPH_USERNAME: username.value.trim(),
-            SPH_PASSWORD: sphPassword.value,
-          },
-          appPassword: appPassword.value,
-        },
+        method: 'PUT', headers, body: { appPassword: appPassword.value },
+      });
+      await api('/api/accounts', {
+        method: 'POST', headers,
+        body: { schoolId: school.value, username: username.value.trim(), password: sphPassword.value },
       });
       forgetToken();
       history.replaceState(null, '', '/');

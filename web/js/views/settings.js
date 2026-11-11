@@ -6,14 +6,13 @@
 import { api, ApiError, errorMessage } from '../api.js';
 import { h, errorBox } from '../dom.js';
 import { initColors } from '../colors.js';
-import { accounts, current } from '../accounts.js';
+import { accounts, current, loadAccounts } from '../accounts.js';
 import { pageHeader } from './common.js';
-import { addChildGroup, childGroup } from './accounts.js';
+import { accountGroup, addChildGroup } from './accounts.js';
 import { messageArea } from './forms.js';
 import { createForm } from './settings-form.js';
 import {
-  accessGroup, colorsGroup, mealsGroup, notifyGroup, portalGroup, substitutionsGroup, syncGroup,
-  updateGroup,
+  accessGroup, colorsGroup, mealsGroup, notifyGroup, substitutionsGroup, syncGroup, updateGroup,
 } from './settings-groups.js';
 
 export const title = 'Einstellungen';
@@ -64,27 +63,28 @@ export async function render(ctx) {
 
   // --- groups ---
   // Tabs: Allgemein (server, notifications, access, update), one tab per child, and
-  // "+ Kind". The server settings for Schulportal, Caseda and WebUntis belong to the
-  // first account; another child has its own login form (and its own Caseda / WebUntis).
-  const child = accounts.find((a) => a.id === current && !a.primary) ?? null;
+  // "+ Kind". Every child has the same form (login, Caseda, WebUntis); only the shown
+  // child's tab has content, the others load the child anew when clicked.
+  const shown = accounts.find((a) => a.id === current) ?? accounts[0];
+  const accountPart = accountGroup({ form, account: shown });
   const panelOf = (id, groups) => h('div', { class: 'tab-panel', id: `panel-${id}`, role: 'tabpanel', hidden: true }, groups);
   const panels = {
     allgemein: panelOf('allgemein', [
       update?.available ? updateGroup({ ...base, status: update }) : null,
+      mealsGroup(base),
       notifyGroup(base),
       syncGroup({ ...base, sync }),
       accessGroup({ ...base, desktop: server.desktop }),
       update && !update.available ? updateGroup({ ...base, status: update }) : null,
     ]),
     konto: panelOf('konto', [
-      child ? childGroup({ account: child }) : portalGroup(base),
+      accountPart.el,
       ctx.features.has('substitutions')
-        ? substitutionsGroup({ ...base, saved: personal.substitutionFilter, plan, withUntis: !child })
+        ? substitutionsGroup({ ...base, saved: personal.substitutionFilter, plan })
         : null,
-      child ? null : mealsGroup(base),
       ctx.features.has('lessons') || ctx.features.has('timetable') ? colorsGroup(base) : null,
     ]),
-    neu: panelOf('neu', [addChildGroup({ defaultSchool: v.SPH_SCHOOL_ID })]),
+    neu: panelOf('neu', [addChildGroup({ defaultSchool: shown?.schoolId })]),
   };
 
   const tabList = [
@@ -206,6 +206,19 @@ export async function render(ctx) {
     refresh();
     say('ok', 'Speichern …');
     try {
+      // The shown child's logins: the server tries changed logins first.
+      let accountResult = null;
+      if (Object.keys(form.changed('account')).length > 0) {
+        const before = { username: shown.username.toLowerCase(), schoolId: shown.schoolId };
+        const updated = await api(`/api/accounts/${encodeURIComponent(shown.id)}`, {
+          method: 'PUT', body: accountPart.body(),
+        });
+        Object.assign(shown, updated);
+        accountResult = {
+          otherPerson: updated.username.toLowerCase() !== before.username || updated.schoolId !== before.schoolId,
+        };
+        tabButtons.get('konto').textContent = shown.name;
+      }
       const serverChanges = form.changed('server');
       const extra = form.extraBody();
       let result = null;
@@ -226,10 +239,12 @@ export async function render(ctx) {
         initColors({ settings: await api('/api/settings', { method: 'PUT', body }) });
       }
       form.commit();
-      if (Object.keys(serverChanges).some((k) => k.startsWith('CASEDA_'))) {
+      if (accountResult) {
+        await loadAccounts();
+        window.dispatchEvent(new CustomEvent('lumo:accounts-changed')); // name in the top bar
         window.dispatchEvent(new Event('lumo:meals-changed')); // menu item Schulessen
       }
-      say('ok', result?.accountChanged
+      say('ok', accountResult?.otherPerson
         ? 'Gespeichert. Die Daten des neuen Kontos werden jetzt geladen.'
         : extra.appPassword
           ? 'Gespeichert. Das Passwort wurde geändert, andere Geräte sind abgemeldet.'

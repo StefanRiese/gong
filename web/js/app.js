@@ -471,7 +471,7 @@ window.addEventListener('lumo:accounts-changed', (e) => {
   const target = e.detail?.switchTo;
   if (target && target !== currentAccount) return switchAccount(target);
   if (!accounts.some((a) => a.id === currentAccount)) {
-    switchTo('main');
+    pickAccount(); // the shown child was removed: the first one
     stopLive();
     return boot();
   }

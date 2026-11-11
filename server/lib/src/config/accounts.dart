@@ -4,14 +4,14 @@ import '../storage/app_database.dart';
 import 'app_config.dart';
 import 'env.dart';
 
-/// Another Schulportal account (child) that the server shows besides the
-/// first one. The first account is configured like before (SPH_*, CASEDA_*,
-/// UNTIS_* settings); the others are kept in [AccountStore].
+/// A Schulportal account (child) the server shows. All accounts are kept in
+/// [AccountStore]; the first one answers the API paths without account.
 class AccountConfig {
-  /// Id of the first account in URLs (`/api/accounts/main/…`).
-  static const mainId = 'main';
+  /// Id of the account that existed before several accounts were possible
+  /// (version 0.18 and older; see `migrateLegacyAccount`).
+  static const legacyId = 'main';
 
-  /// Number of further accounts.
+  /// Number of accounts.
   static const maxAccounts = 8;
   static const maxNameLength = 40;
 
@@ -60,7 +60,6 @@ class AccountConfig {
   Map<String, Object?> describe() => {
     'id': id,
     'name': name,
-    'primary': false,
     'schoolId': sph.schoolId,
     'username': sph.username,
     'caseda': caseda == null
@@ -97,7 +96,7 @@ class AccountConfig {
     AccountConfig? base,
   }) {
     final problems = <String>[];
-    if (!idPattern.hasMatch(id) || id == mainId) problems.add('Invalid id');
+    if (!idPattern.hasMatch(id)) problems.add('Invalid id');
 
     String? text(Map<String, Object?> m, String key) {
       final v = m[key];
@@ -110,10 +109,15 @@ class AccountConfig {
       return t.isEmpty ? null : t;
     }
 
-    final name = text(json, 'name') ?? base?.name;
-    if (name == null) {
-      problems.add('A name is required');
-    } else if (name.length > maxNameLength) {
+    // Without a name the user name is shown.
+    final username = text(json, 'username') ?? base?.sph.username;
+    final name =
+        text(json, 'name') ??
+        base?.name ??
+        (username != null && username.length > maxNameLength
+            ? username.substring(0, maxNameLength)
+            : username);
+    if (name != null && name.length > maxNameLength) {
       problems.add('The name may have at most $maxNameLength characters');
     }
 
@@ -124,7 +128,6 @@ class AccountConfig {
     if (schoolId == null || schoolId < 1) {
       problems.add('schoolId must be a number');
     }
-    final username = text(json, 'username') ?? base?.sph.username;
     if (username == null) {
       problems.add('A username is required');
     } else if (username.length > 100) {
@@ -181,7 +184,11 @@ class AccountConfig {
         } else {
           untis = UntisConfig(
             server: server,
-            school: text(m, 'school') ?? server.split('.').first,
+            // Same server: keep the school name; another one: derive it.
+            school:
+                text(m, 'school') ??
+                (server == base?.untis?.server ? base?.untis?.school : null) ??
+                server.split('.').first,
             username: user,
             password: pw,
           );
@@ -207,7 +214,7 @@ class AccountConfig {
       final id = String.fromCharCodes(
         List.generate(6, (_) => chars.codeUnitAt(r.nextInt(chars.length))),
       );
-      if (id != mainId && !taken.contains(id)) return id;
+      if (!taken.contains(id)) return id;
     }
   }
 }

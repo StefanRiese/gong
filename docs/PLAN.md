@@ -199,17 +199,19 @@ LXC container.
    substitution filter (own classes, types, notices); updates from the web UI; REST API
    reference (`docs/API.md`); rename to **Gong** (0.8.0, now Lumo; „Ranzen“ is taken by an App Store app
    for Schulportal Hessen).
-   *Several children (Unreleased):* the first account stays configured as before (`SPH_*`,
-   `CASEDA_*`, `UNTIS_*`, `ACCOUNT_NAME`); further accounts live in the database (`accounts`,
-   `lib/src/config/accounts.dart`, managed in the web UI / `/api/accounts`). Each further account
-   has its own `SphService`, `ResponseCache`, `SyncService`, `Poller` and `Api` instance
-   (`AppServer._Child`); their rows in `cache`, `seen`, `meta` carry the prefix `@<id>/`
-   (`lib/src/storage/portal_state.dart`), the first account's rows have none, so existing
-   databases need no migration. The primary `Api` forwards `/api/accounts/<id>/<endpoint>` to the
-   instance of that account. Web password, sync schedule, ntfy and update are shared; the
+   *Several children (0.19):* all accounts are equal and live in the database (`accounts`,
+   `lib/src/config/accounts.dart`, managed in the web UI / `/api/accounts`); the old settings
+   `SPH_*`, `CASEDA_*`, `UNTIS_*`, `ACCOUNT_NAME` are only read once by the update function
+   `migrateLegacyAccount` (first start after the update; the account becomes id `main`, its
+   data is moved to the scope `@main/`). Each account has its own `SphService`,
+   `ResponseCache`, `SyncService`, `Poller` and `Api` instance (`AppServer._Account`); their rows
+   in `cache`, `seen`, `meta` carry the prefix `@<id>/` (`lib/src/storage/portal_state.dart`). The
+   root `Api` routes `/api/accounts/<id>/<endpoint>` to the instance of that account, the paths
+   without account to the first one. Web password, sync schedule, ntfy and update are shared. The
    web UI picks the account in a top bar drop-down (`web/js/accounts.js`, remembered per browser,
-   `?konto=<id>` from notification links) and `api.js` adds the prefix. Notifications get the
-   child's name in the title once there are several accounts (`LabeledNotifier`).
+   `?konto=<id>` from notification links); `api.js` adds the prefix. The settings page has a tab
+   per account with one form for all (login, Caseda, WebUntis). Notifications get the child's
+   name in the title once there are several accounts (`LabeledNotifier`).
    *Ideas from comparing with native apps (Lanis Mobile, Ranzen):* messages (read and reply),
    Dateispeicher, iCal feed for timetable and calendar,
    holidays and countdowns on Heute, attendance overview across courses, grade calculator.

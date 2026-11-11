@@ -6,6 +6,34 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.19.0] – 2026-11-11
+
+### Changed
+- **All accounts are equal.** The first account is no longer special: the settings `SPH_SCHOOL_ID`,
+  `SPH_USERNAME`, `SPH_PASSWORD`, `ACCOUNT_NAME`, `CASEDA_ENABLED`, `CASEDA_URL`,
+  `CASEDA_USERNAME`, `CASEDA_PASSWORD`, `UNTIS_ENABLED`, `UNTIS_SERVER`, `UNTIS_SCHOOL`,
+  `UNTIS_USERNAME` and `UNTIS_PASSWORD` are gone. Schulportal, Caseda and WebUntis logins belong
+  to the account, in *Einstellungen* every child's tab has the same form, and a login is tested
+  when saving. Only `CASEDA_BALANCE_WARNING` (for all children) stays a server setting, now in
+  the tab *Allgemein*.
+- **Update function.** On the first start after the update the server turns the old settings
+  (web UI, config file or environment) into the first account, moves its cached data,
+  notification state, filter and colors along, and deletes the old keys from the web UI settings.
+  This happens once, in one transaction; accounts added with 0.18 stay. The old keys in
+  `config.env` are ignored afterwards. Going back to 0.18 would need a backup of `lumo.db`.
+- Setup page: the account is created with the web password in two steps (password first, then
+  the account with its login test); the separate „Anmeldung prüfen“ button is gone.
+- `install.sh --configure` no longer asks for the Schulportal login of an installation that is
+  set up already (the accounts are managed in the web UI).
+- API: accounts have random ids (`main` only for an account taken over from the old settings);
+  `GET /api/accounts` has no `primary`; any account can be removed except the last one;
+  `POST /api/accounts` works with the setup token and ends the setup together with the web
+  password; the name is optional (default: the user name).
+
+### Removed
+- API: `POST /api/server-settings/test-login`, `…/test-caseda` and `…/test-untis` (logins are
+  tested when an account is added or changed).
+
 ## [0.18.2] – 2026-11-11
 
 ### Changed
@@ -419,7 +447,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.18.2...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/StefanRiese/lumo/compare/v0.18.2...v0.19.0
 [0.18.2]: https://github.com/StefanRiese/lumo/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/StefanRiese/lumo/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/StefanRiese/lumo/compare/v0.17.0...v0.18.0

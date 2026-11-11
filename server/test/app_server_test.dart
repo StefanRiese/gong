@@ -105,23 +105,42 @@ void main() {
 
   String cookieOf(HttpHeaders h) => h.value('set-cookie')!.split(';').first;
 
-  Future<String> completeSetup(AppServer s) async {
-    final r = await call(
+  /// Sets up the server like the setup page: first account, then the web
+  /// password. [account] adds fields to the account (e.g. a Caseda login).
+  Future<String> completeSetup(
+    AppServer s, {
+    Map<String, Object?> account = const {},
+  }) async {
+    var r = await call(
+      'POST',
+      '/api/accounts',
+      token: tokenOf(s),
+      json: {
+        'name': 'Max',
+        'schoolId': 1234,
+        'username': 'max.muster',
+        'password': 'geheim',
+        ...account,
+      },
+    );
+    expect(r.status, 201, reason: '${r.body}');
+    expect(s.setupRequired, isTrue, reason: 'the web password is missing');
+    r = await call(
       'PUT',
       '/api/server-settings',
       token: tokenOf(s),
-      json: {
-        'settings': {
-          'SPH_SCHOOL_ID': '1234',
-          'SPH_USERNAME': 'max.muster',
-          'SPH_PASSWORD': 'geheim',
-        },
-        'appPassword': 'web-passwort',
-      },
+      json: {'appPassword': 'web-passwort'},
     );
     expect(r.status, 200, reason: '${r.body}');
     return cookieOf(r.headers);
   }
+
+  /// Id of the first account.
+  Future<String> firstId(String cookie) async =>
+      ((await call('GET', '/api/accounts', cookie: cookie)).body['accounts']
+                  as List)
+              .first['id']
+          as String;
 
   test(
     'HOST 0.0.0.0 also listens on IPv6 (mDNS names resolve to IPv6)',
@@ -141,7 +160,7 @@ void main() {
   );
 
   group('setup mode', () {
-    test('starts without credentials; only the setup page works', () async {
+    test('starts without account; only the setup page works', () async {
       final s = await start();
       expect(s.setupRequired, isTrue);
       expect(s.setupUrl!.path, '/einrichtung');
@@ -164,6 +183,7 @@ void main() {
         (await call('GET', '/api/server-settings', token: 'falsch')).status,
         403,
       );
+      expect((await call('POST', '/api/accounts', json: {})).status, 403);
       final settings = await call(
         'GET',
         '/api/server-settings',
@@ -172,11 +192,8 @@ void main() {
       expect(settings.status, 200);
       expect(settings.body['setupRequired'], isTrue);
       expect(settings.body['secrets'], {
-        'SPH_PASSWORD': false,
         'NTFY_TOKEN': false,
         'APP_PASSWORD': false,
-        'CASEDA_PASSWORD': false,
-        'UNTIS_PASSWORD': false,
       });
       expect(settings.body['values']['PORT'], s.port);
     });
@@ -196,20 +213,18 @@ void main() {
       final s = await start();
       gw.loginErrors.add(const SphAuthException('Wrong username or password'));
       final r = await call(
-        'PUT',
-        '/api/server-settings',
+        'POST',
+        '/api/accounts',
         token: tokenOf(s),
-        json: {
-          'settings': {'SPH_USERNAME': 'max.muster', 'SPH_PASSWORD': 'falsch'},
-          'appPassword': 'web-passwort',
-        },
+        json: {'username': 'max.muster', 'password': 'falsch'},
       );
       expect(r.status, 400);
       expect(r.body['error']['code'], 'sph_login_failed');
       expect(s.setupRequired, isTrue);
+      expect(s.accountCount, 0);
     });
 
-    test('completing the setup logs in and starts normal operation', () async {
+    test('account and web password together end the setup', () async {
       final s = await start();
       final cookie = await completeSetup(s);
       expect(s.setupRequired, isFalse);
@@ -227,31 +242,71 @@ void main() {
         (await call('GET', '/api/server-settings', token: tokenOf2(s))).status,
         401,
       );
-      final settings = await call(
-        'GET',
+      final accounts = await call('GET', '/api/accounts', cookie: cookie);
+      final account = (accounts.body['accounts'] as List).single as Map;
+      expect(account['name'], 'Max');
+      expect(account['schoolId'], 1234);
+      expect(account['username'], 'max.muster');
+      expect(account['caseda'], isNull);
+      expect(account['untis'], isNull);
+      expect(jsonEncode(accounts.body), isNot(contains('geheim')));
+    });
+
+    test('the web password first, then the account, also ends it', () async {
+      final s = await start();
+      var r = await call(
+        'PUT',
         '/api/server-settings',
-        cookie: cookie,
+        token: tokenOf(s),
+        json: {'appPassword': 'web-passwort'},
       );
-      expect(settings.body['values']['SPH_USERNAME'], 'max.muster');
-      expect(settings.body['secrets']['SPH_PASSWORD'], isTrue);
-      expect(settings.body['sources']['SPH_USERNAME'], 'web');
-      expect(jsonEncode(settings.body), isNot(contains('geheim')));
+      expect(r.status, 200, reason: '${r.body}');
+      expect(s.setupRequired, isTrue, reason: 'no account yet');
+      r = await call(
+        'POST',
+        '/api/accounts',
+        token: tokenOf(s),
+        json: {'username': 'max.muster', 'password': 'geheim'},
+      );
+      expect(r.status, 201, reason: '${r.body}');
+      expect(r.body['name'], 'max.muster', reason: 'default: the user name');
+      expect(s.setupRequired, isFalse);
+      expect(
+        r.headers.value('set-cookie'),
+        startsWith('sph_session='),
+        reason: 'logged in right away',
+      );
     });
 
     test('install.sh --configure marker gives config.env precedence', () async {
       var s = await start();
       await completeSetup(s);
+      expect(
+        (await call(
+          'PUT',
+          '/api/server-settings',
+          cookie: cookieOf(
+            (await call(
+              'POST',
+              '/api/auth/login',
+              json: {'password': 'web-passwort'},
+            )).headers,
+          ),
+          json: {
+            'settings': {'NTFY_TOPIC': 'aus-dem-web', 'APP_URL': 'http://web/'},
+          },
+        )).status,
+        200,
+      );
       await s.stop();
-      File(
-        '${dir.path}/reset-web-settings',
-      ).writeAsStringSync('SPH_USERNAME\nSPH_PASSWORD\n');
-      s = await start({'SPH_USERNAME': 'aus.datei', 'SPH_PASSWORD': 'pw'});
-      expect(s.config.sph.username, 'aus.datei');
-      expect(s.config.sph.schoolId, 1234, reason: 'not listed: web value');
+      File('${dir.path}/reset-web-settings').writeAsStringSync('NTFY_TOPIC\n');
+      s = await start({'NTFY_TOPIC': 'aus-der-datei'});
+      expect(s.config.ntfy?.topic, 'aus-der-datei');
+      expect(s.config.appUrl.toString(), 'http://web/', reason: 'not listed');
       expect(File('${dir.path}/reset-web-settings').existsSync(), isFalse);
     });
 
-    test('settings survive a restart', () async {
+    test('settings and accounts survive a restart', () async {
       var s = await start();
       final cookie = await completeSetup(s);
       await call('GET', '/api/timetable', cookie: cookie);
@@ -259,7 +314,7 @@ void main() {
 
       s = await start();
       expect(s.setupRequired, isFalse);
-      expect(s.config.sph.username, 'max.muster');
+      expect(s.accountCount, 1);
       final tt = await call('GET', '/api/timetable', cookie: cookie);
       expect(tt.body['cached'], isTrue, reason: 'cache restored from the DB');
     });
@@ -374,204 +429,127 @@ void main() {
         expect(login.status, 200);
       },
     );
-
-    test('another account clears the cached data', () async {
-      await call('GET', '/api/timetable', cookie: cookie);
-      expect(
-        (await call('GET', '/api/timetable', cookie: cookie)).body['cached'],
-        isTrue,
-      );
-      final r = await call(
-        'PUT',
-        '/api/server-settings',
-        cookie: cookie,
-        json: {
-          'settings': {'SPH_USERNAME': 'erika.muster', 'SPH_PASSWORD': 'pw2'},
-        },
-      );
-      expect(r.body['accountChanged'], isTrue);
-      expect(
-        (await call('GET', '/api/timetable', cookie: cookie)).body['cached'],
-        isFalse,
-      );
-    });
-
-    test('test login uses the stored password if none is given', () async {
-      var r = await call(
-        'POST',
-        '/api/server-settings/test-login',
-        cookie: cookie,
-        json: {'schoolId': 1234, 'username': 'max.muster'},
-      );
-      expect(r.body, {'ok': true});
-      expect(logins.last.password, 'geheim');
-
-      gw.loginErrors.add(const SphAuthException('Wrong username or password'));
-      r = await call(
-        'POST',
-        '/api/server-settings/test-login',
-        cookie: cookie,
-        json: {'schoolId': 1234, 'username': 'max.muster', 'password': 'x'},
-      );
-      expect(r.body['error']['code'], 'sph_login_failed');
-    });
   });
 
   group('WebUntis (second source)', () {
+    const untisLogin = {
+      'server': 'https://schule.webuntis.com/timetable/x',
+      'username': 'klasse5e',
+      'password': 'richtig',
+    };
+
     test('not set up: off, no sync task', () async {
       final s = await start();
       final cookie = await completeSetup(s);
-      final d = await call('GET', '/api/server-settings', cookie: cookie);
-      expect(d.body['values']['UNTIS_ENABLED'], isFalse);
-      expect(d.body['secrets']['UNTIS_PASSWORD'], isFalse);
+      final accounts = await call('GET', '/api/accounts', cookie: cookie);
+      expect((accounts.body['accounts'] as List).single['untis'], isNull);
       final sync = await call('GET', '/api/sync', cookie: cookie);
       expect((sync.body['tasks'] as Map).keys, isNot(contains('untis')));
     });
 
-    test('set up in the settings: login tested, task added', () async {
+    test('set up on the account: login tested, task added', () async {
       final s = await start();
       final cookie = await completeSetup(s);
+      final id = await firstId(cookie);
 
       untis.error = const UntisException('bad', isAuth: true);
       var r = await call(
         'PUT',
-        '/api/server-settings',
+        '/api/accounts/$id',
         cookie: cookie,
         json: {
-          'settings': {
-            'UNTIS_SERVER': 'https://schule.webuntis.com/timetable/x',
-            'UNTIS_USERNAME': 'klasse5e',
-            'UNTIS_PASSWORD': 'falsch',
-          },
+          'untis': {...untisLogin, 'password': 'falsch'},
         },
       );
       expect(r.status, 400);
       expect(r.body['error']['code'], 'untis_login_failed');
-      expect(s.config.untis, isNull);
+      expect(
+        ((await call('GET', '/api/accounts', cookie: cookie)).body['accounts']
+                as List)
+            .single['untis'],
+        isNull,
+      );
 
       untis.error = null;
       r = await call(
         'PUT',
-        '/api/server-settings',
+        '/api/accounts/$id',
         cookie: cookie,
-        json: {
-          'settings': {
-            'UNTIS_SERVER': 'https://schule.webuntis.com/timetable/x',
-            'UNTIS_USERNAME': 'klasse5e',
-            'UNTIS_PASSWORD': 'richtig',
-          },
-        },
+        json: {'untis': untisLogin},
       );
       expect(r.status, 200, reason: '${r.body}');
       expect(untisLogins.last.server, 'schule.webuntis.com');
       expect(untisLogins.last.school, 'schule', reason: 'from the host name');
-
-      final d = await call('GET', '/api/server-settings', cookie: cookie);
-      expect(d.body['values']['UNTIS_ENABLED'], isTrue);
-      expect(d.body['values']['UNTIS_SERVER'], 'schule.webuntis.com');
-      expect(d.body['values']['UNTIS_USERNAME'], 'klasse5e');
-      expect(d.body['secrets']['UNTIS_PASSWORD'], isTrue);
-      expect(jsonEncode(d.body), isNot(contains('richtig')));
+      expect(r.body['untis'], {
+        'server': 'schule.webuntis.com',
+        'school': 'schule',
+        'username': 'klasse5e',
+      });
+      expect(jsonEncode(r.body), isNot(contains('richtig')));
       final sync = await call('GET', '/api/sync', cookie: cookie);
       expect((sync.body['tasks'] as Map).keys, contains('untis'));
     });
 
-    test('incomplete or invalid settings are refused', () async {
+    test('incomplete or invalid logins are refused', () async {
       final s = await start();
       final cookie = await completeSetup(s);
-      for (final settings in [
-        {'UNTIS_SERVER': 'schule.webuntis.com'},
-        {
-          'UNTIS_SERVER': 'ohne punkt',
-          'UNTIS_USERNAME': 'a',
-          'UNTIS_PASSWORD': 'b',
-        },
+      final id = await firstId(cookie);
+      for (final untisJson in [
+        {'server': 'schule.webuntis.com'},
+        {'server': 'ohne punkt', 'username': 'a', 'password': 'b'},
       ]) {
         final r = await call(
           'PUT',
-          '/api/server-settings',
+          '/api/accounts/$id',
           cookie: cookie,
-          json: {'settings': settings},
+          json: {'untis': untisJson},
         );
         expect(r.status, 400);
         expect(r.body['error']['code'], 'invalid_settings');
       }
     });
 
-    test('switched off and on again: login is kept', () async {
-      final s = await start({
-        'UNTIS_SERVER': 'schule.webuntis.com',
-        'UNTIS_SCHOOL': 'meine-schule',
-        'UNTIS_USERNAME': 'klasse5e',
-        'UNTIS_PASSWORD': 'gespeichert',
-      });
-      final cookie = await completeSetup(s);
-      expect(s.config.untis?.school, 'meine-schule');
-
-      var r = await call(
-        'PUT',
-        '/api/server-settings',
-        cookie: cookie,
-        json: {
-          'settings': {'UNTIS_ENABLED': 'false'},
-        },
-      );
-      expect(r.status, 200);
-      expect(s.config.untis, isNull);
-      final d = await call('GET', '/api/server-settings', cookie: cookie);
-      expect(d.body['values']['UNTIS_ENABLED'], isFalse);
-      expect(d.body['values']['UNTIS_USERNAME'], 'klasse5e');
-      expect(d.body['secrets']['UNTIS_PASSWORD'], isTrue);
-
-      final before = untisLogins.length;
-      r = await call(
-        'PUT',
-        '/api/server-settings',
-        cookie: cookie,
-        json: {
-          'settings': {'UNTIS_ENABLED': 'true'},
-        },
-      );
-      expect(r.status, 200);
-      expect(untisLogins.length, greaterThan(before), reason: 'login tested');
-      expect(s.config.untis?.password, 'gespeichert');
-    });
-
     test(
-      'test login answers with the class; stored password is used',
+      'a changed login keeps the stored password; null removes it',
       () async {
-        final s = await start({
-          'UNTIS_SERVER': 'schule.webuntis.com',
-          'UNTIS_USERNAME': 'klasse5e',
-          'UNTIS_PASSWORD': 'gespeichert',
-        });
-        final cookie = await completeSetup(s);
+        final s = await start();
+        final cookie = await completeSetup(
+          s,
+          account: {
+            'untis': {
+              'server': 'schule.webuntis.com',
+              'school': 'meine-schule',
+              'username': 'klasse5e',
+              'password': 'gespeichert',
+            },
+          },
+        );
+        final id = await firstId(cookie);
+        expect(untisLogins.last.school, 'meine-schule');
+
         var r = await call(
-          'POST',
-          '/api/server-settings/test-untis',
+          'PUT',
+          '/api/accounts/$id',
           cookie: cookie,
-          json: {'server': 'schule.webuntis.com', 'username': 'klasse5e'},
+          json: {
+            'untis': {'username': 'klasse6e'},
+          },
         );
-        expect(r.body, {'ok': true, 'className': '05eG'});
+        expect(r.status, 200, reason: '${r.body}');
+        expect(untisLogins.last.username, 'klasse6e');
         expect(untisLogins.last.password, 'gespeichert');
-
-        untis.error = const UntisException('down');
-        r = await call(
-          'POST',
-          '/api/server-settings/test-untis',
-          cookie: cookie,
-          json: {'server': 'schule.webuntis.com', 'username': 'klasse5e'},
-        );
-        expect(r.status, 503);
-        expect(r.body['error']['code'], 'untis_unavailable');
+        expect(untisLogins.last.school, 'meine-schule');
 
         r = await call(
-          'POST',
-          '/api/server-settings/test-untis',
+          'PUT',
+          '/api/accounts/$id',
           cookie: cookie,
-          json: {'server': 'kein host', 'username': 'x'},
+          json: {'untis': null},
         );
-        expect(r.status, 400);
+        expect(r.status, 200);
+        expect(r.body['untis'], isNull);
+        final sync = await call('GET', '/api/sync', cookie: cookie);
+        expect((sync.body['tasks'] as Map).keys, isNot(contains('untis')));
       },
     );
   });
@@ -583,48 +561,57 @@ void main() {
       final r = await call('GET', '/api/meals', cookie: cookie);
       expect(r.status, 404);
       expect(r.body['error']['code'], 'meals_disabled');
-      final d = await call('GET', '/api/server-settings', cookie: cookie);
-      expect(d.body['values']['CASEDA_ENABLED'], isFalse);
     });
 
     test(
-      'set up in the settings: login tested, then balance and orders',
+      'set up on the account: login tested, then balance and orders',
       () async {
         final s = await start();
         final cookie = await completeSetup(s);
+        final id = await firstId(cookie);
 
         meals.error = const CasedaException('wrong', isAuth: true);
         var r = await call(
           'PUT',
-          '/api/server-settings',
+          '/api/accounts/$id',
           cookie: cookie,
           json: {
-            'settings': {
-              'CASEDA_USERNAME': 'eltern@example.org',
-              'CASEDA_PASSWORD': 'falsch',
-            },
+            'caseda': {'username': 'eltern@example.org', 'password': 'falsch'},
           },
         );
         expect(r.status, 400);
         expect(r.body['error']['code'], 'meals_login_failed');
-        expect(s.config.caseda, isNull);
+        expect((await call('GET', '/api/meals', cookie: cookie)).status, 404);
 
         meals.error = null;
         r = await call(
           'PUT',
-          '/api/server-settings',
+          '/api/accounts/$id',
           cookie: cookie,
           json: {
-            'settings': {
-              'CASEDA_USERNAME': 'eltern@example.org',
-              'CASEDA_PASSWORD': 'richtig',
-              'CASEDA_BALANCE_WARNING': '7,50',
-            },
+            'caseda': {'username': 'eltern@example.org', 'password': 'richtig'},
           },
         );
         expect(r.status, 200, reason: '${r.body}');
         expect(mealsLogins.last.username, 'eltern@example.org');
+        expect(jsonEncode(r.body), isNot(contains('richtig')));
+        expect(r.body['caseda'], {
+          'url': 'https://www.caseda-schulmenue.de',
+          'username': 'eltern@example.org',
+        });
 
+        // The warning amount is a server setting for all accounts.
+        expect(
+          (await call(
+            'PUT',
+            '/api/server-settings',
+            cookie: cookie,
+            json: {
+              'settings': {'CASEDA_BALANCE_WARNING': '7,50'},
+            },
+          )).status,
+          200,
+        );
         r = await call('GET', '/api/meals', cookie: cookie);
         expect(r.status, 200);
         expect(r.body['data']['balanceCents'], 1230);
@@ -632,73 +619,33 @@ void main() {
         expect(r.body['balanceWarningCents'], 750);
         expect(r.body['key'], 'meals');
 
-        final d = await call('GET', '/api/server-settings', cookie: cookie);
-        expect(d.body['values']['CASEDA_ENABLED'], isTrue);
-        expect(d.body['values']['CASEDA_USERNAME'], 'eltern@example.org');
-        expect(d.body['secrets']['CASEDA_PASSWORD'], isTrue);
-        expect(jsonEncode(d.body), isNot(contains('richtig')));
-
         final sync = await call('GET', '/api/sync', cookie: cookie);
         expect((sync.body['tasks'] as Map).keys, contains('meals'));
       },
     );
 
-    test('switched off and on again: login is kept', () async {
-      final s = await start({
-        'CASEDA_USERNAME': 'eltern@example.org',
-        'CASEDA_PASSWORD': 'gespeichert',
-      });
-      final cookie = await completeSetup(s);
-      expect(s.config.caseda, isNotNull);
-
-      var r = await call(
-        'PUT',
-        '/api/server-settings',
-        cookie: cookie,
-        json: {
-          'settings': {'CASEDA_ENABLED': 'false'},
+    test('removing the login switches the meals off', () async {
+      final s = await start();
+      final cookie = await completeSetup(
+        s,
+        account: {
+          'caseda': {'username': 'eltern@example.org', 'password': 'pw'},
         },
       );
+      final id = await firstId(cookie);
+      expect((await call('GET', '/api/meals', cookie: cookie)).status, 200);
+
+      final r = await call(
+        'PUT',
+        '/api/accounts/$id',
+        cookie: cookie,
+        json: {'caseda': null},
+      );
       expect(r.status, 200);
-      expect(s.config.caseda, isNull);
       expect(
         (await call('GET', '/api/meals', cookie: cookie)).body['error']['code'],
         'meals_disabled',
       );
-      final d = await call('GET', '/api/server-settings', cookie: cookie);
-      expect(d.body['values']['CASEDA_ENABLED'], isFalse);
-      expect(d.body['values']['CASEDA_USERNAME'], 'eltern@example.org');
-      expect(d.body['secrets']['CASEDA_PASSWORD'], isTrue);
-
-      final before = mealsLogins.length;
-      r = await call(
-        'PUT',
-        '/api/server-settings',
-        cookie: cookie,
-        json: {
-          'settings': {'CASEDA_ENABLED': 'true'},
-        },
-      );
-      expect(r.status, 200);
-      expect(mealsLogins.length, greaterThan(before), reason: 'login tested');
-      expect(s.config.caseda?.password, 'gespeichert');
-      expect((await call('GET', '/api/meals', cookie: cookie)).status, 200);
-    });
-
-    test('test login with the stored password', () async {
-      final s = await start({
-        'CASEDA_USERNAME': 'eltern@example.org',
-        'CASEDA_PASSWORD': 'gespeichert',
-      });
-      final cookie = await completeSetup(s);
-      final r = await call(
-        'POST',
-        '/api/server-settings/test-caseda',
-        cookie: cookie,
-        json: {'username': 'eltern@example.org'},
-      );
-      expect(r.body, {'ok': true});
-      expect(mealsLogins.last.password, 'gespeichert');
     });
   });
 }

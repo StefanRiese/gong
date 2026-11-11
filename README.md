@@ -38,8 +38,8 @@ light or dark mode of the device.
   homework every 15 min, grades and course pages every 2 h, during active hours)
 - Pages open right away from the stored data – also after a restart and while the portal is
   down; open pages update themselves when new data arrives
-- **Several children** on one server: add more Schulportal accounts under *Einstellungen →
-  Kinder* and switch between them in the top bar; every child has own data, filters, colors
+- **Several children** on one server: add Schulportal accounts under *Einstellungen → + Kind*
+  and switch between them in the top bar; every child has own data, filters, colors
   and (optional) Caseda / WebUntis login; notifications name the child
 - Heute, Stundenplan (A/B weeks), Vertretungen, Hausaufgaben (mark as done in the portal),
   Noten, Fächer / course pages, Kalender with filters; consistent subject colors
@@ -107,7 +107,8 @@ WEB_DIR=../web dart run bin/server.dart
 Without credentials the server starts in setup mode and logs a setup link
 (`http://127.0.0.1:8080/einrichtung?token=…`); the settings are stored in the database next to it.
 Alternatively, put `SPH_USERNAME`, `SPH_PASSWORD` and `APP_PASSWORD` into `server/.env`
-(see `server/.env.example`). Details: [server/README.md](server/README.md),
+(see `server/.env.example`; the account is taken over once on the first start, after that
+accounts are managed in the web UI). Details: [server/README.md](server/README.md),
 [web/README.md](web/README.md), REST API: [docs/API.md](docs/API.md).
 
 UI development without Schulportal: `node dev/mock-server.mjs` (password `demo`;

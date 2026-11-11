@@ -45,7 +45,8 @@ server/                 Dart package (own pubspec)
   lib/src/update/       UpdateService: GitHub release check, install per platform (systemd
                         request file / Windows exe swap / macOS bundle via exit code 80)
   lib/src/config/       AppConfig, config.env, web UI settings (DB), setup token, school list;
-                        accounts.dart: further children (accounts) – the first one is AppConfig itself
+                        accounts.dart: the children (accounts, all equal); migrate_accounts.dart: update
+                        from the old SPH_*/CASEDA_*/UNTIS_* settings (once)
   lib/src/storage/      SQLite (AppDatabase), SettingsStore; portal_state.dart: per-account key prefix
                         (`@<id>/`, none for the first account) for cache, seen items, sync/poll status
   lib/src/server/       AppServer: start/stop, setup mode, applies settings changes at runtime
@@ -93,7 +94,7 @@ node dev/mock-server.mjs                            # UI dev without portal, :80
 MOCK_SETUP=1 node dev/mock-server.mjs               # setup page: /einrichtung?token=demo-token
 MOCK_UPDATE=1 node dev/mock-server.mjs              # app update available
 MOCK_ABBREV=1 node dev/mock-server.mjs              # subject abbreviations like the real portal
-MOCK_CHILDREN=1 node dev/mock-server.mjs            # a second account ("Mia") for the account switcher
+MOCK_CHILDREN=1 node dev/mock-server.mjs            # a second account ("Mia") for the account switcher (MOCK_SETUP=1: no account yet)
 curl -X POST localhost:8090/dev/bump-version         # mock "server update" (installed-app reload)
 for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
 shellcheck -s bash deploy/*.sh
@@ -116,7 +117,9 @@ Never commit a generated `build_info.g.dart` (only the placeholder).
   Caseda and WebUntis sit behind `MealsGateway` / `UntisGateway` the same way. Notifications use
   `mergeUntis(..., enrich: false)`: completing entries would change their fingerprints.
 - **Settings:** web UI settings (database) take precedence over env / `config.env`. New
-  editable keys go into `ServerSettingKeys` and `AppServer.describeSettings`. Cache keys and
+  editable keys go into `ServerSettingKeys` and `AppServer.describeSettings`. Accounts (Schulportal,
+  Caseda, WebUntis logins) are not settings: they are in `AccountStore`. A change to how data is
+  stored needs an update function like `migrateLegacyAccount` (once, in one transaction, marker in `meta`). Cache keys and
   their JSON codecs live in `lib/src/sync/cache_keys.dart` (models need `fromJson`).
 - **Web UI views** with forms export `live = false` (no live re-rendering); data is loaded via
   `ctx.get()` so the page follows updates of its cache keys.

@@ -20,8 +20,9 @@ export class ApiError extends Error {
 }
 
 // Several children: the data endpoints of the selected account live below
-// /api/accounts/<id>/ (the first account, "main", is served without prefix).
-let currentAccount = 'main';
+// /api/accounts/<id>/. Without a selected account the server answers for the first one.
+/** @type {string | null} */
+let currentAccount = null;
 
 const PER_ACCOUNT = /^\/api\/(account|timetable|substitutions|calendar|courses|homework|grades|refresh|sync|events|meals|settings|notifications)(?=[/?]|$)/;
 
@@ -36,7 +37,7 @@ export function currentAccountId() {
 
 /** API path of the selected account for [path] (server-wide paths stay as they are). */
 export function scoped(path) {
-  if (currentAccount === 'main' || !PER_ACCOUNT.test(path)) return path;
+  if (currentAccount == null || !PER_ACCOUNT.test(path)) return path;
   return path.replace(/^\/api\//, `/api/accounts/${currentAccount}/`);
 }
 

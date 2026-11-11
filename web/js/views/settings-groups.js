@@ -27,62 +27,13 @@ export function group(id, titleText, hint, ...content) {
 /** Label for a part of a group (not a heading: the hierarchy stays flat). */
 const partLabel = (text, id) => h('div', { class: 'part-label', id }, text);
 
-/** Button that tests a login without saving; the result shows below it. */
-function loginTest(path, body, okText) {
-  const msg = messageArea();
-  const button = h('button', { type: 'button', class: 'button' }, 'Anmeldung prüfen');
-  button.addEventListener('click', async () => {
-    msg.ok('Anmeldung wird geprüft …');
-    button.disabled = true;
-    try {
-      msg.ok(okText(await api(path, { method: 'POST', body: body() })));
-    } catch (err) {
-      msg.error(err);
-    } finally {
-      button.disabled = false;
-    }
-  });
-  return [h('div', { class: 'button-row' }, button), msg.el];
-}
-
-/** Shows [fields] only while [enabled] is checked. */
-function showWhenOn(enabled, fields) {
-  const update = () => {
-    fields.hidden = !enabled.box.checked;
-  };
-  enabled.box.addEventListener('change', update);
-  update();
-  return fields;
-}
-
-// --- Schulportal -----------------------------------------------------------------
-
-export function portalGroup({ form, v, secrets }) {
-  const school = schoolPicker({ value: v.SPH_SCHOOL_ID, onChange: () => form.touch() });
-  form.add('server', 'SPH_SCHOOL_ID', () => (school.value == null ? '' : String(school.value)));
-  const name = bindText(form, 'ACCOUNT_NAME', input({ value: v.ACCOUNT_NAME ?? '', maxlength: 40, placeholder: v.SPH_USERNAME ?? '' }));
-  const username = bindText(form, 'SPH_USERNAME', input({ value: v.SPH_USERNAME ?? '', required: true }));
-  const password = bindText(form, 'SPH_PASSWORD', input({
-    type: 'password', autocomplete: 'off', placeholder: secrets.SPH_PASSWORD ? 'unverändert' : '',
-  }), { secret: true });
-  return group('schulportal', 'Schulportal',
-    'Mit diesen Daten meldet sich der Server beim Schulportal an. Bei einem anderen Konto werden die gespeicherten Daten verworfen.',
-    field('Name', name, 'Wird in der Auswahl der Kinder angezeigt (Standard: der Benutzername).'),
-    field('Schule', school.el),
-    field('Benutzername', username),
-    field('Passwort', password, secrets.SPH_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
-    loginTest('/api/server-settings/test-login',
-      () => ({ schoolId: school.value, username: username.value.trim(), password: password.value || undefined }),
-      () => 'Anmeldung beim Schulportal erfolgreich.'));
-}
-
-// --- Vertretungen (own class, filters) and WebUntis ---------------------------------
+// --- Vertretungen (own class, filters) ---------------------------------------------
 
 /**
  * The permanent filter of the substitution plan (stored on the server; applies to
- * Vertretungen, Heute and notifications) and WebUntis as a second source.
+ * Vertretungen, Heute and notifications).
  */
-export function substitutionsGroup({ form, v, secrets, saved, plan, withUntis = true }) {
+export function substitutionsGroup({ form, saved, plan }) {
   const parts = [];
 
   if (plan) {
@@ -160,70 +111,21 @@ export function substitutionsGroup({ form, v, secrets, saved, plan, withUntis = 
     );
   }
 
-  if (withUntis) parts.push(...untisPart({ form, v, secrets }));
   return group('vertretungsplan', 'Vertretungen',
-    'Gilt auf allen Geräten.', parts);
+    'Gilt auf allen Geräten, für das Kind dieses Reiters.', parts);
 }
 
-function untisPart({ form, v, secrets }) {
-  const enabled = bindCheck(form, 'UNTIS_ENABLED',
-    checkbox('WebUntis als zweite Quelle nutzen', v.UNTIS_ENABLED));
-  const server = bindText(form, 'UNTIS_SERVER', input({
-    type: 'text', value: v.UNTIS_SERVER ?? '', placeholder: 'meineschule.webuntis.com',
-    autocapitalize: 'none', spellcheck: false,
-  }));
-  const school = bindText(form, 'UNTIS_SCHOOL', input({
-    type: 'text', value: v.UNTIS_SCHOOL ?? '', placeholder: 'wie vor „.webuntis.com“',
-  }));
-  const username = bindText(form, 'UNTIS_USERNAME', input({ type: 'text', value: v.UNTIS_USERNAME ?? '', autocomplete: 'off' }));
-  const password = bindText(form, 'UNTIS_PASSWORD', input({
-    type: 'password', autocomplete: 'off', placeholder: secrets.UNTIS_PASSWORD ? 'unverändert' : '',
-  }), { secret: true });
-  const fields = showWhenOn(enabled, h('div', { class: 'stack' },
-    field('Adresse von WebUntis', server, 'Die Adresse der Webseite genügt, z. B. aus dem Browser kopiert.'),
-    field('Name der Schule in WebUntis', school, 'Nur nötig, wenn er nicht dem Anfang der Adresse entspricht.'),
-    field('Benutzername', username),
-    field('Passwort', password, secrets.UNTIS_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
-    loginTest('/api/server-settings/test-untis',
-      () => ({
-        server: server.value.trim(), username: username.value.trim(),
-        password: password.value || undefined, school: school.value.trim() || undefined,
-      }),
-      (res) => (res.className ? `Anmeldung bei WebUntis erfolgreich, Klasse ${res.className}.` : 'Anmeldung bei WebUntis erfolgreich.'))));
-  return [
-    partLabel('WebUntis', 'webuntis'),
-    h('p', { class: 'hint' },
-      'Ergänzt die Vertretungen um Änderungen aus WebUntis, die im Schulportal (noch) fehlen – zum Beispiel für spätere Tage. Diese Einträge sind gekennzeichnet. Nur lesend; ein Klassenzugang genügt.'),
-    enabled.el,
-    fields,
-  ];
-}
+// --- Schulessen ---------------------------------------------------------------------------
 
-// --- Schulessen (Caseda) ----------------------------------------------------------------
-
-export function mealsGroup({ form, v, secrets }) {
-  const enabled = bindCheck(form, 'CASEDA_ENABLED',
-    checkbox('Schulessen von Caseda anzeigen (Guthaben und eigene Bestellungen)', v.CASEDA_ENABLED));
-  const username = bindText(form, 'CASEDA_USERNAME', input({ type: 'email', value: v.CASEDA_USERNAME ?? '', autocomplete: 'off' }));
-  const password = bindText(form, 'CASEDA_PASSWORD', input({
-    type: 'password', autocomplete: 'off', placeholder: secrets.CASEDA_PASSWORD ? 'unverändert' : '',
-  }), { secret: true });
+/** The balance warning of the school meals page (all children). The logins are part of each child. */
+export function mealsGroup({ form, v }) {
   const warning = bindText(form, 'CASEDA_BALANCE_WARNING', input({
     type: 'text', inputmode: 'decimal', value: v.CASEDA_BALANCE_WARNING ?? '10,00',
     class: 'input narrow', pattern: '[0-9]+([,.][0-9]{1,2})?',
   }));
-  const url = bindText(form, 'CASEDA_URL', input({ type: 'url', value: v.CASEDA_URL ?? 'https://www.caseda-schulmenue.de' }));
-  const fields = showWhenOn(enabled, h('div', { class: 'stack' },
-    field('E-Mail (Caseda-Konto)', username),
-    field('Passwort', password, secrets.CASEDA_PASSWORD ? 'Leer lassen, um das gespeicherte Passwort zu behalten.' : undefined),
-    field('Hinweis bei Guthaben unter … €', warning),
-    field('Adresse des Bestellsystems', url, 'Andere Caterer mit schulmenueplaner.de funktionieren ebenso.'),
-    loginTest('/api/server-settings/test-caseda',
-      () => ({ username: username.value.trim(), password: password.value || undefined, url: url.value.trim() }),
-      () => 'Anmeldung bei Caseda erfolgreich.')));
-  return group('schulessen', 'Schulessen',
-    'Zeigt unter Schulessen die eigenen Bestellungen und das Guthaben, auf der Seite Heute das bestellte Essen – nur lesend; bestellt wird weiterhin bei Caseda.',
-    enabled.el, fields);
+  return group('schulessen-hinweis', 'Schulessen',
+    'Das Schulessen (Guthaben und bestellte Mahlzeiten) wird bei jedem Kind eingerichtet, im Reiter des Kindes. Bestellt wird weiterhin bei Caseda.',
+    field('Hinweis bei Guthaben unter … €', warning, 'Gilt für alle Kinder.'));
 }
 
 // --- Fächer & Farben -----------------------------------------------------------------------

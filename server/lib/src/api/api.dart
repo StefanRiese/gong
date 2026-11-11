@@ -10,7 +10,6 @@ import 'package:shelf_static/shelf_static.dart';
 import '../auth/password.dart';
 import '../caseda/caseda.dart';
 import '../auth/sessions.dart';
-import '../config/accounts.dart';
 import '../config/app_config.dart';
 import '../config/server_settings.dart';
 import '../notify/notifier.dart';
@@ -76,11 +75,8 @@ const _eventPing = Duration(seconds: 25);
 ///   GET  /api/setup         {setupRequired} (no login needed)
 ///   GET  /api/server-settings       server settings (secrets only as set/unset)
 ///   PUT  /api/server-settings       {settings, appPassword?, currentPassword?}
-///   POST /api/server-settings/test-login  {schoolId, username, password?}
 ///   GET  /api/schools?q=…   school search (public list of Schulportal Hessen)
 ///   GET  /api/meals         school meals (Caseda): balance and own orders
-///   POST /api/server-settings/test-caseda  {username, password?, url?}
-///   POST /api/server-settings/test-untis   {server, username, password?, school?}
 ///   GET  /api/update        version, latest release, update state
 ///   POST /api/update/check  look for a new release now
 ///   POST /api/update/install  install the latest release (202, async)
@@ -93,26 +89,32 @@ const _eventPing = Duration(seconds: 25);
 ///   POST /api/notifications/check    check for changes now
 /// Several children (accounts): every data endpoint above (account …
 /// notifications, `settings`, `refresh`, `sync`, `events`, `meals`) is also
-/// available as /api/accounts/{id}/… (`main` = the first account; without
+/// available as /api/accounts/{id}/… (without
 /// the prefix the first account answers).
-///   GET    /api/accounts      the accounts: id, name, primary, …
+///   GET    /api/accounts      the accounts: id, name, school, …
 ///   POST   /api/accounts      add an account (login is tested first)
 ///   PUT    /api/accounts/{id}  change name / login of an account
-///   DELETE /api/accounts/{id}  remove an account (not the first one)
+///   DELETE /api/accounts/{id}  remove an account (not the last one)
 /// Data endpoints answer from the cache right away (expired entries are
 /// refreshed in the background) with `{"data": …, "key": …, "fetchedAt": …,
 /// "cached": bool, "stale": bool, "refreshing": bool}`; `?refresh=1` waits
 /// for fresh data instead.
 class Api {
-  /// Id of the account this instance serves (see [AccountConfig.mainId]).
-  final String accountId;
-
-  /// Instances of the further accounts by id; set up by the server. They
-  /// share sessions, login limit, update and server control with this one.
+  /// Instances of the accounts by id, set up by the server: each serves the
+  /// data endpoints of one account. They share sessions, login limit, update
+  /// and server control with the instance that routes to them.
   final Map<String, Api> children = {};
 
-  /// Replaced when the Schulportal credentials change (see [ServerControl]).
-  SphService service;
+  /// The account that answers the data endpoints without account in the path
+  /// (`/api/timetable`); null = this instance serves them itself (one account).
+  Api? Function()? defaultAccount;
+
+  /// Portal access of the account this instance serves; null for the
+  /// instance that only routes to the accounts.
+  SphService? service;
+
+  SphService get _svc =>
+      service ?? (throw StateError('This instance serves no account'));
   String passwordHash;
   final SessionStore sessions;
   final LoginRateLimiter limiter;
@@ -162,8 +164,7 @@ class Api {
   final DateTime Function() _now;
 
   Api({
-    this.accountId = AccountConfig.mainId,
-    required this.service,
+    this.service,
     required this.passwordHash,
     SessionStore? sessions,
     LoginRateLimiter? limiter,
@@ -223,14 +224,14 @@ class Api {
       ..get('/api/auth/me', _me)
       ..get(
         '/api/account',
-        _data(CacheKeys.account, CacheTtl.account, (_) => service.account()),
+        _data(CacheKeys.account, CacheTtl.account, (_) => _svc.account()),
       )
       ..get(
         '/api/timetable',
         _data(
           CacheKeys.timetable,
           CacheTtl.timetable,
-          (_) => service.timetable(),
+          (_) => _svc.timetable(),
           present: _timetableDifferences,
         ),
       )
@@ -239,20 +240,20 @@ class Api {
         _data(
           CacheKeys.substitutions,
           CacheTtl.substitutions,
-          (_) => service.substitutions(),
+          (_) => _svc.substitutions(),
           present: _filterSubstitutions,
         ),
       )
       ..get('/api/calendar', _calendar)
       ..get(
         '/api/courses',
-        _data(CacheKeys.courses, CacheTtl.courses, (_) => service.courses()),
+        _data(CacheKeys.courses, CacheTtl.courses, (_) => _svc.courses()),
       )
       ..get('/api/courses/<id>', (Request r, String id) {
         return _data(
           CacheKeys.course(id),
           CacheTtl.courseDetails,
-          (_) => service.courseDetails(id),
+          (_) => _svc.courseDetails(id),
         )(r);
       })
       ..put('/api/courses/<id>/entries/<entry>/homework', _setHomeworkDone)
@@ -262,19 +263,19 @@ class Api {
             ? _data(
                 CacheKeys.allHomework,
                 CacheTtl.allHomework,
-                (_) => service.allHomework(),
+                (_) => _svc.allHomework(),
                 present: _searchHomework,
               )(r)
             : _data(
                 CacheKeys.homework,
                 CacheTtl.homework,
-                (_) => service.homework(),
+                (_) => _svc.homework(),
                 present: _searchHomework,
               )(r);
       })
       ..get(
         '/api/grades',
-        _data(CacheKeys.grades, CacheTtl.grades, (_) => service.grades()),
+        _data(CacheKeys.grades, CacheTtl.grades, (_) => _svc.grades()),
       )
       ..post('/api/refresh', _refresh)
       ..get('/api/sync', _syncStatus)
@@ -282,9 +283,6 @@ class Api {
       ..get('/api/setup', _setup)
       ..get('/api/server-settings', _getServerSettings)
       ..put('/api/server-settings', _putServerSettings)
-      ..post('/api/server-settings/test-login', _testLogin)
-      ..post('/api/server-settings/test-caseda', _testCaseda)
-      ..post('/api/server-settings/test-untis', _testUntis)
       ..get('/api/meals', _meals)
       ..get('/api/schools', _schools)
       ..get('/api/update', _updateStatus)
@@ -301,7 +299,26 @@ class Api {
       ..delete('/api/accounts/<id>', _removeAccount)
       ..all('/api/accounts/<id>/<rest|.*>', _accountScoped);
 
-    return router.call;
+    return (Request request) {
+      // Data endpoints without account belong to the default account.
+      final segments = request.url.pathSegments;
+      final fallback = defaultAccount;
+      if (fallback != null &&
+          segments.length >= 2 &&
+          segments[0] == 'api' &&
+          _scopedEndpoints.contains(segments[1])) {
+        if (control?.setupRequired ?? false) return _setupRequired();
+        if (!_authorized(request)) {
+          return _error(401, 'unauthorized', 'Login required');
+        }
+        final target = fallback();
+        if (target == null) {
+          return _error(404, 'unknown_account', 'No account is set up');
+        }
+        return target.routes(request);
+      }
+      return router.call(request);
+    };
   }
 
   // --- accounts (children) -----------------------------------------------------
@@ -330,7 +347,7 @@ class Api {
     if (!_authorized(request)) {
       return Future.value(_error(401, 'unauthorized', 'Login required'));
     }
-    final target = id == accountId ? this : children[id];
+    final target = children[id];
     if (target == null) {
       return Future.value(_error(404, 'unknown_account', 'No such account'));
     }
@@ -352,14 +369,7 @@ class Api {
     if (!_authorized(request)) {
       return _error(401, 'unauthorized', 'Login required');
     }
-    final c = control;
-    return _json(200, {
-      'accounts': c != null
-          ? c.listAccounts()
-          : [
-              {'id': accountId, 'name': '', 'primary': true},
-            ],
-    });
+    return _json(200, {'accounts': control?.listAccounts() ?? const []});
   }
 
   /// Reads the JSON object of an account request; null = error [response].
@@ -411,16 +421,23 @@ class Api {
   }) async {
     final c = control;
     if (c == null) return _error(404, 'not_found', 'Not available');
-    if (c.setupRequired) return _setupRequired();
-    if (!_authorized(request)) {
-      return _error(401, 'unauthorized', 'Login required');
-    }
+    // The first account is added on the setup page (setup token).
+    if (!_settingsAuthorized(request)) return _settingsDenied();
     final (body, bad) = await _accountBody(request);
     if (bad != null) return bad;
     final limited = _loginBudget();
     if (limited != null) return limited;
+    final wasSetup = c.setupRequired;
     try {
-      return _json(status, await change(c, body!));
+      final result = await change(c, body!);
+      // The account ended the setup: logged in right away.
+      return _json(
+        status,
+        result,
+        headers: wasSetup && !c.setupRequired
+            ? {'set-cookie': _cookie(sessions.create(), sessions.ttl)}
+            : const {},
+      );
     } on ConfigException catch (e) {
       return _error(
         400,
@@ -731,7 +748,7 @@ class Api {
     return _data(
       CacheKeys.calendar(start, end),
       CacheTtl.calendar,
-      (_) => service.calendar(from: start, to: end),
+      (_) => _svc.calendar(from: start, to: end),
       present: _searchCalendar,
     )(request);
   }
@@ -757,7 +774,7 @@ class Api {
       return _error(400, 'bad_request', 'Expected {"done": true|false}');
     }
     try {
-      await service.setHomeworkDone(courseId, entryId, done);
+      await _svc.setHomeworkDone(courseId, entryId, done);
     } on SphException catch (e) {
       return _sphError(e);
     } on ArgumentError catch (e) {
@@ -922,18 +939,6 @@ class Api {
         'Invalid settings',
         extra: {'problems': e.problems},
       );
-    } on SphAuthException catch (e) {
-      return _error(400, 'sph_login_failed', e.message);
-    } on SphException catch (e) {
-      return _sphError(e);
-    } on CasedaException catch (e) {
-      return e.isAuth
-          ? _error(400, 'meals_login_failed', e.message)
-          : _error(503, 'meals_unavailable', e.message);
-    } on UntisException catch (e) {
-      return e.isAuth
-          ? _error(400, 'untis_login_failed', e.message)
-          : _error(503, 'untis_unavailable', e.message);
     }
 
     final headers = <String, String>{};
@@ -947,171 +952,10 @@ class Api {
       'saved': true,
       'setupRequired': c.setupRequired,
       'restartRequired': result.restartRequired,
-      'accountChanged': result.accountChanged,
     }, headers: headers);
   }
 
   final _testLogins = <DateTime>[];
-
-  /// Tests a Caseda login (school meals) without storing it.
-  Future<Response> _testCaseda(Request request) async {
-    final c = control;
-    if (c == null) return _error(404, 'not_found', 'Not available');
-    if (!_settingsAuthorized(request)) return _settingsDenied();
-    if (!_isJson(request)) {
-      return _error(415, 'unsupported_media_type', 'Use application/json');
-    }
-    final now = _now();
-    _testLogins.removeWhere(
-      (t) => now.difference(t) > const Duration(minutes: 5),
-    );
-    if (_testLogins.length >= 5) {
-      return _error(
-        429,
-        'too_many_attempts',
-        'Too many test logins, try again later',
-        headers: {'retry-after': '300'},
-      );
-    }
-    final String username;
-    final String? password;
-    final String? url;
-    try {
-      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
-      if (body is! Map) throw const FormatException();
-      username = (body['username'] as String).trim();
-      password = body['password'] as String?;
-      url = body['url'] as String?;
-      if (username.isEmpty) throw const FormatException();
-    } on Object {
-      return _error(400, 'bad_request', 'Expected {"username", "password"?}');
-    }
-    _testLogins.add(now);
-    try {
-      await c.testCasedaLogin(
-        username: username,
-        password: password == null || password.isEmpty ? null : password,
-        url: url == null || url.trim().isEmpty ? null : url.trim(),
-      );
-      return _json(200, {'ok': true});
-    } on CasedaException catch (e) {
-      return e.isAuth
-          ? _error(400, 'meals_login_failed', e.message)
-          : _error(503, 'meals_unavailable', e.message);
-    } on ArgumentError catch (e) {
-      return _error(400, 'bad_request', '${e.message}');
-    }
-  }
-
-  /// Tests a WebUntis login (second source for substitutions) without
-  /// storing it; answers with the class of the account.
-  Future<Response> _testUntis(Request request) async {
-    final c = control;
-    if (c == null) return _error(404, 'not_found', 'Not available');
-    if (!_settingsAuthorized(request)) return _settingsDenied();
-    if (!_isJson(request)) {
-      return _error(415, 'unsupported_media_type', 'Use application/json');
-    }
-    final now = _now();
-    _testLogins.removeWhere(
-      (t) => now.difference(t) > const Duration(minutes: 5),
-    );
-    if (_testLogins.length >= 5) {
-      return _error(
-        429,
-        'too_many_attempts',
-        'Too many test logins, try again later',
-        headers: {'retry-after': '300'},
-      );
-    }
-    final String server;
-    final String username;
-    final String? password;
-    final String? school;
-    try {
-      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
-      if (body is! Map) throw const FormatException();
-      server = (body['server'] as String).trim();
-      username = (body['username'] as String).trim();
-      password = body['password'] as String?;
-      school = body['school'] as String?;
-      if (server.isEmpty || username.isEmpty) throw const FormatException();
-    } on Object {
-      return _error(
-        400,
-        'bad_request',
-        'Expected {"server", "username", "password"?, "school"?}',
-      );
-    }
-    _testLogins.add(now);
-    try {
-      final className = await c.testUntisLogin(
-        server: server,
-        username: username,
-        password: password == null || password.isEmpty ? null : password,
-        school: school == null || school.trim().isEmpty ? null : school.trim(),
-      );
-      return _json(200, {'ok': true, 'className': className});
-    } on UntisException catch (e) {
-      return e.isAuth
-          ? _error(400, 'untis_login_failed', e.message)
-          : _error(503, 'untis_unavailable', e.message);
-    } on ArgumentError catch (e) {
-      return _error(400, 'bad_request', '${e.message}');
-    }
-  }
-
-  Future<Response> _testLogin(Request request) async {
-    final c = control;
-    if (c == null) return _error(404, 'not_found', 'Not available');
-    if (!_settingsAuthorized(request)) return _settingsDenied();
-    if (!_isJson(request)) {
-      return _error(415, 'unsupported_media_type', 'Use application/json');
-    }
-    // Protects the Schulportal account against lockout by repeated tries.
-    final now = _now();
-    _testLogins.removeWhere(
-      (t) => now.difference(t) > const Duration(minutes: 5),
-    );
-    if (_testLogins.length >= 5) {
-      return _error(
-        429,
-        'too_many_attempts',
-        'Too many test logins, try again later',
-        headers: {'retry-after': '300'},
-      );
-    }
-    final int schoolId;
-    final String username;
-    final String? password;
-    try {
-      final body = jsonDecode(await _readLimited(request, _maxLoginBody));
-      if (body is! Map) throw const FormatException();
-      schoolId = int.parse('${body['schoolId']}');
-      username = (body['username'] as String).trim();
-      password = body['password'] as String?;
-      if (username.isEmpty) throw const FormatException();
-    } on Object {
-      return _error(
-        400,
-        'bad_request',
-        'Expected {"schoolId", "username", "password"?}',
-      );
-    }
-    _testLogins.add(now);
-    try {
-      await c.testLogin(
-        schoolId: schoolId,
-        username: username,
-        password: password == null || password.isEmpty ? null : password,
-      );
-      return _json(200, {'ok': true});
-    } on SphAuthException catch (e) {
-      return _error(400, 'sph_login_failed', e.message);
-    } on SphException catch (e) {
-      return _sphError(e);
-    }
-  }
 
   Future<Response> _schools(Request request) async {
     final c = control;

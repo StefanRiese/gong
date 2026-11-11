@@ -126,22 +126,26 @@ void main() {
     }
   }
 
-  test('starts with the one account; the list needs a login', () async {
-    await start();
-    expect((await call('GET', '/api/accounts')).status, 401);
-    final cookie = await login();
-    final r = await call('GET', '/api/accounts', cookie: cookie);
-    expect(r.status, 200);
-    expect(r.body['accounts'], [
-      {
-        'id': 'main',
-        'name': 'max.muster',
-        'primary': true,
-        'schoolId': 1234,
-        'username': 'max.muster',
-      },
-    ]);
-  });
+  test(
+    'the old account settings become the first account; the list needs a login',
+    () async {
+      await start();
+      expect((await call('GET', '/api/accounts')).status, 401);
+      final cookie = await login();
+      final r = await call('GET', '/api/accounts', cookie: cookie);
+      expect(r.status, 200);
+      expect(r.body['accounts'], [
+        {
+          'id': 'main',
+          'name': 'max.muster',
+          'schoolId': 1234,
+          'username': 'max.muster',
+          'caseda': null,
+          'untis': null,
+        },
+      ]);
+    },
+  );
 
   test('adding an account tries its login and never shows passwords', () async {
     await start();
@@ -159,7 +163,6 @@ void main() {
             as List;
     expect(list.map((a) => a['name']), ['max.muster', 'Anna']);
     expect(list[1]['id'], id);
-    expect(list[1]['primary'], isFalse);
     expect(jsonEncode(list), isNot(contains('annas-passwort')));
   });
 
@@ -225,7 +228,7 @@ void main() {
     // Both timetables are cached, each under its own key.
     await call('GET', '/api/timetable', cookie: cookie);
     await call('GET', '/api/accounts/$id/timetable', cookie: cookie);
-    expect(cacheKeys(), containsAll(['timetable', '@$id/timetable']));
+    expect(cacheKeys(), containsAll(['@main/timetable', '@$id/timetable']));
   });
 
   test('user settings are per account', () async {
@@ -338,10 +341,10 @@ void main() {
     expect(r.status, 404);
   });
 
-  test('the first account only takes a name', () async {
+  test('the first account can be renamed like any other', () async {
     await start();
     final cookie = await login();
-    var r = await call(
+    final r = await call(
       'PUT',
       '/api/accounts/main',
       cookie: cookie,
@@ -349,13 +352,6 @@ void main() {
     );
     expect(r.status, 200, reason: '${r.body}');
     expect(r.body['name'], 'Max');
-    r = await call(
-      'PUT',
-      '/api/accounts/main',
-      cookie: cookie,
-      json: {'username': 'x'},
-    );
-    expect(r.status, 400);
     expect(
       ((await call('GET', '/api/accounts', cookie: cookie)).body['accounts']
           as List)[0]['name'],
@@ -363,16 +359,14 @@ void main() {
     );
   });
 
-  test('removing an account deletes its data; the first stays', () async {
+  test('removing an account deletes its data; the last one stays', () async {
     await start();
     final cookie = await login();
     final id = await addAnna(cookie);
     await call('GET', '/api/accounts/$id/timetable', cookie: cookie);
     await call('GET', '/api/timetable', cookie: cookie);
 
-    var r = await call('DELETE', '/api/accounts/main', cookie: cookie);
-    expect(r.status, 400);
-    r = await call('DELETE', '/api/accounts/nope', cookie: cookie);
+    var r = await call('DELETE', '/api/accounts/nope', cookie: cookie);
     expect(r.status, 404);
 
     r = await call('DELETE', '/api/accounts/$id', cookie: cookie);
@@ -381,8 +375,11 @@ void main() {
       (await call('GET', '/api/accounts/$id/timetable', cookie: cookie)).status,
       404,
     );
-    expect(cacheKeys(), ['timetable']);
+    expect(cacheKeys(), ['@main/timetable']);
     expect(gateways['anna.muster']!.disposed, isTrue);
+
+    r = await call('DELETE', '/api/accounts/main', cookie: cookie);
+    expect(r.status, 400, reason: 'the last account cannot be removed');
     expect(
       ((await call('GET', '/api/accounts', cookie: cookie)).body['accounts']
               as List)
@@ -390,6 +387,37 @@ void main() {
       1,
     );
   });
+
+  test(
+    'the first of several accounts answers the paths without account',
+    () async {
+      await start();
+      final cookie = await login();
+      final id = await addAnna(cookie);
+      List<dynamic> features(Map<String, dynamic> r) => r['data']['features'];
+      expect(
+        features(
+          await call('GET', '/api/account', cookie: cookie).then((r) => r.body),
+        ),
+        contains('calendar'),
+      );
+      // Remove the first account: the next one answers now.
+      expect(
+        (await call('DELETE', '/api/accounts/main', cookie: cookie)).status,
+        204,
+      );
+      expect(
+        features(
+          await call('GET', '/api/account', cookie: cookie).then((r) => r.body),
+        ),
+        isNot(contains('calendar')),
+      );
+      expect(
+        (await call('GET', '/api/accounts/$id/account', cookie: cookie)).status,
+        200,
+      );
+    },
+  );
 
   test('server settings changes reach the further accounts', () async {
     await start();

@@ -81,14 +81,13 @@ Without internet access on the container, copy a release archive over and use
 
 ## School meals and WebUntis (optional)
 
-Both are read-only and set up in the web UI under *Einstellungen* (or with the
-`CASEDA_*` / `UNTIS_*` keys in `config.env`, see `config.env.example`):
+Both are read-only and set up per child in the web UI under *Einstellungen* (tab of the child):
 
 - **Schulessen** – login of the Caseda Schulmenü account; shows the own orders (page
   *Schulessen*, today's meal on Heute) and the balance. Ordering stays on the Caseda website.
 - **Vertretungen (WebUntis)** – login of the school's WebUntis (a class account is enough);
   completes the Schulportal substitutions with what WebUntis knows and adds changes the
-  Schulportal plan does not have yet. „Anmeldung prüfen“ tests the login.
+  Schulportal plan does not have yet. The logins are tested when saving.
 
 The logins are tested before they are saved and can be switched off without losing them.
 

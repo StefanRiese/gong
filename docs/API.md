@@ -10,7 +10,7 @@ changes are listed in [CHANGELOG.md](../CHANGELOG.md).
 - [Basics](#basics)
 - [Authentication](#authentication)
 - [Data endpoints](#data-endpoints)
-- [Several children (accounts)](#several-children-accounts)
+- [Accounts (children)](#accounts-children)
 - [Sync and live updates](#sync-and-live-updates)
 - [Notifications](#notifications)
 - [Setup and server settings](#setup-and-server-settings)
@@ -259,35 +259,36 @@ UI's Heute page only shows entries of the own classes in the lessons.
 `PUT` changes the fields that are sent – fields not sent keep their value – and answers with the
 stored version. Invalid values → `400 bad_request`.
 
-## Several children (accounts)
+## Accounts (children)
 
-One server can show several Schulportal accounts, e.g. for siblings. The first account is the one
-set up on the setup page (`SPH_*` settings); it has the id `main`. Further accounts are added
-over the API or in *Einstellungen → Kinder*; their ids are 6 random letters and digits. Every
-account has its own portal session, cache, sync, user settings and notification status. The web
-password, the sync schedule, ntfy and the other server settings are shared.
+One server can show several Schulportal accounts, e.g. for siblings. All accounts are equal:
+they are added over the API or in *Einstellungen* (tab *+ Kind*), and the first one is also set up
+on the setup page. Their ids are 6 random letters and digits (an account taken over from versions
+before 0.19 has the id `main`). Every account has its own portal session, cache, sync, user
+settings, notification status and – optionally – Caseda and WebUntis login. The web password, the
+sync schedule, ntfy and the other server settings are shared.
 
 **Per-account endpoints.** The endpoints `account`, `timetable`, `substitutions`, `calendar`,
 `courses`, `homework`, `grades`, `meals`, `settings`, `refresh`, `sync`, `events` and
-`notifications` (with everything below them) also exist below `/api/accounts/{id}/`, e.g.
+`notifications` (with everything below them) exist below `/api/accounts/{id}/`, e.g.
 `GET /api/accounts/k3x9ab/substitutions` or `PUT /api/accounts/k3x9ab/courses/5/entries/7/homework`.
-Without the prefix the first account answers, so existing clients keep working. Server-wide
-endpoints (`auth`, `setup`, `server-settings`, `schools`, `update`) have no per-account form.
-Unknown ids answer `404 unknown_account`.
+Without the prefix the first account of the list answers, so clients for one account keep working.
+Server-wide endpoints (`auth`, `setup`, `server-settings`, `schools`, `update`) have no
+per-account form. Unknown ids answer `404 unknown_account`.
 
 ### `GET /api/accounts`
 
 ```json
 {"accounts": [
-  {"id": "main", "name": "Max", "primary": true, "schoolId": 6128, "username": "max.muster"},
-  {"id": "k3x9ab", "name": "Anna", "primary": false, "schoolId": 6128, "username": "anna.muster",
+  {"id": "k3x9ab", "name": "Max", "schoolId": 6128, "username": "max.muster",
+   "caseda": null, "untis": null},
+  {"id": "p7q2mz", "name": "Anna", "schoolId": 6128, "username": "anna.muster",
    "caseda": {"url": "https://www.caseda-schulmenue.de", "username": "eltern@example.org"},
-   "untis": null}
+   "untis": {"server": "meineschule.webuntis.com", "school": "meineschule", "username": "klasse5e"}}
 ]}
 ```
 
-The first account is always first; `name` of the first account is `ACCOUNT_NAME` (default: the
-Schulportal user name). Passwords are never sent.
+Passwords are never sent.
 
 ### `POST /api/accounts`
 
@@ -299,23 +300,27 @@ Adds an account after a test login: `201` with the description of the new accoun
  "untis": {"server": "meineschule.webuntis.com", "school": "…", "username": "…", "password": "…"}}
 ```
 
-`name` (max. 40 characters), `username` and `password` are required; `schoolId` defaults to 6128;
-`caseda` and `untis` are optional (same meaning as `CASEDA_*` / `UNTIS_*`, `url` and `school` are
-optional). At most 8 further accounts; the same school and user name twice is refused. Errors:
-`400 invalid_settings` (`problems`), `400 sph_login_failed` / `meals_login_failed` /
-`untis_login_failed`, `429 too_many_attempts` (shares the limit of the test logins).
+`username` and `password` are required; `name` (max. 40 characters) defaults to the user name,
+`schoolId` to 6128. `caseda` (school meals) and `untis` (WebUntis) are optional, `url` and
+`school` inside them too. At most 8 accounts; the same school and user name twice is refused.
+Errors: `400 invalid_settings` (`problems`), `400 sph_login_failed` / `meals_login_failed` /
+`untis_login_failed`, `429 too_many_attempts` (at most 5 logins per 5 minutes, so the portal
+accounts are not locked by repeated tries).
+
+While the server is not set up this works with the setup token (`X-Setup-Token`), and it is how
+the first account is created. If the web password is set already, the response then sets the
+session cookie (the setup is complete).
 
 ### `PUT /api/accounts/{id}`
 
 Changes an account; fields that are not sent are kept, an empty `password` keeps the stored one,
-`"caseda": null` / `"untis": null` switch the login off. Logins that changed are tried first.
-Another school or user name discards the cached data and user settings of that account. For
-`main` only `{"name": …}` is accepted (the login is part of the server settings).
+`"caseda": null` / `"untis": null` remove the login. Logins that changed are tried first.
+Another school or user name discards the cached data and user settings of that account.
 
 ### `DELETE /api/accounts/{id}`
 
-`204`. Removes the account with its cached data and user settings; `main` cannot be removed
-(`400`).
+`204`. Removes the account with its cached data and user settings. The last account cannot be
+removed (`400`).
 
 ## Sync and live updates
 
@@ -411,7 +416,7 @@ data: {"running":false}
 ## Notifications
 
 Push notifications via [ntfy](https://ntfy.sh) about new substitutions, homework and grades.
-They are configured in the [server settings](#setup-and-server-settings).
+They are configured in the [account](#accounts-children).
 
 ### `GET /api/notifications`
 
@@ -450,12 +455,13 @@ Syncs substitutions, homework and grades now and sends new items. Waits until do
 
 ## Setup and server settings
 
-The server's settings (Schulportal login, web UI password, sync, notifications, network) can be
-read and changed over the API; the web UI uses it for the setup page and *Einstellungen →
-Server*. They are stored in the database and take precedence over `config.env`.
+The server's settings (web UI password, sync, notifications, network) can be read and changed
+over the API; the web UI uses it for the setup page and *Einstellungen*. They are stored in the
+database and take precedence over `config.env`. The Schulportal accounts are not part of them:
+see [Accounts](#accounts-children).
 
-**Authorization:** with the session cookie. While the server is **not set up** (no Schulportal
-login or no web UI password) only the one-time setup token is accepted instead, as header
+**Authorization:** with the session cookie. While the server is **not set up** (no account or
+no web UI password) only the one-time setup token is accepted instead, as header
 `X-Setup-Token: <token>`. The server logs the token as link `…/einrichtung?token=<token>` and
 writes it to `DATA_DIR/setup-token`.
 
@@ -470,9 +476,6 @@ login answer `503 setup_required`.
 {
   "setupRequired": false,
   "values": {
-    "ACCOUNT_NAME": "",
-    "SPH_SCHOOL_ID": 6128,
-    "SPH_USERNAME": "max.muster",
     "SYNC": true,
     "POLL_INTERVAL_MINUTES": 15,
     "GRADES_INTERVAL_MINUTES": 120,
@@ -490,8 +493,8 @@ login answer `503 setup_required`.
     "OPEN_BROWSER": false,
     "UPDATE_CHECK": true
   },
-  "secrets": {"SPH_PASSWORD": true, "NTFY_TOKEN": false, "APP_PASSWORD": true},
-  "sources": {"SPH_USERNAME": "web", "PORT": "config", "SYNC": "default", …},
+  "secrets": {"NTFY_TOKEN": false, "APP_PASSWORD": true},
+  "sources": {"NTFY_TOPIC": "web", "PORT": "config", "SYNC": "default", …},
   "restartRequired": [],
   "desktop": false
 }
@@ -525,12 +528,12 @@ Content-Type: application/json
 ```
 
 ```json
-{"saved": true, "setupRequired": false, "restartRequired": [], "accountChanged": false}
+{"saved": true, "setupRequired": false, "restartRequired": []}
 ```
 
 | Field | |
 |---|---|
-| `settings` | config keys → values: `SPH_SCHOOL_ID`, `SPH_USERNAME`, `SPH_PASSWORD`, `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK`, `CASEDA_ENABLED`, `CASEDA_URL`, `CASEDA_USERNAME`, `CASEDA_PASSWORD`, `CASEDA_BALANCE_WARNING`, `UNTIS_ENABLED`, `UNTIS_SERVER`, `UNTIS_SCHOOL`, `UNTIS_USERNAME`, `UNTIS_PASSWORD` |
+| `settings` | config keys → values: `SYNC`, `POLL_INTERVAL_MINUTES`, `GRADES_INTERVAL_MINUTES`, `ACTIVE_HOURS`, `NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`, `NOTIFY`, `NOTIFY_GRADE_VALUES`, `APP_URL`, `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE`, `TRUST_PROXY`, `OPEN_BROWSER`, `UPDATE_CHECK`, `CASEDA_BALANCE_WARNING` |
 | `appPassword` | new web UI password (at least 8 characters); stored as hash |
 | `currentPassword` | required with `appPassword`, except during the setup |
 
@@ -538,27 +541,11 @@ Behaviour:
 
 - All values are validated together; on errors nothing is stored:
   `400 invalid_settings` with `problems` (list of messages).
-- New Schulportal credentials (school, user or password) are tested with a login first:
-  `400 sph_login_failed` if they do not work.
 - Changes apply right away, except `HOST`, `PORT`, `SESSION_TTL_DAYS`, `COOKIE_SECURE` and
   `TRUST_PROXY` (listed in `restartRequired`).
-- Another school or user (`accountChanged: true`) discards the cached data and notification
-  state of the previous account.
 - A new web UI password logs out all other sessions.
-- Completing the setup (Schulportal login and web UI password set) ends setup mode, invalidates
+- Completing the setup (an account and the web UI password set) ends setup mode, invalidates
   the token and logs in: the response sets the session cookie.
-
-### `POST /api/server-settings/test-login`
-
-Tests Schulportal credentials without storing them.
-
-```json
-{"schoolId": 6128, "username": "max.muster", "password": "…"}
-```
-
-Without `password` the stored password is used. → `200 {"ok": true}`, `400 sph_login_failed`,
-`503 sph_unavailable`. At most 5 tests per 5 minutes (`429 too_many_attempts`), so the
-Schulportal account is not locked by repeated tries.
 
 ### `GET /api/schools?q=…`
 
@@ -629,7 +616,7 @@ until `current` changes (the web UI then reloads itself).
 ## School meals
 
 Read-only view of the school meal ordering system **Caseda Schulmenü** (schulmenueplaner.de):
-balance and own orders. Set up in the server settings (`CASEDA_*`); ordering stays on the
+balance and own orders. Set up per account (Caseda login of the account); ordering stays on the
 Caseda website.
 
 ### `GET /api/meals`
@@ -660,16 +647,10 @@ The background sync refreshes it every 2 hours (task `meals`). Errors: `404 meal
 (not set up or switched off), `503 meals_auth_failed` (login rejected),
 `503 meals_unavailable`; cached data is served as `stale` when Caseda is down.
 
-### `POST /api/server-settings/test-caseda`
-
-`{"username": "…", "password"?: "…", "url"?: "…"}` – tests a Caseda login without storing it
-(without `password` the stored one is used). → `200 {"ok": true}`, `400 meals_login_failed`,
-`503 meals_unavailable`; shares the limit of 5 test logins per 5 minutes.
-
 ## WebUntis (second source)
 
 Optional second source for the substitutions: changed lessons of the account's class from
-**WebUntis**, read-only. Set up in the server settings (`UNTIS_*`). The server logs in like the
+**WebUntis**, read-only. Set up per account (WebUntis login of the account). The server logs in like the
 WebUntis web app (a class account such as „klasse5e“ is enough) and reads the changed lessons of
 the next 21 days (cancelled lessons, substitute teachers, room changes, texts).
 
@@ -685,14 +666,6 @@ classes like any other entry). Days after the end of the Schulportal plan are ad
 The background sync (task `untis`, same interval as the substitutions) keeps it up to date;
 notifications cover the added entries as well (not the completions, so a lesson is not
 notified twice).
-
-### `POST /api/server-settings/test-untis`
-
-`{"server": "…", "username": "…", "password"?: "…", "school"?: "…"}` – tests a WebUntis login
-without storing it (without `password` the stored one is used; `server` may be a pasted web
-address, `school` defaults to the first part of the host name). →
-`200 {"ok": true, "className": "05eG"}`, `400 untis_login_failed`, `503 untis_unavailable`;
-shares the limit of 5 test logins per 5 minutes.
 
 ## Data models
 
@@ -834,7 +807,7 @@ Errors have a status code and a JSON body:
 |---|---|---|
 | 400 | `bad_request` | invalid parameters or body |
 | 400 | `invalid_settings` | settings rejected; `problems`: list of messages |
-| 400 | `sph_login_failed` | new or tested Schulportal credentials do not work |
+| 400 | `sph_login_failed` | the Schulportal login of a new or changed account does not work |
 | 401 | `unauthorized` | not logged in / session expired |
 | 401 | `invalid_password` | wrong web UI password at login |
 | 403 | `invalid_password` | wrong current password when changing it |
@@ -844,8 +817,8 @@ Errors have a status code and a JSON body:
 | 404 | `unknown_account` | no account with that id (`/api/accounts/{id}/…`) |
 | 409 | `notifications_disabled` | ntfy is not set up |
 | 409 | `no_update` | no update can be installed |
-| 400 | `meals_login_failed` | new or tested Caseda login does not work |
-| 400 | `untis_login_failed` | new or tested WebUntis login does not work |
+| 400 | `meals_login_failed` | the Caseda login of an account does not work |
+| 400 | `untis_login_failed` | the WebUntis login of an account does not work |
 | 503 | `untis_unavailable` | WebUntis not reachable |
 | 404 | `meals_disabled` | school meals not set up or switched off |
 | 503 | `meals_auth_failed` / `meals_unavailable` | Caseda login rejected / Caseda not reachable |

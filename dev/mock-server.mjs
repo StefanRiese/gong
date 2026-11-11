@@ -25,14 +25,13 @@ const stale = process.env.MOCK_STALE === '1';
 let setupRequired = process.env.MOCK_SETUP === '1';
 const SETUP_TOKEN = 'demo-token';
 let appPassword = 'demo';
+let passwordSet = !setupRequired;
 const serverValues = {
-  ACCOUNT_NAME: '', SPH_SCHOOL_ID: 9999, SPH_USERNAME: 'max.muster', SYNC: true, POLL_INTERVAL_MINUTES: 15,
+  SYNC: true, POLL_INTERVAL_MINUTES: 15,
   GRADES_INTERVAL_MINUTES: 120, ACTIVE_HOURS: '6-22', NTFY_URL: 'https://ntfy.sh', NTFY_TOPIC: '',
   NOTIFY: 'substitutions,homework,grades', NOTIFY_GRADE_VALUES: false, APP_URL: '', HOST: '0.0.0.0',
   PORT: 8090, SESSION_TTL_DAYS: 30, COOKIE_SECURE: false, TRUST_PROXY: false, OPEN_BROWSER: false, UPDATE_CHECK: true,
-  CASEDA_ENABLED: true, CASEDA_URL: 'https://www.caseda-schulmenue.de', CASEDA_USERNAME: 'eltern@example.org',
   CASEDA_BALANCE_WARNING: '10,00',
-  UNTIS_ENABLED: true, UNTIS_SERVER: 'musterschule.webuntis.com', UNTIS_SCHOOL: 'musterschule', UNTIS_USERNAME: 'klasse7b',
 };
 const SCHOOLS = [
   { id: 9999, name: 'Musterschule', city: 'Musterstadt' },
@@ -49,20 +48,27 @@ const doneOverrides = new Map(); // "course/entry" → done
 const fetched = new Map(); // cache key → fetchedAt (ISO)
 const eventClients = new Set();
 let syncRunning = false;
-// Further accounts (children): id → {id, name, schoolId, username, caseda, untis, settings}.
-// MOCK_CHILDREN=1 starts with one ("Mia").
-const children = new Map();
+// The accounts (children): id → {id, name, schoolId, username, caseda, untis, settings, slim}.
+// The first one answers the paths without account. MOCK_CHILDREN=1 adds "Mia" (no
+// calendar, no school meals, fewer homework entries); MOCK_SETUP=1 starts without accounts.
 const newSettings = () => ({ subjectColors: {}, courseSubjects: {},
   substitutionFilter: { classes: [], showUnassigned: false, hiddenTypes: [], hiddenNotices: [] } });
-if (process.env.MOCK_CHILDREN === '1') {
-  children.set('mia001', { id: 'mia001', name: 'Mia', schoolId: 9999, username: 'mia.muster',
-    caseda: null, untis: null, settings: newSettings() });
+const accountsMap = new Map();
+if (!setupRequired) {
+  accountsMap.set('max001', { id: 'max001', name: 'max.muster', schoolId: 9999, username: 'max.muster',
+    caseda: { url: 'https://www.caseda-schulmenue.de', username: 'eltern@example.org' },
+    untis: { server: 'musterschule.webuntis.com', school: 'musterschule', username: 'klasse7b' },
+    settings: newSettings(), slim: false });
 }
-const accountList = () => [
-  { id: 'main', name: serverValues.ACCOUNT_NAME || serverValues.SPH_USERNAME, primary: true,
-    schoolId: serverValues.SPH_SCHOOL_ID, username: serverValues.SPH_USERNAME },
-  ...[...children.values()].map(({ settings: _s, ...c }) => ({ ...c, primary: false })),
-];
+if (process.env.MOCK_CHILDREN === '1') {
+  accountsMap.set('mia001', { id: 'mia001', name: 'Mia', schoolId: 9999, username: 'mia.muster',
+    caseda: null, untis: null, settings: newSettings(), slim: true });
+}
+const publicAccount = ({ settings: _s, slim: _l, ...a }) => a;
+const accountList = () => [...accountsMap.values()].map(publicAccount);
+const updateSetup = () => {
+  setupRequired = !(passwordSet && accountsMap.size > 0);
+};
 // Simulated app update (Einstellungen → Server → Update).
 const update = {
   current: 'v0.6.0', latest: null, available: false, notes: null, mode: 'systemd',
@@ -191,7 +197,7 @@ const untisDay = {
   ],
   notices: [],
 };
-const allSubstitutions = () => (serverValues.UNTIS_ENABLED ? [...substitutions, untisDay] : substitutions);
+const allSubstitutions = (acc) => (acc?.untis ? [...substitutions, untisDay] : substitutions);
 
 const courses = [
   ['101', 'Mathematik 7b', ['Becker']], ['102', 'Deutsch 7b', ['Yilmaz']],
@@ -302,7 +308,7 @@ async function readBody(req) {
 
 async function handleApi(req, res, url) {
   let path = url.pathname;
-  let acct = 'main'; // account the request is for
+  let acct = null; // account the request is for (null: the first one)
   if (path === '/api/setup') return json(res, 200, { setupRequired });
   // During the simulated update the "server" is away for a moment.
   if (Date.now() < restartingUntil) return error(res, 503, 'restarting', 'Restarting');
@@ -313,6 +319,21 @@ async function handleApi(req, res, url) {
         : error(res, 401, 'unauthorized', 'Login required');
     }
     return handleServerSettings(req, res, url);
+  }
+  if (setupRequired && path === '/api/accounts' && req.method === 'POST') {
+    if (req.headers['x-setup-token'] !== SETUP_TOKEN) {
+      return error(res, 403, 'setup_token_invalid', 'Missing or wrong setup token');
+    }
+    const result = await createAccount(req, res);
+    if (!result) return;
+    updateSetup();
+    const headers = {};
+    if (!setupRequired) {
+      const t = Math.random().toString(36).slice(2);
+      sessions.add(t);
+      headers['set-cookie'] = `sph_session=${t}; Path=/; HttpOnly; SameSite=Strict`;
+    }
+    return json(res, 201, result, headers);
   }
   if (setupRequired) return error(res, 503, 'setup_required', 'Not set up');
   if (req.method === 'POST' && path === '/api/auth/login') {
@@ -333,56 +354,44 @@ async function handleApi(req, res, url) {
   // --- accounts (children) ---
   if (path === '/api/accounts' && req.method === 'GET') return json(res, 200, { accounts: accountList() });
   if (path === '/api/accounts' && req.method === 'POST') {
-    const b = JSON.parse((await readBody(req)) || '{}');
-    const problems = [];
-    if (!String(b.name ?? '').trim()) problems.push('A name is required');
-    if (!String(b.username ?? '').trim()) problems.push('A username is required');
-    if (!String(b.password ?? '').trim()) problems.push('A password is required');
-    if (problems.length) {
-      return json(res, 400, { error: { code: 'invalid_settings', message: 'Invalid settings', problems } });
-    }
-    if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
-    const id = Math.random().toString(36).slice(2, 8).padEnd(6, '0');
-    const c = { id, name: String(b.name).trim(), schoolId: Number(b.schoolId) || 9999, username: String(b.username).trim(),
-      caseda: b.caseda ? { url: b.caseda.url ?? 'https://www.caseda-schulmenue.de', username: b.caseda.username } : null,
-      untis: b.untis ? { server: b.untis.server, school: b.untis.school ?? '', username: b.untis.username } : null,
-      settings: newSettings() };
-    children.set(id, c);
-    const { settings: _s, ...pub } = c;
-    return json(res, 201, { ...pub, primary: false });
+    const result = await createAccount(req, res);
+    return result ? json(res, 201, result) : undefined;
   }
   const am = /^\/api\/accounts\/([a-z0-9]+)(?:\/(.*))?$/.exec(path);
   if (am) {
     const [, id, rest] = am;
-    if (id !== 'main' && !children.has(id)) return error(res, 404, 'unknown_account', 'No such account');
+    if (!accountsMap.has(id)) return error(res, 404, 'unknown_account', 'No such account');
     if (rest === undefined) {
       if (req.method === 'DELETE') {
-        if (id === 'main') return error(res, 400, 'bad_request', 'The first account cannot be removed');
-        children.delete(id);
+        if (accountsMap.size <= 1) return error(res, 400, 'bad_request', 'The last account cannot be removed');
+        accountsMap.delete(id);
         res.writeHead(204);
         return res.end();
       }
       if (req.method === 'PUT') {
         const b = JSON.parse((await readBody(req)) || '{}');
         if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
-        if (id === 'main') {
-          serverValues.ACCOUNT_NAME = String(b.name ?? '').trim();
-          return json(res, 200, accountList()[0]);
-        }
-        const c = children.get(id);
+        const c = accountsMap.get(id);
         for (const k of ['name', 'username']) if (b[k]) c[k] = String(b[k]).trim();
         if (b.schoolId) c.schoolId = Number(b.schoolId);
-        if ('caseda' in b) c.caseda = b.caseda && { url: b.caseda.url ?? 'https://www.caseda-schulmenue.de', username: b.caseda.username ?? c.caseda?.username };
-        if ('untis' in b) c.untis = b.untis && { server: b.untis.server ?? c.untis?.server, school: b.untis.school ?? '', username: b.untis.username ?? c.untis?.username };
-        const { settings: _s, ...pub } = c;
-        return json(res, 200, { ...pub, primary: false });
+        if ('caseda' in b) {
+          if (b.caseda?.password === 'falsch') return error(res, 400, 'meals_login_failed', 'Login failed');
+          c.caseda = b.caseda && { url: b.caseda.url ?? c.caseda?.url ?? 'https://www.caseda-schulmenue.de',
+            username: b.caseda.username ?? c.caseda?.username };
+        }
+        if ('untis' in b) {
+          if (b.untis?.password === 'falsch') return error(res, 400, 'untis_login_failed', 'Login failed');
+          c.untis = b.untis && { server: b.untis.server ?? c.untis?.server, school: b.untis.school ?? c.untis?.school ?? '',
+            username: b.untis.username ?? c.untis?.username };
+        }
+        return json(res, 200, publicAccount(c));
       }
       return error(res, 404, 'not_found', 'No such endpoint');
     }
     acct = id;
     path = `/api/${rest}`;
   }
-  const child = children.get(acct) ?? null;
+  const child = accountsMap.get(acct ?? [...accountsMap.keys()][0]);
 
   const hw = /^\/api\/courses\/([^/]+)\/entries\/([^/]+)\/homework$/.exec(path);
   if (hw && req.method === 'PUT') {
@@ -393,11 +402,11 @@ async function handleApi(req, res, url) {
     doneOverrides.set(`${hw[1]}/${hw[2]}`, done);
     return json(res, 200, { done });
   }
-  if (path === '/api/settings' && req.method === 'GET') return json(res, 200, child ? child.settings : settings);
+  if (path === '/api/settings' && req.method === 'GET') return json(res, 200, child.settings);
   if (path === '/api/settings' && req.method === 'PUT') {
     // Fields not sent keep their value (like the real server).
     const body = JSON.parse((await readBody(req)) || '{}');
-    const current = child ? child.settings : settings;
+    const current = child.settings;
     const colors = {};
     for (const [k, v] of Object.entries(body.subjectColors ?? current.subjectColors)) {
       if (!/^#[0-9a-f]{6}$/i.test(v) || !k.trim()) return error(res, 400, 'bad_request', `Invalid color for ${k}`);
@@ -417,7 +426,7 @@ async function handleApi(req, res, url) {
         hiddenTypes: list(f.hiddenTypes), hiddenNotices: list(f.hiddenNotices),
       },
     };
-    if (child) child.settings = next; else settings = next;
+    child.settings = next;
     return json(res, 200, next);
   }
   if (path === '/api/notifications' && req.method === 'GET') {
@@ -481,12 +490,10 @@ async function handleApi(req, res, url) {
   }
   switch (path) {
     case '/api/account':
-      return data(res, 'account', child
-        ? { schoolId: child.schoolId, username: child.username, accountType: 'student',
-          features: ['timetable', 'substitutions', 'lessons'] }
-        : { schoolId: 9999, username: 'max.muster', accountType: 'student',
-          features: ['timetable', 'substitutions', 'calendar', 'lessons'] });
-    case '/api/timetable': return data(res, 'timetable', timetable, serverValues.UNTIS_ENABLED ? {
+      return data(res, 'account', { schoolId: child.schoolId, username: child.username, accountType: 'student',
+        features: child.slim ? ['timetable', 'substitutions', 'lessons']
+          : ['timetable', 'substitutions', 'calendar', 'lessons'] });
+    case '/api/timetable': return data(res, 'timetable', timetable, child.untis ? {
       differences: [
         { weekday: 1, start: '14:00', text: 'Mo 14:00: WebUntis hat LRS, im Schulportal-Stundenplan fehlt sie' },
         { weekday: 3, start: '09:55', text: 'Mi 09:55: Schulportal Mathe, WebUntis Deutsch' },
@@ -494,10 +501,10 @@ async function handleApi(req, res, url) {
     } : {});
     case '/api/substitutions': {
       // Permanent filter from the settings, like the real server.
-      const f = (child ? child.settings : settings).substitutionFilter;
+      const f = child.settings.substitutionFilter;
       const active = f.classes.length > 0 || f.hiddenTypes.length > 0 || f.hiddenNotices.length > 0;
       if (!active || url.searchParams.get('alle') === '1') {
-        return data(res, 'substitutions', allSubstitutions(), { filter: { active: false, hidden: 0 } });
+        return data(res, 'substitutions', allSubstitutions(child), { filter: { active: false, hidden: 0 } });
       }
       const classesOf = (c) => (c ?? '').split(/[,;?/]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
       const wanted = new Set(f.classes.map((c) => c.toLowerCase()));
@@ -509,7 +516,7 @@ async function handleApi(req, res, url) {
         return own.length === 0 ? f.showUnassigned : own.some((c) => wanted.has(c));
       };
       let hidden = 0;
-      const days = allSubstitutions().map((d) => {
+      const days = allSubstitutions(child).map((d) => {
         const entries = d.entries.filter(keep);
         hidden += d.entries.length - entries.length;
         const hiddenNotices = new Set(f.hiddenNotices.map((t) => t.toLowerCase()));
@@ -520,7 +527,7 @@ async function handleApi(req, res, url) {
     case '/api/courses': return data(res, 'courses', courses);
     case '/api/homework': {
       const withDone = (h) => ({ ...h, done: doneOverrides.get(`${h.courseId}/${h.entryId}`) ?? h.done });
-      if (child) return data(res, url.searchParams.get('alle') === '1' ? 'homework:all' : 'homework', homework.slice(0, 2).map(withDone));
+      if (child.slim) return data(res, url.searchParams.get('alle') === '1' ? 'homework:all' : 'homework', homework.slice(0, 2).map(withDone));
       if (url.searchParams.get('alle') !== '1') return data(res, 'homework', homework.map(withDone));
       // All homework: current entries plus older ones from the course histories.
       const all = [...homework.map(withDone)];
@@ -536,7 +543,7 @@ async function handleApi(req, res, url) {
     case '/api/grades': return data(res, 'grades', grades);
     case '/api/meals': {
       // School meals (Caseda): own orders and balance; off in the settings → 404.
-      if (child ? !child.caseda : !serverValues.CASEDA_ENABLED) {
+      if (!child.caseda) {
         return error(res, 404, 'meals_disabled', 'School meals are not set up');
       }
       const order = (date, line, name, allergens = [], priceCents = 390, ordered = 1) =>
@@ -579,32 +586,15 @@ async function handleServerSettings(req, res, url) {
     return json(res, 200, words.length === 0 ? [] : SCHOOLS.filter((s) =>
       words.every((w) => `${s.id} ${s.name} ${s.city}`.toLowerCase().includes(w))));
   }
-  if (path === '/api/server-settings/test-login') {
-    const b = JSON.parse((await readBody(req)) || '{}');
-    // Password "falsch" simulates wrong credentials.
-    if (b.password === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
-    return json(res, 200, { ok: true });
-  }
-  if (path === '/api/server-settings/test-untis') {
-    const b = JSON.parse((await readBody(req)) || '{}');
-    if (b.password === 'falsch') return error(res, 400, 'untis_login_failed', 'Login failed');
-    return json(res, 200, { ok: true, className: '07bG' });
-  }
-  if (path === '/api/server-settings/test-caseda') {
-    const b = JSON.parse((await readBody(req)) || '{}');
-    if (b.password === 'falsch') return error(res, 400, 'meals_login_failed', 'Login failed');
-    return json(res, 200, { ok: true });
-  }
   if (req.method === 'GET') {
     return json(res, 200, {
       setupRequired, values: serverValues, desktop: false,
-      secrets: { SPH_PASSWORD: !setupRequired, NTFY_TOKEN: false, APP_PASSWORD: !setupRequired, CASEDA_PASSWORD: true, UNTIS_PASSWORD: true },
+      secrets: { NTFY_TOKEN: false, APP_PASSWORD: passwordSet },
       sources: {}, restartRequired: [],
     });
   }
   const b = JSON.parse((await readBody(req)) || '{}');
   const s = b.settings ?? {};
-  if (s.SPH_PASSWORD === 'falsch') return error(res, 400, 'sph_login_failed', 'Wrong username or password');
   if (s.POLL_INTERVAL_MINUTES && Number(s.POLL_INTERVAL_MINUTES) < 5) {
     return json(res, 400, { error: { code: 'invalid_settings', message: 'Invalid settings',
       problems: ['POLL_INTERVAL_MINUTES must be at least 5'] } });
@@ -614,24 +604,48 @@ async function handleServerSettings(req, res, url) {
       return error(res, 403, 'invalid_password', 'Current password is wrong');
     }
     appPassword = b.appPassword;
+    passwordSet = true;
   }
   const restart = [];
   for (const [k, v] of Object.entries(s)) {
-    if (k === 'SPH_PASSWORD' || k === 'NTFY_TOKEN' || k === 'CASEDA_PASSWORD' || k === 'UNTIS_PASSWORD') continue;
+    if (k === 'NTFY_TOKEN') continue;
     if (['HOST', 'PORT'].includes(k) && String(serverValues[k]) !== String(v)) restart.push(k);
     serverValues[k] = typeof serverValues[k] === 'number' ? Number(v)
       : typeof serverValues[k] === 'boolean' ? v === 'true' : v;
   }
   const headers = {};
   const wasSetup = setupRequired;
-  if (setupRequired) {
-    setupRequired = false;
+  updateSetup();
+  if (wasSetup && !setupRequired) {
     const t = Math.random().toString(36).slice(2);
     sessions.add(t);
     headers['set-cookie'] = `sph_session=${t}; Path=/; HttpOnly; SameSite=Strict`;
   }
-  return json(res, 200, { saved: true, setupRequired, restartRequired: restart,
-    accountChanged: !wasSetup && 'SPH_USERNAME' in s }, headers);
+  return json(res, 200, { saved: true, setupRequired, restartRequired: restart }, headers);
+}
+
+/** Adds an account from a request body; answers errors itself and then returns null. */
+async function createAccount(req, res) {
+  const b = JSON.parse((await readBody(req)) || '{}');
+  const problems = [];
+  if (!String(b.username ?? '').trim()) problems.push('A username is required');
+  if (!String(b.password ?? '').trim()) problems.push('A password is required');
+  if (problems.length) {
+    json(res, 400, { error: { code: 'invalid_settings', message: 'Invalid settings', problems } });
+    return null;
+  }
+  if (b.password === 'falsch') {
+    error(res, 400, 'sph_login_failed', 'Wrong username or password');
+    return null;
+  }
+  const id = Math.random().toString(36).slice(2, 8).padEnd(6, '0');
+  const username = String(b.username).trim();
+  const c = { id, name: String(b.name ?? '').trim() || username, schoolId: Number(b.schoolId) || 9999, username,
+    caseda: b.caseda ? { url: b.caseda.url ?? 'https://www.caseda-schulmenue.de', username: b.caseda.username } : null,
+    untis: b.untis ? { server: b.untis.server, school: b.untis.school ?? '', username: b.untis.username } : null,
+    settings: newSettings(), slim: accountsMap.size > 0 };
+  accountsMap.set(id, c);
+  return publicAccount(c);
 }
 
 async function handleStatic(req, res, url) {

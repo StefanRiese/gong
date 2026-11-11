@@ -708,8 +708,6 @@ void main() {
 
   group('AppConfig notifications', () {
     final base = {
-      'SPH_USERNAME': 'u',
-      'SPH_PASSWORD': 'p',
       'APP_PASSWORD_HASH': PasswordHasher.hash('geheim123', iterations: 10),
     };
 

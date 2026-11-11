@@ -17,7 +17,7 @@ Dart backend for Lumo, built on [liblanis](https://pub.dev/packages/liblanis).
 
 ```sh
 cd server
-cp .env.example .env        # then fill in SPH_USERNAME and SPH_PASSWORD
+cp .env.example .env        # then fill in SPH_USERNAME and SPH_PASSWORD (debug tools, first start)
 dart pub get
 dart run bin/spike.dart --db-only   # SQLite only, no network
 dart run bin/spike.dart             # login + summary (counts only)
@@ -132,15 +132,29 @@ time with short pauses:
 | `untis` | like `substitutions` (only with WebUntis) | `untis` – changed lessons of the class (`lib/src/untis/`), merged into `/api/substitutions` |
 | `account`, `timetable` | 6 h | `account`, `timetable` |
 
-### Optional sources
+### Accounts and optional sources
 
-Both are off until set up (*Einstellungen*, or `CASEDA_*` / `UNTIS_*` in the config
-file; `…_ENABLED=false` switches off but keeps the login). Both are read-only and sit behind
-gateway interfaces (`MealsGateway`, `UntisGateway`), so tests use fakes.
+All accounts (children) are in the database (`AccountStore`, `lib/src/config/accounts.dart`):
+Schulportal login, name and – optionally – Caseda and WebUntis. The first one answers the API
+paths without account; every account has its own `SphService`, `ResponseCache`, `SyncService`,
+`Poller` and `Api` instance (`AppServer._Account`); their rows in `cache`, `seen` and `meta` carry
+the prefix `@<id>/` (`lib/src/storage/portal_state.dart`). Web password, sync schedule, ntfy and
+update are shared settings.
+
+**Update from before 0.19.** There the one account was configured by `SPH_*`, `CASEDA_*`,
+`UNTIS_*` and `ACCOUNT_NAME` (config file or web UI). On the first start `migrateLegacyAccount`
+(`lib/src/config/migrate_accounts.dart`) turns them into the first account (id `main`), moves
+its cached data, seen items, sync / poll status and user settings to the account's scope and
+deletes the old keys from the web UI settings, all in one transaction and only once (marker
+`accounts-schema` in the table `meta`). Accounts added with 0.18 stay. Afterwards the old keys in
+`config.env` are ignored. A new installation that has these keys in `config.env` gets its first
+account from them the same way.
+
+Caseda and WebUntis are read-only and sit behind gateway interfaces (`MealsGateway`,
+`UntisGateway`), so tests use fakes.
 
 - **School meals (Caseda Schulmenü):** balance and own orders of three weeks; page *Schulessen*,
-  today's meal on Heute. `CASEDA_URL`, `CASEDA_USERNAME`, `CASEDA_PASSWORD`,
-  `CASEDA_BALANCE_WARNING`.
+  today's meal on Heute. Login per account; `CASEDA_BALANCE_WARNING` is a server setting.
 - **WebUntis:** changed lessons of the account's class for 21 days from the REST interface of
   the WebUntis web app (a class account is enough). `GET /api/substitutions` combines them
   with the plan (`mergeUntis`): entries in both sources are completed (original teacher,
@@ -149,9 +163,8 @@ gateway interfaces (`MealsGateway`, `UntisGateway`), so tests use fakes.
   the plan become new days. Notifications get the plan without the completions (fingerprints).
   The regular lessons of the current and the next week are compared with the Schulportal
   timetable (`compareTimetables`); `GET /api/timetable` then adds `differences` and the page
-  *Stundenplan* shows a warning.
-  `UNTIS_SERVER` (host or pasted address), `UNTIS_SCHOOL` (default: first part of the host),
-  `UNTIS_USERNAME`, `UNTIS_PASSWORD`.
+  *Stundenplan* shows a warning. Login per account: address (host or pasted web address), school
+  (default: first part of the host), user name, password.
 
 Failures are retried after 5, 10, 20 … min (at most the interval); `SYNC=false` disables the
 schedule (data is then loaded on demand). The `ResponseCache` answers from the cache right away

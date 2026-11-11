@@ -95,12 +95,7 @@ void main() {
     final hash = PasswordHasher.hash('geheim123', iterations: 10);
 
     test('parses env with defaults', () {
-      final c = AppConfig.fromEnv({
-        'SPH_USERNAME': 'u',
-        'SPH_PASSWORD': 'p',
-        'APP_PASSWORD_HASH': hash,
-      });
-      expect(c.sph.schoolId, 6128);
+      final c = AppConfig.fromEnv({'APP_PASSWORD_HASH': hash});
       expect(c.host, '127.0.0.1');
       expect(c.port, 8080);
       expect(c.webDir, isNull);
@@ -110,9 +105,6 @@ void main() {
 
     test('parses overrides', () {
       final c = AppConfig.fromEnv({
-        'SPH_SCHOOL_ID': '5151',
-        'SPH_USERNAME': 'u',
-        'SPH_PASSWORD': 'p',
         'APP_PASSWORD_HASH': hash,
         'HOST': '0.0.0.0',
         'PORT': '9000',
@@ -121,7 +113,6 @@ void main() {
         'TRUST_PROXY': '1',
         'SESSION_TTL_DAYS': '7',
       });
-      expect(c.sph.schoolId, 5151);
       expect(c.host, '0.0.0.0');
       expect(c.port, 9000);
       expect(c.webDir, '/opt/web');
@@ -135,7 +126,6 @@ void main() {
         () => AppConfig.fromEnv({'PORT': 'abc', 'APP_PASSWORD_HASH': 'x'}),
         throwsA(
           isA<ConfigException>().having((e) => e.problems, 'problems', [
-            contains('SPH_USERNAME'),
             contains('invalid format'),
             contains('PORT'),
           ]),
@@ -143,48 +133,39 @@ void main() {
       );
     });
 
-    test('Caseda: login, switch, warning amount', () {
-      final base = {
-        'SPH_USERNAME': 'u',
-        'SPH_PASSWORD': 'p',
-        'APP_PASSWORD_HASH': hash,
-      };
-      expect(AppConfig.fromEnv(base).caseda, isNull);
-      var c = AppConfig.fromEnv({
-        ...base,
-        'CASEDA_USERNAME': 'e@example.org',
-        'CASEDA_PASSWORD': 'pw',
-        'CASEDA_BALANCE_WARNING': '7,5',
-      });
-      expect(c.caseda!.url.host, 'www.caseda-schulmenue.de');
-      expect(c.mealsBalanceWarningCents, 750);
-      c = AppConfig.fromEnv({
-        ...base,
-        'CASEDA_USERNAME': 'e@example.org',
-        'CASEDA_PASSWORD': 'pw',
-        'CASEDA_ENABLED': 'false',
-      });
-      expect(c.caseda, isNull);
+    test('Caseda: warning amount', () {
+      final base = {'APP_PASSWORD_HASH': hash};
+      expect(AppConfig.fromEnv(base).mealsBalanceWarningCents, 1000);
       expect(
-        () => AppConfig.fromEnv({
+        AppConfig.fromEnv({
           ...base,
-          'CASEDA_USERNAME': 'e@example.org',
-          'CASEDA_URL': 'http://x',
-          'CASEDA_BALANCE_WARNING': 'viel',
-        }),
+          'CASEDA_BALANCE_WARNING': '7,5',
+        }).mealsBalanceWarningCents,
+        750,
+      );
+      expect(
+        () => AppConfig.fromEnv({...base, 'CASEDA_BALANCE_WARNING': 'viel'}),
         throwsA(
           isA<ConfigException>().having((e) => e.problems, 'problems', [
-            contains('CASEDA_USERNAME and CASEDA_PASSWORD'),
             contains('CASEDA_BALANCE_WARNING'),
           ]),
         ),
       );
     });
 
+    test('the old account settings are no configuration any more', () {
+      // Read once by the migration (see migrate_accounts_test.dart).
+      final c = AppConfig.fromEnv({
+        'APP_PASSWORD_HASH': hash,
+        'SPH_USERNAME': 'u',
+        'CASEDA_USERNAME': 'e@example.org',
+        'UNTIS_SERVER': 'bad server',
+      });
+      expect(c.needsSetup, isFalse);
+    });
+
     test('APP_PASSWORD (plain) is hashed and wins over the hash', () {
       final c = AppConfig.fromEnv({
-        'SPH_USERNAME': 'u',
-        'SPH_PASSWORD': 'p',
         'APP_PASSWORD': 'neues-passwort',
         'APP_PASSWORD_HASH': hash,
         'OPEN_BROWSER': 'true',
@@ -195,11 +176,8 @@ void main() {
       );
       expect(c.openBrowser, isTrue);
       expect(
-        () => AppConfig.fromEnv({
-          'SPH_USERNAME': 'u',
-          'SPH_PASSWORD': 'p',
-          'APP_PASSWORD': 'kurz',
-        }, passwordIterations: 10),
+        () =>
+            AppConfig.fromEnv({'APP_PASSWORD': 'kurz'}, passwordIterations: 10),
         throwsA(
           isA<ConfigException>().having((e) => e.problems, 'problems', [
             contains('at least 8'),

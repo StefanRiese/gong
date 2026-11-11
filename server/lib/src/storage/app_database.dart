@@ -210,6 +210,37 @@ class AppDatabase implements CacheStore, PortalState {
     }
   }
 
+  /// Runs [action] in one transaction (all or nothing).
+  T transaction<T>(T Function() action) {
+    _db.execute('BEGIN');
+    try {
+      final result = action();
+      _db.execute('COMMIT');
+      return result;
+    } catch (_) {
+      _db.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  /// Gives everything that belongs to the single account of versions before
+  /// 0.19 (rows without scope prefix: cached data, seen items, sync / poll
+  /// status, user settings) the scope [prefix] of an account (see
+  /// [scopePrefix]).
+  void moveUnscopedTo(String prefix) {
+    _db.execute("UPDATE cache SET key = ? || key WHERE key NOT LIKE '@%'", [
+      prefix,
+    ]);
+    _db.execute("UPDATE seen SET kind = ? || kind WHERE kind NOT LIKE '@%'", [
+      prefix,
+    ]);
+    _db.execute(
+      "UPDATE meta SET key = ? || key WHERE key = 'settings' "
+      "OR key LIKE 'poll:%' OR key LIKE 'sync:%'",
+      [prefix],
+    );
+  }
+
   /// Expiry of the session, or null if unknown.
   DateTime? sessionExpiry(String token) {
     final rows = _db.select(

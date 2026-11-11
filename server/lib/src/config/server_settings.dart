@@ -8,10 +8,6 @@ import '../storage/app_database.dart';
 /// „Einstellungen“). Names are the config.env keys.
 abstract final class ServerSettingKeys {
   static const editable = {
-    'ACCOUNT_NAME',
-    'SPH_SCHOOL_ID',
-    'SPH_USERNAME',
-    'SPH_PASSWORD',
     'APP_PASSWORD_HASH',
     'SYNC',
     'POLL_INTERVAL_MINUTES',
@@ -30,26 +26,11 @@ abstract final class ServerSettingKeys {
     'TRUST_PROXY',
     'OPEN_BROWSER',
     'UPDATE_CHECK',
-    'CASEDA_ENABLED',
-    'CASEDA_URL',
-    'CASEDA_USERNAME',
-    'CASEDA_PASSWORD',
     'CASEDA_BALANCE_WARNING',
-    'UNTIS_ENABLED',
-    'UNTIS_SERVER',
-    'UNTIS_SCHOOL',
-    'UNTIS_USERNAME',
-    'UNTIS_PASSWORD',
   };
 
   /// Never sent to the browser (only whether they are set).
-  static const secret = {
-    'SPH_PASSWORD',
-    'NTFY_TOKEN',
-    'APP_PASSWORD_HASH',
-    'CASEDA_PASSWORD',
-    'UNTIS_PASSWORD',
-  };
+  static const secret = {'NTFY_TOKEN', 'APP_PASSWORD_HASH'};
 
   /// Take effect only after a restart of the server.
   static const restart = {
@@ -70,6 +51,13 @@ class WebSettingsStore {
   WebSettingsStore(this.db);
 
   static const _key = 'server-config';
+
+  /// All stored values, also settings that no longer exist (migration).
+  Map<String, String> loadRaw() => {
+    for (final MapEntry(:key, :value)
+        in (db.getJson(_key) ?? const <String, Object?>{}).entries)
+      if (value is String) key: value,
+  };
 
   Map<String, String> load() => {
     for (final MapEntry(:key, :value)

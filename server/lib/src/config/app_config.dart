@@ -1,10 +1,8 @@
 import '../auth/password.dart';
 import '../notify/poller.dart';
 import '../sync/sync_service.dart';
-import 'env.dart';
 
-/// ntfy push notification settings; null in [AppConfig.ntfy] = disabled.
-/// Caseda Schulmenü login (school meals); null in [AppConfig.caseda] = off.
+/// Caseda Schulmenü login (school meals) of an account; null = off.
 class CasedaConfig {
   final Uri url;
   final String username;
@@ -17,8 +15,7 @@ class CasedaConfig {
   });
 }
 
-/// WebUntis login (second source for substitutions); null in
-/// [AppConfig.untis] = off.
+/// WebUntis login (second source for substitutions) of an account; null = off.
 class UntisConfig {
   /// Host name, e.g. "ghs-griesheim.webuntis.com".
   final String server;
@@ -49,6 +46,7 @@ class UntisConfig {
   }
 }
 
+/// ntfy push notification settings; null in [AppConfig.ntfy] = disabled.
 class NtfyConfig {
   final Uri server;
   final String topic;
@@ -59,12 +57,6 @@ class NtfyConfig {
 
 /// Server configuration from environment variables / `.env`.
 class AppConfig {
-  final SphCredentials sph;
-
-  /// Name of the first account in the account switcher (ACCOUNT_NAME);
-  /// empty = the Schulportal user name.
-  final String accountName;
-
   /// PBKDF2 hash of the web UI password (see bin/hash_password.dart).
   final String appPasswordHash;
   final String host;
@@ -99,18 +91,10 @@ class AppConfig {
   /// Look for new releases on GitHub (UPDATE_CHECK, default on).
   final bool updateCheck;
 
-  /// School meals (Caseda Schulmenü): balance and own orders; null = off.
-  final CasedaConfig? caseda;
-
   /// Balance below this is highlighted in the web UI (CASEDA_BALANCE_WARNING).
   final int mealsBalanceWarningCents;
 
-  /// WebUntis as a second source for substitutions; null = off.
-  final UntisConfig? untis;
-
   const AppConfig({
-    required this.sph,
-    this.accountName = '',
     required this.appPasswordHash,
     this.host = '127.0.0.1',
     this.port = 8080,
@@ -125,20 +109,17 @@ class AppConfig {
     this.sync = const SyncConfig(),
     this.openBrowser = false,
     this.updateCheck = true,
-    this.caseda,
     this.mealsBalanceWarningCents = 1000,
-    this.untis,
     this.missing = const [],
   });
 
   /// Required settings that are not set yet (with `allowIncomplete`): the
-  /// server then starts in setup mode (web UI setup page).
+  /// server then starts in setup mode (web UI setup page). The accounts are
+  /// not part of the configuration (see `AccountStore`); without one the
+  /// server is in setup mode as well.
   final List<String> missing;
 
   bool get needsSetup => missing.isNotEmpty;
-
-  /// Name of the first account as shown in the web UI.
-  String get displayName => accountName.isNotEmpty ? accountName : sph.username;
 
   String get databasePath => '$dataDir/lumo.db';
 
@@ -146,8 +127,8 @@ class AppConfig {
   static final _hoursPattern = RegExp(r'^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$');
 
   /// Parses [env]; throws [ConfigException] listing all problems.
-  /// With [allowIncomplete], missing Schulportal credentials or web UI
-  /// password are no error but listed in [missing] (setup mode).
+  /// With [allowIncomplete], a missing web UI password is no error but listed
+  /// in [missing] (setup mode).
   /// [passwordIterations] overrides the PBKDF2 cost for a plain
   /// APP_PASSWORD (tests).
   factory AppConfig.fromEnv(
@@ -160,14 +141,6 @@ class AppConfig {
     String? get(String key) {
       final v = env[key]?.trim();
       return (v == null || v.isEmpty) ? null : v;
-    }
-
-    var sph = SphCredentials.fromEnv(env);
-    if (sph == null) {
-      const message = 'SPH_USERNAME and SPH_PASSWORD are required';
-      (allowIncomplete ? missing : problems).add(message);
-      final school = int.tryParse(get('SPH_SCHOOL_ID') ?? '6128') ?? 6128;
-      sph = SphCredentials(school, get('SPH_USERNAME') ?? '', '');
     }
 
     // APP_PASSWORD (plain text) wins over APP_PASSWORD_HASH; the desktop
@@ -277,33 +250,6 @@ class AppConfig {
       }
     }
 
-    // --- school meals (Caseda Schulmenü) ---
-    // CASEDA_ENABLED=false switches it off but keeps the login.
-    CasedaConfig? caseda;
-    final casedaUser = get('CASEDA_USERNAME');
-    final casedaPassword = get('CASEDA_PASSWORD');
-    final casedaEnabled = !const {
-      '0',
-      'false',
-      'no',
-      'off',
-    }.contains(env['CASEDA_ENABLED']?.trim().toLowerCase());
-    if (casedaEnabled && (casedaUser != null || casedaPassword != null)) {
-      final url = Uri.tryParse(
-        get('CASEDA_URL') ?? 'https://www.caseda-schulmenue.de',
-      );
-      if (casedaUser == null || casedaPassword == null) {
-        problems.add('CASEDA_USERNAME and CASEDA_PASSWORD are both needed');
-      } else if (url == null || !url.isScheme('https') || url.host.isEmpty) {
-        problems.add('CASEDA_URL must be an https URL');
-      } else {
-        caseda = CasedaConfig(
-          url: url,
-          username: casedaUser,
-          password: casedaPassword,
-        );
-      }
-    }
     int? warning;
     final warningRaw = get('CASEDA_BALANCE_WARNING');
     if (warningRaw != null) {
@@ -317,53 +263,9 @@ class AppConfig {
       }
     }
 
-    // --- WebUntis (second source for substitutions) ---
-    // UNTIS_ENABLED=false switches it off but keeps the login.
-    UntisConfig? untis;
-    final untisServerRaw = get('UNTIS_SERVER');
-    final untisUser = get('UNTIS_USERNAME');
-    final untisPassword = get('UNTIS_PASSWORD');
-    final untisEnabled = !const {
-      '0',
-      'false',
-      'no',
-      'off',
-    }.contains(env['UNTIS_ENABLED']?.trim().toLowerCase());
-    if (untisEnabled &&
-        (untisServerRaw != null ||
-            untisUser != null ||
-            untisPassword != null)) {
-      final server = untisServerRaw == null
-          ? null
-          : UntisConfig.parseServer(untisServerRaw);
-      if (untisServerRaw == null ||
-          untisUser == null ||
-          untisPassword == null) {
-        problems.add(
-          'UNTIS_SERVER, UNTIS_USERNAME and UNTIS_PASSWORD are all needed',
-        );
-      } else if (server == null) {
-        problems.add('UNTIS_SERVER must be a host name like xyz.webuntis.com');
-      } else {
-        untis = UntisConfig(
-          server: server,
-          school: get('UNTIS_SCHOOL') ?? server.split('.').first,
-          username: untisUser,
-          password: untisPassword,
-        );
-      }
-    }
-
-    final accountName = get('ACCOUNT_NAME') ?? '';
-    if (accountName.length > 40) {
-      problems.add('ACCOUNT_NAME may have at most 40 characters');
-    }
-
     if (problems.isNotEmpty) throw ConfigException(problems);
 
     return AppConfig(
-      sph: sph,
-      accountName: accountName,
       appPasswordHash: hash,
       host: get('HOST') ?? '127.0.0.1',
       port: port!,
@@ -397,9 +299,7 @@ class AppConfig {
         'no',
         'off',
       }.contains(env['UPDATE_CHECK']?.trim().toLowerCase()),
-      caseda: caseda,
       mealsBalanceWarningCents: warning ?? 1000,
-      untis: untis,
       missing: missing,
     );
   }

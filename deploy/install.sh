@@ -238,17 +238,25 @@ configure() { # force
   echo
   say "Einrichtung"
   local school user pw app1 app2 hash
-  school=$(ask "Schulnummer (Schulportal Hessen)" "$(config_get SPH_SCHOOL_ID)")
-  [[ $school =~ ^[0-9]+$ ]] || die "Schulnummer muss eine Zahl sein."
-  user=$(ask "Schulportal-Benutzername (z. B. vorname.nachname)" "$(config_get SPH_USERNAME)")
-  [[ -n $user ]] || die "Benutzername fehlt."
-  local has_pw=0
-  [[ -n $(config_get SPH_PASSWORD) ]] && has_pw=1
-  if [[ $has_pw == 1 ]]; then
-    pw=$(ask_secret "Schulportal-Passwort (leer = unverändert)")
+  # The Schulportal accounts are managed in the web UI. Only a new installation
+  # (no database yet) takes the first one from here, once, on its first start.
+  local with_account=1
+  [[ -f $STATE_DIR/lumo.db ]] && with_account=0
+  if [[ $with_account == 1 ]]; then
+    school=$(ask "Schulnummer (Schulportal Hessen)" "$(config_get SPH_SCHOOL_ID)")
+    [[ $school =~ ^[0-9]+$ ]] || die "Schulnummer muss eine Zahl sein."
+    user=$(ask "Schulportal-Benutzername (z. B. vorname.nachname)" "$(config_get SPH_USERNAME)")
+    [[ -n $user ]] || die "Benutzername fehlt."
+    local has_pw=0
+    [[ -n $(config_get SPH_PASSWORD) ]] && has_pw=1
+    if [[ $has_pw == 1 ]]; then
+      pw=$(ask_secret "Schulportal-Passwort (leer = unverändert)")
+    else
+      pw=$(ask_secret "Schulportal-Passwort")
+      [[ -n $pw ]] || die "Passwort fehlt."
+    fi
   else
-    pw=$(ask_secret "Schulportal-Passwort")
-    [[ -n $pw ]] || die "Passwort fehlt."
+    echo "Die Schulportal-Konten (Kinder) werden in der Web-Oberfläche verwaltet (Einstellungen)."
   fi
 
   echo "Passwort für die Web-Oberfläche (mind. 8 Zeichen; leer = unverändert, falls schon gesetzt)."
@@ -264,9 +272,11 @@ configure() { # force
     die "Ein Web-Passwort ist erforderlich."
   fi
 
-  config_set SPH_SCHOOL_ID "$school"
-  config_set SPH_USERNAME "$user"
-  [[ -z $pw ]] || config_set SPH_PASSWORD "$pw"
+  if [[ $with_account == 1 ]]; then
+    config_set SPH_SCHOOL_ID "$school"
+    config_set SPH_USERNAME "$user"
+    [[ -z $pw ]] || config_set SPH_PASSWORD "$pw"
+  fi
   configure_ntfy
   say "Einstellungen gespeichert in $CONFIG_FILE (nur für root lesbar)"
 }
@@ -501,8 +511,8 @@ do_configure() {
   # Settings made in the web UI take precedence over config.env: let the
   # server forget them for the keys just entered (applied on its next start).
   if [[ -d $STATE_DIR ]]; then
-    printf '%s\n' SPH_SCHOOL_ID SPH_USERNAME SPH_PASSWORD APP_PASSWORD_HASH \
-      NTFY_URL NTFY_TOPIC NTFY_TOKEN APP_URL > "$STATE_DIR/reset-web-settings"
+    printf '%s\n' APP_PASSWORD_HASH NTFY_URL NTFY_TOPIC NTFY_TOKEN APP_URL \
+      > "$STATE_DIR/reset-web-settings"
     chmod 644 "$STATE_DIR/reset-web-settings"
   fi
   if [[ $SKIP_SYSTEMD != 1 ]] && systemctl is-enabled --quiet "$APP" 2>/dev/null; then

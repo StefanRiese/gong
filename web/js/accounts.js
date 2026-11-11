@@ -7,11 +7,11 @@ import { h } from './dom.js';
 
 const KEY = 'lumo.account';
 
-/** @type {{id: string, name: string, primary: boolean, schoolId?: number, username?: string, caseda?: any, untis?: any}[]} */
+/** @type {{id: string, name: string, schoolId?: number, username?: string, caseda?: any, untis?: any}[]} */
 export let accounts = [];
 
 /** Id of the account shown right now. */
-export let current = 'main';
+export let current = '';
 
 function saved() {
   try {
@@ -52,15 +52,15 @@ export function pickAccount() {
     const query = params.toString();
     history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
   }
-  const id = [linked, saved(), current].find((c) => c && accounts.some((a) => a.id === c)) ?? 'main';
+  const id = [linked, saved(), current].find((c) => c && accounts.some((a) => a.id === c)) ?? accounts[0]?.id ?? '';
   use(id);
   return id;
 }
 
 function use(id) {
   current = id;
-  setAccount(id);
-  remember(id);
+  setAccount(id || null);
+  if (id) remember(id);
 }
 
 /** Switches to [id] (the caller reloads the page content). */

@@ -13,6 +13,7 @@ import '../caseda/caseda.dart';
 import '../untis/untis.dart';
 import '../config/accounts.dart';
 import '../config/app_config.dart';
+import '../config/migrate_accounts.dart';
 import '../config/env.dart';
 import '../config/server_settings.dart';
 import '../desktop/build_info.g.dart';
@@ -52,31 +53,31 @@ class AppServerException implements Exception {
   String toString() => message;
 }
 
-/// A further account (child): its own portal session, cache, sync and
+/// One account (child): its own portal session, cache, sync and
 /// notifications, served by its own [Api].
-class _Child {
+class _Account {
   AccountConfig config;
   SphService service;
   final ResponseCache cache;
   final Api api;
   late SyncService sync;
 
-  _Child(this.config, this.service, this.cache, this.api);
+  _Account(this.config, this.service, this.cache, this.api);
 
   String get prefix => scopePrefix(config.id);
 }
 
-/// The running HTTP server with database, portal session and sync.
+/// The running HTTP server with database, portal sessions and sync.
 ///
 /// Configuration comes from environment variables / config.env ([start]'s
 /// `env`), overlaid by the settings made in the web UI (stored in the
-/// database). Without Schulportal credentials or web UI password the server
-/// runs in setup mode: the web UI shows the setup page, authorized by a
-/// one-time token ([setupUrl]).
+/// database). The accounts (children) are kept in the database (see
+/// [AccountStore]). Without an account or web UI password the server runs in
+/// setup mode: the web UI shows the setup page, authorized by a one-time token
+/// ([setupUrl]).
 class AppServer implements ServerControl {
   final HttpServer _http;
   final AppDatabase _db;
-  final ResponseCache _cache;
   final Api _api;
   final Map<String, String> _base;
   final WebSettingsStore _web;
@@ -90,11 +91,12 @@ class AppServer implements ServerControl {
   final AppConfig startedConfig;
 
   AppConfig _config;
-  SphService _service;
-  SyncService _sync;
   final UpdateService _update;
   final AccountStore _accountStore;
-  final _children = <String, _Child>{};
+
+  /// The accounts in display order; the first one answers the API paths
+  /// without account.
+  final _accounts = <String, _Account>{};
   SetupToken? _setupToken;
   Future<void> _applying = Future.value();
   Future<void>? _stopping;
@@ -102,7 +104,6 @@ class AppServer implements ServerControl {
   AppServer._(
     this._http,
     this._db,
-    this._cache,
     this._api,
     this._base,
     this._web,
@@ -112,8 +113,6 @@ class AppServer implements ServerControl {
     this._schools,
     this._log,
     this._config,
-    this._service,
-    this._sync,
     this._update,
     this._setupToken,
   ) : startedConfig = _config,
@@ -122,6 +121,9 @@ class AppServer implements ServerControl {
   AppConfig get config => _config;
 
   int get port => _http.port;
+
+  /// Number of accounts (children).
+  int get accountCount => _accounts.length;
 
   /// Address of the web UI for a browser on this machine.
   Uri get localUrl => localUrlFor(_config.host, port);
@@ -215,6 +217,19 @@ class AppServer implements ServerControl {
 
     final web = WebSettingsStore(db);
     _applyResetMarker(boot.dataDir, web, info);
+    try {
+      // Update from versions with one account in the settings.
+      migrateLegacyAccount(
+        db: db,
+        env: env,
+        web: web,
+        store: AccountStore(db),
+        log: info,
+      );
+    } on Object catch (e) {
+      db.close();
+      throw AppServerException('Cannot update the account settings: $e', 78);
+    }
     final AppConfig config;
     try {
       config = AppConfig.fromEnv(
@@ -226,42 +241,14 @@ class AppServer implements ServerControl {
       throw AppServerException('$e', 78);
     }
 
-    // Cached portal data lives in the database, so it is there right after
-    // a restart and while the portal is down.
-    final cache = Api.createCache(store: db);
-    final settings = SettingsStore(db);
-    final service = SphService(makeGateway(config.sph));
-    final sync = _createSync(
-      service,
-      cache,
-      db,
-      config,
-      config.caseda,
-      config.untis,
-      info,
-      makeMeals,
-      makeUntis,
-    );
-    late final AppServer server;
+    // Routes the requests to the accounts; serves no account itself.
     final api = Api(
-      service: service,
       passwordHash: config.appPasswordHash,
       sessions: SessionStore(ttl: config.sessionTtl, database: db),
-      cache: cache,
       cookieSecure: config.cookieSecure,
       trustProxy: config.trustProxy,
       webDir: webDir,
       embeddedWeb: embedded,
-      poller: _createPoller(
-        sync,
-        db,
-        settings,
-        config,
-        info,
-        () => server._label(AccountConfig.mainId),
-      ),
-      sync: sync,
-      settings: settings,
       passwordIterations: passwordIterations,
     );
 
@@ -273,8 +260,6 @@ class AppServer implements ServerControl {
       http = await _listen(handler, config.host, config.port);
     } on Object {
       await api.close();
-      await sync.stop();
-      await service.dispose();
       db.close();
       rethrow;
     }
@@ -293,16 +278,11 @@ class AppServer implements ServerControl {
       log: info,
       get: updateGet,
     )..cleanUp();
-    api
-      ..update = update
-      ..meals = config.caseda == null ? null : makeMeals(config.caseda!)
-      ..mealsBalanceWarningCents = config.mealsBalanceWarningCents
-      ..untisEnabled = config.untis != null;
+    api.update = update;
 
-    server = AppServer._(
+    final server = AppServer._(
       http,
       db,
-      cache,
       api,
       env,
       web,
@@ -312,13 +292,18 @@ class AppServer implements ServerControl {
       schools ?? SchoolDirectory(),
       log,
       config,
-      service,
-      sync,
       update,
-      config.needsSetup ? SetupToken.create(dataDir: config.dataDir) : null,
+      null,
     );
-    api.control = server;
-    server._startChildren();
+    api
+      ..control = server
+      ..defaultAccount = (() => server._accounts.values.firstOrNull?.api);
+    for (final c in server._accountStore.load()) {
+      server._accounts[c.id] = server._createAccount(c);
+    }
+    if (server._needsSetup) {
+      server._setupToken = SetupToken.create(dataDir: config.dataDir);
+    }
 
     final webSource = webDir != null
         ? ', web UI from $webDir'
@@ -326,14 +311,14 @@ class AppServer implements ServerControl {
         ? ', embedded web UI'
         : '';
     info('Listening on http://${config.host}:${http.port}$webSource');
-    if (config.needsSetup) {
+    if (server._needsSetup) {
       info(
-        'Not set up yet (Schulportal login or web UI password missing). '
+        'Not set up yet (Schulportal account or web UI password missing). '
         'Setup page: ${server.setupUrl}',
       );
     } else {
       server._logStatus();
-      sync.start();
+      server._startSyncs();
     }
     update.start();
     return server;
@@ -430,20 +415,22 @@ class AppServer implements ServerControl {
   /// Name and id of an account for notifications; null while there is only
   /// one account (nothing to tell apart).
   ({String name, String id})? _label(String id) {
-    if (_children.isEmpty) return null;
-    final name = id == AccountConfig.mainId
-        ? _config.displayName
-        : _children[id]?.config.name ?? '';
-    return (name: name, id: id);
+    if (_accounts.length < 2) return null;
+    return (name: _accounts[id]?.config.name ?? '', id: id);
   }
+
+  /// No account or no web UI password yet.
+  bool get _needsSetup => _config.needsSetup || _accounts.isEmpty;
 
   void _info(String m) => _log('${DateTime.now().toIso8601String()} $m', false);
 
   void _logStatus() {
     final c = _config;
-    _info('Schulportal: school ${c.sph.schoolId}, user ${c.sph.username}');
-    if (_children.isNotEmpty) {
-      _info('Further accounts: ${_children.length}');
+    for (final a in _accounts.values) {
+      _info(
+        'Schulportal account: school ${a.config.sph.schoolId}, '
+        'user ${a.config.sph.username}',
+      );
     }
     final sc = c.sync;
     if (sc.enabled) {
@@ -456,10 +443,9 @@ class AppServer implements ServerControl {
     } else {
       _info('Background sync disabled (SYNC=false): data is loaded on demand');
     }
-    final poller = _api.poller;
-    if (poller != null) {
+    if (c.ntfy != null && c.poller.kinds.isNotEmpty) {
       _info(
-        'Notifications via ${poller.notifier.description}: '
+        'Notifications via ${c.ntfy!.server.host}: '
         '${c.poller.kinds.map((k) => k.name).join(', ')}'
         '${sc.enabled ? '' : ' (only on manual refresh, SYNC=false)'}',
       );
@@ -471,7 +457,7 @@ class AppServer implements ServerControl {
   // --- ServerControl -----------------------------------------------------------
 
   @override
-  bool get setupRequired => _config.needsSetup;
+  bool get setupRequired => _needsSetup;
 
   @override
   bool checkSetupToken(String? token) => _setupToken?.matches(token) ?? false;
@@ -487,9 +473,6 @@ class AppServer implements ServerControl {
     }
 
     final values = <String, Object?>{
-      'ACCOUNT_NAME': c.accountName,
-      'SPH_SCHOOL_ID': c.sph.schoolId,
-      'SPH_USERNAME': c.sph.username,
       'SYNC': c.sync.enabled,
       'POLL_INTERVAL_MINUTES': c.sync.interval.inMinutes,
       'GRADES_INTERVAL_MINUTES': c.sync.detailsInterval.inMinutes,
@@ -507,39 +490,19 @@ class AppServer implements ServerControl {
       'TRUST_PROXY': c.trustProxy,
       'OPEN_BROWSER': c.openBrowser,
       'UPDATE_CHECK': c.updateCheck,
-      'CASEDA_URL':
-          c.caseda?.url.toString() ??
-          raw('CASEDA_URL') ??
-          'https://www.caseda-schulmenue.de',
-      // Switched off keeps the stored login (shown below).
-      'CASEDA_ENABLED': c.caseda != null,
-      'CASEDA_USERNAME': c.caseda?.username ?? raw('CASEDA_USERNAME') ?? '',
       'CASEDA_BALANCE_WARNING': (c.mealsBalanceWarningCents / 100)
           .toStringAsFixed(2)
           .replaceAll('.', ','),
-      'UNTIS_ENABLED': c.untis != null,
-      'UNTIS_SERVER': c.untis?.server ?? raw('UNTIS_SERVER') ?? '',
-      'UNTIS_SCHOOL': c.untis?.school ?? raw('UNTIS_SCHOOL') ?? '',
-      'UNTIS_USERNAME': c.untis?.username ?? raw('UNTIS_USERNAME') ?? '',
     };
     return {
-      'setupRequired': c.needsSetup,
+      'setupRequired': _needsSetup,
       'values': values,
       'secrets': {
-        'SPH_PASSWORD': c.sph.password.isNotEmpty,
         'NTFY_TOKEN': (c.ntfy?.token ?? '').isNotEmpty,
         'APP_PASSWORD': c.appPasswordHash.isNotEmpty,
-        'CASEDA_PASSWORD': raw('CASEDA_PASSWORD') != null,
-        'UNTIS_PASSWORD': raw('UNTIS_PASSWORD') != null,
       },
       'sources': {
-        for (final k in [
-          ...values.keys,
-          'SPH_PASSWORD',
-          'NTFY_TOKEN',
-          'CASEDA_PASSWORD',
-          'UNTIS_PASSWORD',
-        ])
+        for (final k in [...values.keys, 'NTFY_TOKEN'])
           k: web.containsKey(k)
               ? 'web'
               : _base.containsKey(k)
@@ -564,61 +527,6 @@ class AppServer implements ServerControl {
   }
 
   @override
-  Future<void> testLogin({
-    required int schoolId,
-    required String username,
-    String? password,
-  }) async {
-    final pw = password ?? _config.sph.password;
-    final probe = SphService(_gateway(SphCredentials(schoolId, username, pw)));
-    try {
-      await probe.account();
-    } finally {
-      await probe.dispose();
-    }
-  }
-
-  @override
-  Future<void> testCasedaLogin({
-    required String username,
-    String? password,
-    String? url,
-  }) async {
-    final base = url == null
-        ? _config.caseda?.url ?? Uri.parse('https://www.caseda-schulmenue.de')
-        : Uri.tryParse(url);
-    if (base == null || !base.isScheme('https') || base.host.isEmpty) {
-      throw ArgumentError('url must be an https URL');
-    }
-    final pw = password ?? _config.caseda?.password ?? '';
-    await _mealsGateway(
-      CasedaConfig(url: base, username: username, password: pw),
-    ).load(DateTime.now());
-  }
-
-  @override
-  Future<String> testUntisLogin({
-    required String server,
-    required String username,
-    String? password,
-    String? school,
-  }) async {
-    final host = UntisConfig.parseServer(server);
-    if (host == null) {
-      throw ArgumentError('server must be a host name like xyz.webuntis.com');
-    }
-    final snap = await _untisGateway(
-      UntisConfig(
-        server: host,
-        school: school ?? host.split('.').first,
-        username: username,
-        password: password ?? _config.untis?.password ?? '',
-      ),
-    ).load(DateTime.now());
-    return snap.className;
-  }
-
-  @override
   Future<ApplyResult> apply(Map<String, String> changes) =>
       _exclusive(() => _apply(changes));
 
@@ -631,6 +539,7 @@ class AppServer implements ServerControl {
 
   Future<ApplyResult> _apply(Map<String, String> changes) async {
     final previous = _config;
+    final wasSetup = _needsSetup;
     final web = {..._web.load(), ...changes};
     final next = AppConfig.fromEnv(_merge(_base, web));
     if (next.port != previous.port) {
@@ -638,144 +547,57 @@ class AppServer implements ServerControl {
       if (problem != null) throw ConfigException([problem]);
     }
 
-    final p = previous.sph, n = next.sph;
-    final accountChanged =
-        p.schoolId != n.schoolId ||
-        p.username.toLowerCase() != n.username.toLowerCase();
-    final credentialsChanged = accountChanged || p.password != n.password;
-    if (credentialsChanged) {
-      await testLogin(
-        schoolId: n.schoolId,
-        username: n.username,
-        password: n.password,
-      );
-    }
-
-    final pc = previous.caseda, nc = next.caseda;
-    final casedaChanged =
-        pc?.url != nc?.url ||
-        pc?.username != nc?.username ||
-        pc?.password != nc?.password;
-    if (nc != null && casedaChanged) {
-      await _mealsGateway(nc).load(DateTime.now());
-    }
-    if (pc?.url != nc?.url ||
-        pc?.username.toLowerCase() != nc?.username.toLowerCase()) {
-      _cache.remove(CacheKeys.meals); // another Caseda account (or none)
-    }
-
-    final pu = previous.untis, nu = next.untis;
-    if (nu != null &&
-        (pu?.server != nu.server ||
-            pu?.school != nu.school ||
-            pu?.username != nu.username ||
-            pu?.password != nu.password)) {
-      await _untisGateway(nu).load(DateTime.now());
-    }
-    if (pu?.server != nu?.server ||
-        pu?.school != nu?.school ||
-        pu?.username.toLowerCase() != nu?.username.toLowerCase()) {
-      _cache.remove(CacheKeys.untis); // another account (or switched off)
-    }
-
     _web.save(web);
-    final wasSetup = previous.needsSetup;
-    await _reconfigure(
-      next,
-      newService: credentialsChanged || wasSetup,
-      resetData: accountChanged && !wasSetup,
-    );
-    if (wasSetup) {
-      _setupToken?.discard();
-      _setupToken = null;
-      _info('Setup done');
-    }
+    await _reconfigure(next);
+    _checkSetupDone(wasSetup);
     _info('Settings changed: ${changes.keys.join(', ')}');
-    return ApplyResult(
-      restartRequired: _pendingRestart(next),
-      accountChanged: accountChanged,
-    );
+    return ApplyResult(restartRequired: _pendingRestart(next));
   }
 
-  Future<void> _reconfigure(
-    AppConfig next, {
-    required bool newService,
-    required bool resetData,
-  }) async {
-    await _sync.stop();
-    if (newService) {
-      await _service.dispose();
-      _service = SphService(_gateway(next.sph));
-    }
-    if (resetData) {
-      // Another account: nothing of the old one may show up.
-      _cache.clear();
-      _db.resetPortalState();
-    }
-    _sync = _createSync(
-      _service,
-      _cache,
-      _db,
-      next,
-      next.caseda,
-      next.untis,
-      _info,
-      _mealsGateway,
-      _untisGateway,
-    );
-    _api
-      ..service = _service
-      ..sync = _sync
-      ..poller = _createPoller(
-        _sync,
-        _db,
-        _api.settings,
-        next,
-        _info,
-        () => _label(AccountConfig.mainId),
-      )
-      ..meals = next.caseda == null ? null : _mealsGateway(next.caseda!)
-      ..mealsBalanceWarningCents = next.mealsBalanceWarningCents
-      ..untisEnabled = next.untis != null
-      ..passwordHash = next.appPasswordHash;
+  /// Applies a new configuration: every account gets a new sync and
+  /// notifications (schedule, ntfy, …).
+  Future<void> _reconfigure(AppConfig next) async {
+    _api.passwordHash = next.appPasswordHash;
     _update.checkEnabled = next.updateCheck;
     _config = next;
-    for (final child in _children.values) {
-      await _rebuildChild(child);
+    for (final account in _accounts.values) {
+      await account.sync.stop();
+      _wire(account);
     }
-    if (!next.needsSetup) {
+    if (!_needsSetup) {
       _logStatus();
-      _sync.start();
-      _startChildSyncs();
+      _startSyncs();
     }
   }
 
-  // --- further accounts (children) -----------------------------------------------
-
-  /// Sets up the stored further accounts (no login yet) and starts their
-  /// sync, spread over time so the portal does not get all requests at once.
-  void _startChildren() {
-    for (final c in _accountStore.load()) {
-      _children[c.id] = _createChild(c);
-    }
-    if (!_config.needsSetup) _startChildSyncs();
+  /// Leaves setup mode once an account and the web UI password exist.
+  void _checkSetupDone(bool wasSetup) {
+    if (!wasSetup || _needsSetup) return;
+    _setupToken?.discard();
+    _setupToken = null;
+    _info('Setup done');
+    _logStatus();
+    _startSyncs();
   }
 
-  void _startChildSyncs() {
-    var i = 1;
-    for (final child in _children.values) {
-      child.sync.start(firstDelay: Duration(seconds: 5 + 20 * i++));
+  /// Starts the sync of all accounts, one after the other so the portal does
+  /// not get all requests at once.
+  void _startSyncs() {
+    var i = 0;
+    for (final account in _accounts.values) {
+      account.sync.start(firstDelay: Duration(seconds: 5 + 20 * i++));
     }
   }
 
-  _Child _createChild(AccountConfig c) {
+  // --- accounts (children) -----------------------------------------------------
+
+  _Account _createAccount(AccountConfig c) {
     final service = SphService(_gateway(c.sph));
     final cache = Api.createCache(
       store: ScopedCacheStore(_db, scopePrefix(c.id)),
     );
     final api =
         Api(
-            accountId: c.id,
             service: service,
             passwordHash: _config.appPasswordHash,
             sessions: _api.sessions,
@@ -786,17 +608,17 @@ class AppServer implements ServerControl {
           ..control = this
           ..update = _update;
     _api.children[c.id] = api;
-    return _wireChild(_Child(c, service, cache, api));
+    return _wire(_Account(c, service, cache, api));
   }
 
-  /// (Re)creates sync and notifications of [child] from the current
+  /// (Re)creates sync and notifications of [account] from the current
   /// configuration; the old sync must be stopped before.
-  _Child _wireChild(_Child child) {
-    final c = child.config;
-    final state = ScopedState(_db, child.prefix);
-    child.sync = _createSync(
-      child.service,
-      child.cache,
+  _Account _wire(_Account account) {
+    final c = account.config;
+    final state = ScopedState(_db, account.prefix);
+    account.sync = _createSync(
+      account.service,
+      account.cache,
       state,
       _config,
       c.caseda,
@@ -805,13 +627,13 @@ class AppServer implements ServerControl {
       _mealsGateway,
       _untisGateway,
     );
-    child.api
-      ..service = child.service
-      ..sync = child.sync
+    account.api
+      ..service = account.service
+      ..sync = account.sync
       ..poller = _createPoller(
-        child.sync,
+        account.sync,
         state,
-        child.api.settings,
+        account.api.settings,
         _config,
         _info,
         () => _label(c.id),
@@ -819,29 +641,27 @@ class AppServer implements ServerControl {
       ..meals = c.caseda == null ? null : _mealsGateway(c.caseda!)
       ..mealsBalanceWarningCents = _config.mealsBalanceWarningCents
       ..untisEnabled = c.untis != null;
-    return child;
-  }
-
-  Future<void> _rebuildChild(_Child child) async {
-    await child.sync.stop();
-    _wireChild(child);
+    return account;
   }
 
   @override
   List<Map<String, Object?>> listAccounts() => [
-    {
-      'id': AccountConfig.mainId,
-      'name': _config.displayName,
-      'primary': true,
-      'schoolId': _config.sph.schoolId,
-      'username': _config.sph.username,
-    },
-    for (final c in _children.values) c.config.describe(),
+    for (final a in _accounts.values) a.config.describe(),
   ];
 
   static bool _sameLogin(SphCredentials a, SphCredentials b) =>
       a.schoolId == b.schoolId &&
       a.username.toLowerCase() == b.username.toLowerCase();
+
+  /// Tries a Schulportal login (new or changed credentials).
+  Future<void> _testLogin(SphCredentials credentials) async {
+    final probe = SphService(_gateway(credentials));
+    try {
+      await probe.account();
+    } finally {
+      await probe.dispose();
+    }
+  }
 
   /// Tries the logins of [next] that are new or changed against [previous].
   Future<void> _verifyLogins(
@@ -853,11 +673,7 @@ class AppServer implements ServerControl {
         p.schoolId != n.schoolId ||
         p.username != n.username ||
         p.password != n.password) {
-      await testLogin(
-        schoolId: n.schoolId,
-        username: n.username,
-        password: n.password,
-      );
+      await _testLogin(n);
     }
     final pc = previous?.caseda, nc = next.caseda;
     if (nc != null &&
@@ -877,37 +693,35 @@ class AppServer implements ServerControl {
   }
 
   void _checkNotDuplicate(AccountConfig next) {
-    final others = [
-      if (next.id != AccountConfig.mainId) _config.sph,
-      for (final c in _children.values)
-        if (c.config.id != next.id) c.config.sph,
-    ];
-    if (others.any((o) => _sameLogin(o, next.sph))) {
-      throw const ConfigException([
-        'This Schulportal account is already set up',
-      ]);
+    for (final a in _accounts.values) {
+      if (a.config.id != next.id && _sameLogin(a.config.sph, next.sph)) {
+        throw const ConfigException([
+          'This Schulportal account is already set up',
+        ]);
+      }
     }
   }
 
   @override
   Future<Map<String, Object?>> addAccount(Map<String, Object?> data) =>
       _exclusive(() async {
-        final list = _accountStore.load();
-        if (list.length >= AccountConfig.maxAccounts) {
+        final wasSetup = _needsSetup;
+        if (_accounts.length >= AccountConfig.maxAccounts) {
           throw const ConfigException([
-            'At most ${AccountConfig.maxAccounts} further accounts',
+            'At most ${AccountConfig.maxAccounts} accounts',
           ]);
         }
         final cfg = AccountConfig.parse(
           data,
-          id: AccountConfig.newId({for (final a in list) a.id}),
+          id: AccountConfig.newId(_accounts.keys.toSet()),
         );
         _checkNotDuplicate(cfg);
         await _verifyLogins(cfg, null);
-        _accountStore.save([...list, cfg]);
-        final child = _children[cfg.id] = _createChild(cfg);
-        if (!_config.needsSetup) child.sync.start();
+        _accountStore.save([for (final a in _accounts.values) a.config, cfg]);
+        final account = _accounts[cfg.id] = _createAccount(cfg);
         _info('Account added: ${cfg.name}');
+        if (!_needsSetup) account.sync.start();
+        _checkSetupDone(wasSetup);
         return cfg.describe();
       });
 
@@ -916,20 +730,9 @@ class AppServer implements ServerControl {
     String id,
     Map<String, Object?> data,
   ) => _exclusive(() async {
-    if (id == AccountConfig.mainId) {
-      if (data.keys.any((k) => k != 'name')) {
-        throw const ConfigException([
-          'Only the name of the first account can be changed here '
-              '(settings page)',
-        ]);
-      }
-      final name = '${data['name'] ?? ''}'.trim();
-      await _apply({'ACCOUNT_NAME': name});
-      return listAccounts().first;
-    }
-    final child = _children[id];
-    if (child == null) throw const AccountNotFound();
-    final previous = child.config;
+    final account = _accounts[id];
+    if (account == null) throw const AccountNotFound();
+    final previous = account.config;
     final next = AccountConfig.parse(data, id: id, base: previous);
     _checkNotDuplicate(next);
     await _verifyLogins(next, previous);
@@ -939,56 +742,51 @@ class AppServer implements ServerControl {
         p.schoolId != n.schoolId ||
         p.username != n.username ||
         p.password != n.password;
-    await child.sync.stop();
+    await account.sync.stop();
     if (!_sameLogin(p, n)) {
       // Another person: nothing of the old account may show up.
-      child.cache.clear();
-      _db.resetPortalState(child.prefix);
+      account.cache.clear();
+      _db.resetPortalState(account.prefix);
     }
     if (previous.caseda?.url != next.caseda?.url ||
         previous.caseda?.username.toLowerCase() !=
             next.caseda?.username.toLowerCase()) {
-      child.cache.remove(CacheKeys.meals);
+      account.cache.remove(CacheKeys.meals);
     }
     if (previous.untis?.server != next.untis?.server ||
         previous.untis?.school != next.untis?.school ||
         previous.untis?.username.toLowerCase() !=
             next.untis?.username.toLowerCase()) {
-      child.cache.remove(CacheKeys.untis);
+      account.cache.remove(CacheKeys.untis);
     }
     if (newService) {
-      await child.service.dispose();
-      child.service = SphService(_gateway(n));
+      await account.service.dispose();
+      account.service = SphService(_gateway(n));
     }
-    child.config = next;
-    _accountStore.save([
-      for (final a in _accountStore.load()) a.id == id ? next : a,
-    ]);
-    _wireChild(child);
-    if (!_config.needsSetup) child.sync.start();
+    account.config = next;
+    _accountStore.save([for (final a in _accounts.values) a.config]);
+    _wire(account);
+    if (!_needsSetup) account.sync.start();
     _info('Account changed: ${next.name}');
     return next.describe();
   });
 
   @override
   Future<void> removeAccount(String id) => _exclusive(() async {
-    if (id == AccountConfig.mainId) {
-      throw ArgumentError('The first account cannot be removed');
+    final account = _accounts[id];
+    if (account == null) throw const AccountNotFound();
+    if (_accounts.length <= 1) {
+      throw ArgumentError('The last account cannot be removed');
     }
-    final child = _children[id];
-    if (child == null) throw const AccountNotFound();
-    await child.sync.stop();
-    await child.api.close();
-    await child.service.dispose();
-    await child.cache.close();
-    _db.resetPortalState(child.prefix);
-    _children.remove(id);
+    await account.sync.stop();
+    await account.api.close();
+    await account.service.dispose();
+    await account.cache.close();
+    _db.resetPortalState(account.prefix);
+    _accounts.remove(id);
     _api.children.remove(id);
-    _accountStore.save([
-      for (final a in _accountStore.load())
-        if (a.id != id) a,
-    ]);
-    _info('Account removed: ${child.config.name}');
+    _accountStore.save([for (final a in _accounts.values) a.config]);
+    _info('Account removed: ${account.config.name}');
   });
 
   @override
@@ -1012,13 +810,13 @@ class AppServer implements ServerControl {
     return io.serve(handler, host, port);
   }
 
-  /// Stops listening, the sync and the portal session; closes the database.
+  /// Stops listening, the sync and the portal sessions; closes the database.
   Future<void> stop() => _stopping ??= () async {
     await _applying;
     _update.stop();
     await _api.close(); // open event streams would keep the server open
-    for (final child in _children.values) {
-      await child.api.close();
+    for (final account in _accounts.values) {
+      await account.api.close();
     }
     await _http
         .close()
@@ -1027,13 +825,10 @@ class AppServer implements ServerControl {
           const Duration(seconds: 5),
           onTimeout: () => _http.close(force: true).then<void>((_) {}),
         );
-    await _sync.stop();
-    await _service.dispose();
-    await _cache.close();
-    for (final child in _children.values) {
-      await child.sync.stop();
-      await child.service.dispose();
-      await child.cache.close();
+    for (final account in _accounts.values) {
+      await account.sync.stop();
+      await account.service.dispose();
+      await account.cache.close();
     }
     _db.close();
   }();
