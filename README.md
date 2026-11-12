@@ -118,12 +118,28 @@ Alternatively, put `SPH_USERNAME`, `SPH_PASSWORD` and `APP_PASSWORD` into `serve
 accounts are managed in the web UI). Details: [server/README.md](server/README.md),
 [web/README.md](web/README.md), REST API: [docs/API.md](docs/API.md).
 
-UI development without Schulportal: `node dev/mock-server.mjs` (password `demo`;
-`MOCK_SETUP=1` shows the setup page, `MOCK_UPDATE=1` an available update, `MOCK_CHILDREN=1` a
-second child).
+UI development without Schulportal: `node dev/mock-server.mjs` (port 8090, password `demo`,
+invented data). Flags (environment variables) switch scenarios: `MOCK_SETUP=1` the setup page
+(`/einrichtung?token=demo-token`), `MOCK_UPDATE=1` an available update, `MOCK_CHILDREN=1` a
+second child, `MOCK_PARENT=1` a parent account, `MOCK_ABBREV=1` subject abbreviations like the
+real portal, `MOCK_STATUS=bad` a red status LED (default: one yellow), `MOCK_STALE=1` stale data.
 
 Debugging against the real services prints counts only: `dart run bin/sph.dart …`,
 `bin/caseda.dart --summary`, `bin/untis.dart --summary` (credentials in `server/.env`).
+
+### Checks
+
+CI runs these; run them before committing:
+
+```sh
+cd server
+dart format --output=none --set-exit-if-changed .
+dart analyze --fatal-infos
+dart test
+cd ..
+for f in web/js/*.js web/js/views/*.js dev/*.mjs; do node --check "$f"; done
+shellcheck -s bash deploy/*.sh
+```
 
 ## License
 
