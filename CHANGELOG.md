@@ -6,10 +6,13 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+## [0.21.0] – 2026-11-12
+
 ### Added
 - *Einstellungen → Update* shows that Lumo is free software under the GPL-3.0, with links to the
-  source code and the license (the Windows exe carried no license notice before). The releases now include the license notices
-  of the bundled packages (`THIRD-PARTY-LICENSES.txt`, also at `/THIRD-PARTY-LICENSES.txt` in the web UI).
+  source code and the license (the Windows exe carried no license notice before).
+- The releases include the license notices of the bundled packages (`THIRD-PARTY-LICENSES.txt`,
+  also at `/THIRD-PARTY-LICENSES.txt` in the web UI).
 
 ## [0.20.1] – 2026-11-11
 
@@ -528,7 +531,8 @@ First release.
 - LXC deployment: systemd unit with sandboxing, `install.sh` (install, update, rollback,
   configure, uninstall), release builds for Linux/Windows/macOS via GitHub Actions.
 
-[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/StefanRiese/lumo/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/StefanRiese/lumo/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/StefanRiese/lumo/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/StefanRiese/lumo/compare/v0.19.5...v0.20.0
 [0.19.5]: https://github.com/StefanRiese/lumo/compare/v0.19.4...v0.19.5
