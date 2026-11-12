@@ -6,6 +6,11 @@ Pushing a tag `vX.Y.Z` builds and publishes the release (see `deploy/README.md`)
 
 ## [Unreleased]
 
+### Added
+- *Einstellungen → Update* shows that Lumo is free software under the GPL-3.0, with links to the
+  source code and the license (the Windows exe carried no license notice before). The releases now include the license notices
+  of the bundled packages (`THIRD-PARTY-LICENSES.txt`, also at `/THIRD-PARTY-LICENSES.txt` in the web UI).
+
 ## [0.20.1] – 2026-11-11
 
 ### Fixed

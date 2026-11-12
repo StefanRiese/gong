@@ -8,7 +8,8 @@
 #   bash deploy/build-macos-app.sh dist/macos-arm64 dist/macos-x64
 #   → dist/lumo-macos-universal.zip (+ .sha256)
 #
-# Each input directory contains bin/server, lib/ (SQLite) and VERSION.
+# Each input directory contains bin/server, lib/ (SQLite), THIRD-PARTY-LICENSES.txt
+# and VERSION.
 # The app is signed ad hoc (no Apple Developer ID): on first start, open it
 # with right click → Öffnen.
 
@@ -73,6 +74,7 @@ sed -e "s/@VERSION@/$version/" -e "s/@SHORT_VERSION@/$short/" \
 plutil -lint "$contents/Info.plist"
 cp "$ROOT/deploy/desktop/MenuBarIcon.png" "$ROOT/deploy/desktop/MenuBarIcon@2x.png" "$contents/Resources/"
 cp "$ROOT/LICENSE" "$contents/Resources/"
+cp "${inputs[0]}/THIRD-PARTY-LICENSES.txt" "$contents/Resources/"
 echo "$version" > "$contents/Resources/VERSION"
 
 iconset="$work/AppIcon.iconset"

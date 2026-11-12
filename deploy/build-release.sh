@@ -6,10 +6,11 @@
 #              lib/                            bundled native libraries (SQLite)
 #              web/                            web UI
 #              deploy/                         systemd unit, install.sh, README
-#              config.env.example, LICENSE, VERSION
+#              config.env.example, LICENSE, THIRD-PARTY-LICENSES.txt, VERSION
 #   Windows: dist/lumo-windows-<arch>.exe (+ .sha256)
 #              single file: tray app with embedded web UI and icon, SQLite
-#              from Windows (winsqlite3.dll), no console window
+#              from Windows (winsqlite3.dll), no console window; the licenses of
+#              the packages are in the web UI (/THIRD-PARTY-LICENSES.txt)
 #   macOS:   dist/macos-<arch>/ (bin/server, lib/, VERSION) with embedded web UI;
 #              deploy/build-macos-app.sh turns one or two of these (arm64 + x64)
 #              into the (universal) app bundle
@@ -50,6 +51,7 @@ restore() {
   cp "$backup/pubspec.yaml" "$backup/pubspec.lock" .
   cp "$backup/build_info.g.dart" lib/src/desktop/
   rm -rf "$backup"
+  rm -f "$ROOT/web/THIRD-PARTY-LICENSES.txt"
 }
 trap restore EXIT
 
@@ -75,6 +77,9 @@ if [[ $os != linux ]]; then
 fi
 
 dart pub get
+# Licenses of the packages; in web/, so the web UI (also the one embedded in the
+# desktop builds) can show them. Generated, not committed.
+dart run tool/third_party_licenses.dart ../web/THIRD-PARTY-LICENSES.txt
 dart run tool/embed_assets.dart "${embed[@]}"
 rm -rf build/release
 dart build cli -t bin/server.dart -o build/release/server
@@ -105,6 +110,7 @@ case $os in
     mkdir -p "$out/bin" "$out/lib"
     cp build/release/server/bundle/bin/server "$out/bin/"
     cp -R build/release/server/bundle/lib/. "$out/lib/"
+    cp "$ROOT/web/THIRD-PARTY-LICENSES.txt" "$out/"
     echo "$version" > "$out/VERSION"
     echo "Created ${out#"$ROOT"/} (→ deploy/build-macos-app.sh)"
     exit 0
@@ -124,7 +130,7 @@ cp "$ROOT/deploy/lumo.service" "$ROOT/deploy/lumo-update.path" \
   "$ROOT/deploy/lumo-update.service" "$ROOT/deploy/install.sh" "$ROOT/deploy/README.md" "$STAGE/deploy/"
 chmod +x "$STAGE/deploy/install.sh"
 cp "$ROOT/server/.env.example" "$STAGE/config.env.example"
-cp "$ROOT/LICENSE" "$STAGE/"
+cp "$ROOT/LICENSE" "$ROOT/web/THIRD-PARTY-LICENSES.txt" "$STAGE/"
 echo "$version" > "$STAGE/VERSION"
 
 archive="$APP-$os-$arch.tar.gz"

@@ -455,7 +455,13 @@ export function updateGroup({ form, v, status }) {
 
   return group('update', status.available ? 'Update verfügbar' : 'Update', null,
     body, unsavedHint, auto.el, msg.el,
-    h('div', { class: 'button-row' }, install, check));
+    h('div', { class: 'button-row' }, install, check),
+    h('p', { class: 'muted' }, 'Lumo ist freie Software unter der GPL-3.0. ',
+      h('a', { href: 'https://github.com/StefanRiese/lumo', target: '_blank', rel: 'noopener' }, 'Quellcode'),
+      ' · ',
+      h('a', { href: 'https://github.com/StefanRiese/lumo/blob/main/LICENSE', target: '_blank', rel: 'noopener' }, 'Lizenz'),
+      ' · ',
+      h('a', { href: '/THIRD-PARTY-LICENSES.txt', target: '_blank', rel: 'noopener' }, 'Lizenzen der Bibliotheken')));
 }
 
 // --- Neustart ---------------------------------------------------------------------------------
